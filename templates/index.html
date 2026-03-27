@@ -47,6 +47,21 @@
                         </select>
                     </div>
                 </div>
+                <!-- APIキー設定 -->
+                <div id="apiKeySection" style="margin-bottom:1rem;padding:1rem;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+                        <label style="margin:0">SCRAPECREATORS APIキー（文字起こし用）</label>
+                        <span id="apiKeyStatus" style="font-size:.8rem"></span>
+                    </div>
+                    <div style="display:flex;gap:.5rem">
+                        <input type="password" id="apiKeyInput" placeholder="APIキーを入力（初回のみ）" style="flex:1">
+                        <button onclick="saveApiKey()" style="padding:.5rem 1rem;background:var(--cyan);color:#000;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:.85rem">保存</button>
+                    </div>
+                    <p style="font-size:.75rem;color:var(--dim);margin-top:.4rem">
+                        <a href="https://app.scrapecreators.com" target="_blank" style="color:var(--cyan)">app.scrapecreators.com</a> で無料取得（100回/月）。一度保存すれば次回以降は不要です。
+                    </p>
+                </div>
+
                 <button class="btn-primary" id="analyzeBtn" onclick="startAnalysis()">
                     分析を開始する
                 </button>

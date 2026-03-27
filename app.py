@@ -1,6 +1,7 @@
 """TikTok バイラル動画分析ツール - Webインターフェース."""
 
 import json
+import os
 import threading
 import uuid
 from pathlib import Path
@@ -22,6 +23,33 @@ app = Flask(__name__)
 
 # ジョブの進捗を管理
 jobs = {}
+
+# APIキーの保存先
+CONFIG_PATH = Path(__file__).parent / ".api_config.json"
+
+
+def load_api_key():
+    """保存されたAPIキーを読み込む."""
+    if CONFIG_PATH.exists():
+        try:
+            data = json.loads(CONFIG_PATH.read_text())
+            key = data.get("scrapecreators_api_key", "")
+            if key:
+                os.environ["SCRAPECREATORS_API_KEY"] = key
+            return key
+        except Exception:
+            pass
+    return os.environ.get("SCRAPECREATORS_API_KEY", "")
+
+
+def save_api_key(key):
+    """APIキーをファイルに保存する."""
+    CONFIG_PATH.write_text(json.dumps({"scrapecreators_api_key": key}))
+    os.environ["SCRAPECREATORS_API_KEY"] = key
+
+
+# 起動時にAPIキーを読み込む
+load_api_key()
 
 
 def run_analysis(job_id: str, account_url: str, min_views: int, whisper_model: str):
@@ -193,6 +221,22 @@ def job_status(job_id):
     if not job:
         return jsonify({"error": "ジョブが見つかりません"}), 404
     return jsonify(job)
+
+
+@app.route("/api/config", methods=["GET"])
+def get_config():
+    key = load_api_key()
+    return jsonify({"has_key": bool(key), "key_preview": key[:8] + "..." if len(key) > 8 else ""})
+
+
+@app.route("/api/config", methods=["POST"])
+def set_config():
+    data = request.get_json()
+    key = data.get("api_key", "").strip()
+    if not key:
+        return jsonify({"error": "APIキーを入力してください"}), 400
+    save_api_key(key)
+    return jsonify({"success": True, "message": "APIキーを保存しました"})
 
 
 if __name__ == "__main__":

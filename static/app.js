@@ -396,6 +396,47 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// APIキー管理
+function checkApiKey() {
+    fetch('/api/config')
+        .then(r => r.json())
+        .then(data => {
+            const status = document.getElementById('apiKeyStatus');
+            if (data.has_key) {
+                status.innerHTML = `<span style="color:var(--green)">✓ 設定済 (${data.key_preview})</span>`;
+                document.getElementById('apiKeyInput').placeholder = '設定済み（変更する場合のみ入力）';
+            } else {
+                status.innerHTML = '<span style="color:var(--accent)">✗ 未設定</span>';
+            }
+        })
+        .catch(() => {});
+}
+
+function saveApiKey() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    if (!key) { alert('APIキーを入力してください'); return; }
+
+    fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: key }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('apiKeyInput').value = '';
+            checkApiKey();
+            alert('APIキーを保存しました！');
+        } else {
+            alert(data.error || 'エラーが発生しました');
+        }
+    })
+    .catch(() => alert('保存に失敗しました'));
+}
+
+// ページ読み込み時にAPIキー確認
+checkApiKey();
+
 // Enterキーで分析開始
 document.getElementById('accountUrl').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') startAnalysis();
