@@ -263,7 +263,7 @@ async function generateAllImages(){
   if(!key){alert("APIキーを入力してください");return}
   if(!currentScenes.length)return;
   const prog=document.getElementById("progressCard"),msg=document.getElementById("progressMsg"),bar=document.getElementById("progressBar");
-  prog.classList.remove("hidden");document.getElementById("gallerySection").classList.add("hidden");imageResults=[];
+  prog.classList.remove("hidden");document.getElementById("gallerySection").classList.remove("hidden");document.getElementById("galleryGrid").innerHTML="";imageResults=[];
   for(let i=0;i<currentScenes.length;i++){
     msg.textContent=`画像生成中 (${i+1}/${currentScenes.length}) — ${currentScenes[i].speaker}`;
     bar.style.width=((i+1)/currentScenes.length*100)+"%";
@@ -272,18 +272,26 @@ async function generateAllImages(){
       const d=await r.json();let url="";
       if(d.error){
         if(d.error.message&&d.error.message.includes("Quota")){
-          msg.textContent=`レート制限...60秒待機中 (${currentScenes[i].speaker})`;
-          await new Promise(r=>setTimeout(r,60000));
+          msg.textContent=`レート制限...30秒待機中 (${currentScenes[i].speaker})`;
+          await new Promise(r=>setTimeout(r,30000));
           i--;continue;
         }
-        imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:false,url:"",err:d.error.message||"APIエラー"});continue
+        imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:false,url:"",err:d.error.message||"APIエラー"});
+        addToGallery(imageResults[imageResults.length-1]);continue
       }
       for(const c of(d.candidates||[]))for(const p of(c.content?.parts||[]))if(p.inlineData?.mimeType?.startsWith("image/")){url="data:"+p.inlineData.mimeType+";base64,"+p.inlineData.data;break}
       imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:!!url,url,err:url?"":"レスポンスに画像なし"});
-    }catch(e){imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:false,url:"",err:e.message})}
-    if(i<currentScenes.length-1){msg.textContent=`次の画像まで15秒待機中...`;await new Promise(r=>setTimeout(r,15000))}
+      addToGallery(imageResults[imageResults.length-1]);
+    }catch(e){imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:false,url:"",err:e.message});addToGallery(imageResults[imageResults.length-1])}
+    if(i<currentScenes.length-1){msg.textContent=`次の画像まで5秒待機中...`;await new Promise(r=>setTimeout(r,5000))}
   }
-  prog.classList.add("hidden");showGallery();
+  prog.classList.add("hidden");
+}
+function addToGallery(r){
+  const grid=document.getElementById("galleryGrid");
+  const d=document.createElement("div");d.className="gallery-card";
+  d.innerHTML=r.ok?`<img src="${r.url}"><div class="gallery-label"><span class="scene-num">#${r.n}</span>${esc(r.speaker)}</div>`:`<div class="gallery-err">${esc(r.err)}</div><div class="gallery-label">#${r.n} ${esc(r.speaker)}</div>`;
+  grid.appendChild(d);
 }
 function showGallery(){
   const g=document.getElementById("gallerySection"),grid=document.getElementById("galleryGrid");
