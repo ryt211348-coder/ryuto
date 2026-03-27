@@ -53,7 +53,7 @@ def transcribe_videos(
     transcript_dir: Path,
     video_ids: list[str],
     model_size: str = "base",
-) -> dict[str, str]:
+) -> "dict[str, str]":
     """複数の動画音声を一括文字起こしする."""
     transcript_dir.mkdir(parents=True, exist_ok=True)
     transcripts = {}

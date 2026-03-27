@@ -22,7 +22,7 @@ from tiktok_analyzer.analyzer import (
 app = Flask(__name__)
 
 # ジョブの進捗を管理
-jobs: dict[str, dict] = {}
+jobs = {}
 
 
 def run_analysis(job_id: str, account_url: str, min_views: int, whisper_model: str):

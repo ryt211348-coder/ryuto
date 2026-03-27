@@ -97,7 +97,7 @@ def analyze_ending(transcript: str) -> dict:
     return patterns
 
 
-def extract_phrases(transcript: str, min_len: int = 3, max_len: int = 15) -> list[str]:
+def extract_phrases(transcript: str, min_len: int = 3, max_len: int = 15) -> "list[str]":
     """台本からフレーズを抽出する."""
     # 句読点やスペースで分割
     parts = re.split(r"[。、！？!?\s\n,.]", transcript)

@@ -5,6 +5,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
+from typing import Optional
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -26,7 +27,7 @@ class VideoInfo:
     description: str
 
 
-def extract_account_videos(account_url: str) -> list[VideoInfo]:
+def extract_account_videos(account_url: str) -> "list[VideoInfo]":
     """yt-dlpでTikTokアカウントの全動画メタデータを取得する."""
     console.print(f"\n[bold cyan]アカウントから動画情報を取得中...[/bold cyan]")
     console.print(f"  URL: {account_url}\n")
@@ -86,7 +87,7 @@ def extract_account_videos(account_url: str) -> list[VideoInfo]:
     return videos
 
 
-def filter_viral_videos(videos: list[VideoInfo], min_views: int = 1_000_000) -> list[VideoInfo]:
+def filter_viral_videos(videos: list[VideoInfo], min_views: int = 1_000_000) -> "list[VideoInfo]":
     """指定再生数以上の動画をフィルタリングする."""
     viral = [v for v in videos if v.view_count >= min_views]
     viral.sort(key=lambda v: v.view_count, reverse=True)
@@ -106,7 +107,7 @@ def filter_viral_videos(videos: list[VideoInfo], min_views: int = 1_000_000) -> 
     return viral
 
 
-def download_video_audio(video: VideoInfo, output_dir: Path) -> Path | None:
+def download_video_audio(video: VideoInfo, output_dir: Path) -> Optional[Path]:
     """動画の音声をダウンロードする."""
     output_path = output_dir / f"{video.video_id}.mp3"
 
