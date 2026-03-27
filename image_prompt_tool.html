@@ -270,11 +270,18 @@ async function generateAllImages(){
     try{
       const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:"Generate this image:\n\n"+currentScenes[i].prompt}]}],generationConfig:{responseModalities:["IMAGE"]}})});
       const d=await r.json();let url="";
-      if(d.error){imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:false,url:"",err:d.error.message||"APIエラー"});continue}
+      if(d.error){
+        if(d.error.message&&d.error.message.includes("Quota")){
+          msg.textContent=`レート制限...60秒待機中 (${currentScenes[i].speaker})`;
+          await new Promise(r=>setTimeout(r,60000));
+          i--;continue;
+        }
+        imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:false,url:"",err:d.error.message||"APIエラー"});continue
+      }
       for(const c of(d.candidates||[]))for(const p of(c.content?.parts||[]))if(p.inlineData?.mimeType?.startsWith("image/")){url="data:"+p.inlineData.mimeType+";base64,"+p.inlineData.data;break}
       imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:!!url,url,err:url?"":"レスポンスに画像なし"});
     }catch(e){imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:false,url:"",err:e.message})}
-    if(i<currentScenes.length-1)await new Promise(r=>setTimeout(r,2000));
+    if(i<currentScenes.length-1){msg.textContent=`次の画像まで15秒待機中...`;await new Promise(r=>setTimeout(r,15000))}
   }
   prog.classList.add("hidden");showGallery();
 }
