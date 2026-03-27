@@ -34,9 +34,9 @@ async def _fetch_with_tiktokapi(username):
 
     videos_data = []
     async with TikTokApi() as api:
-        await api.create_sessions(num_sessions=1, sleep_after=3)
+        await api.create_sessions(num_sessions=1, sleep_after=5)
         user = api.user(username)
-        async for video in user.videos(count=100):
+        async for video in user.videos(count=300):
             vd = video.as_dict
             stats = vd.get("stats", {})
             desc = vd.get("desc", "")
