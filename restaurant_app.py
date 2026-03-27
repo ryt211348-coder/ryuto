@@ -14,6 +14,7 @@ from restaurant_finder.scorer import compute_overall_score, rank_restaurants
 app = Flask(__name__)
 
 
+@app.route("/")
 @app.route("/restaurant")
 def restaurant_index():
     """レストラン検索ページを表示."""
