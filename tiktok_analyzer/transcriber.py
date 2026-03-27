@@ -14,6 +14,21 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCo
 
 console = Console()
 
+# Whisperモデルのグローバルキャッシュ
+_whisper_model = None
+_whisper_model_size = None
+
+
+def _get_whisper_model(model_size="base"):
+    """Whisperモデルを取得（キャッシュ付き）."""
+    global _whisper_model, _whisper_model_size
+    if _whisper_model is None or _whisper_model_size != model_size:
+        import whisper
+        console.print(f"  [dim]Whisperモデル ({model_size}) をロード中...[/dim]")
+        _whisper_model = whisper.load_model(model_size)
+        _whisper_model_size = model_size
+    return _whisper_model
+
 
 def _try_scrapecreators(video_url, lang="ja"):
     """ScrapeCreators API でTikTokの字幕を取得する（無料100回）."""
@@ -205,8 +220,7 @@ def _try_whisper(video_url, output_dir, model_size="base"):
 
     # Whisper文字起こし
     try:
-        import whisper
-        model = whisper.load_model(model_size)
+        model = _get_whisper_model(model_size)
         result = model.transcribe(str(audio_path), language="ja", verbose=False)
         text = result.get("text", "")
         try:
@@ -326,10 +340,10 @@ def transcribe_videos(video_list, transcript_dir, whisper_model="base"):
             if text:
                 transcripts[video_id] = text
             progress.update(task, advance=1)
-            # TikTokのIPブロック回避: 動画間に3秒待機
+            # TikTokのIPブロック回避: 動画間に1秒待機
             if i < len(video_list) - 1:
                 import time as _time
-                _time.sleep(3)
+                _time.sleep(1)
 
     success = len(transcripts)
     total = len(video_list)
