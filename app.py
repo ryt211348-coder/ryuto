@@ -201,6 +201,11 @@ def build_result(videos, transcripts, analysis):
 
 @app.route("/")
 def index():
+    return render_template("planner.html")
+
+
+@app.route("/analyzer")
+def analyzer():
     return render_template("index.html")
 
 
