@@ -37,6 +37,9 @@ class AnalysisResult:
     appeal_types: list = field(default_factory=list)          # 訴求の種類（悩み解決/比較/ランキング等）
     emotional_triggers: list = field(default_factory=list)    # 感情トリガー
 
+    # === 台本構成詳細 ===
+    script_breakdowns: list = field(default_factory=list)   # 各動画の台本構成詳細
+
     # === 使用率 ===
     format_rates: dict = field(default_factory=dict)
     hook_technique_rates: dict = field(default_factory=dict)
@@ -121,6 +124,54 @@ STOPWORDS = {
     "本当に", "めちゃくちゃ", "かなり", "とても", "非常に",
     "やっぱり", "やはり", "実際に", "個人的に",
 }
+
+
+# 美容・コスメ系キーワード辞書（台本内から検出するワード）
+BEAUTY_KEYWORDS = [
+    # スキンケア
+    "美容液", "化粧水", "乳液", "クリーム", "洗顔", "クレンジング", "導入液",
+    "セラム", "エッセンス", "トナー", "ブースター", "オイル", "バーム",
+    "日焼け止め", "UVケア", "パック", "マスク", "ピーリング", "角質ケア",
+    # 肌悩み
+    "毛穴", "ニキビ", "シミ", "シワ", "たるみ", "くすみ", "乾燥", "テカリ",
+    "赤み", "肌荒れ", "敏感肌", "脂性肌", "混合肌", "乾燥肌", "インナードライ",
+    "黒ずみ", "角栓", "ほうれい線", "クマ", "そばかす", "肝斑",
+    # 成分
+    "ビタミンC", "ナイアシンアミド", "レチノール", "ヒアルロン酸", "セラミド",
+    "トラネキサム酸", "アゼライン酸", "BHA", "AHA", "CICA", "シカ",
+    "コラーゲン", "ペプチド", "グルタチオン", "アルブチン", "PDRN",
+    "エクソソーム", "グリセリン", "スクワラン", "プラセンタ",
+    # メイク
+    "ファンデーション", "下地", "コンシーラー", "パウダー", "チーク",
+    "アイシャドウ", "マスカラ", "アイライナー", "リップ", "グロス",
+    "ハイライト", "シェーディング", "ブラシ", "スポンジ", "プライマー",
+    # ヘアケア
+    "シャンプー", "トリートメント", "ヘアオイル", "ヘアケア", "頭皮",
+    # 効果・テクスチャ
+    "保湿", "美白", "エイジングケア", "ハリ", "弾力", "透明感", "ツヤ",
+    "鎮静", "抗炎症", "抗酸化", "ターンオーバー", "バリア機能",
+    "浸透", "密着", "カバー力", "持ち", "崩れにくい", "低刺激",
+    "みずみずしい", "さっぱり", "しっとり", "もちもち", "サラサラ",
+    # ブランド・ショップ
+    "韓国コスメ", "韓国スキンケア", "デパコス", "プチプラ", "ドラコス",
+    "Qoo10", "qoo10", "メガ割", "Amazon", "楽天",
+    # 施術
+    "ダーマペン", "フォトフェイシャル", "レーザー", "ボトックス", "ハイフ",
+    # 一般的な企画キーワード
+    "コスパ", "リピート", "殿堂入り", "ベスコス", "新作", "新発売",
+    "限定", "廃盤", "リニューアル", "大容量", "ミニサイズ", "サンプル",
+    "朝ケア", "夜ケア", "スキンケア", "保湿力", "洗浄力",
+]
+
+
+def _extract_keywords(transcript):
+    """台本から意味のあるキーワードを抽出する."""
+    found = []
+    for kw in BEAUTY_KEYWORDS:
+        count = len(re.findall(re.escape(kw), transcript, re.IGNORECASE))
+        if count > 0:
+            found.extend([kw] * count)
+    return found
 
 
 def _is_stopword(phrase):
@@ -292,12 +343,9 @@ def analyze_viral_patterns(videos, transcripts):
         all_products.extend(products)
         analysis["products"] = products
 
-        # フレーズ抽出（ストップワード除外）
-        parts = re.split(r"[。、！？!?\s\n,.]", transcript)
-        for part in parts:
-            part = part.strip()
-            if 3 <= len(part) <= 20 and not _is_stopword(part):
-                all_phrases.append(part)
+        # キーワード抽出（美容・コンテンツ系の意味ある単語のみ）
+        keywords = _extract_keywords(transcript)
+        all_phrases.extend(keywords)
 
         video_analyses.append(analysis)
         result.hook_patterns.append(analysis)
@@ -321,6 +369,20 @@ def analyze_viral_patterns(videos, transcripts):
 
     # === 台本構成集計 ===
     result.structure_patterns = structure_counter.most_common(10)
+
+    # === 台本構成詳細（各動画の導入→本題→締め） ===
+    for a in sorted(video_analyses, key=lambda x: x["views"], reverse=True)[:10]:
+        s = a.get("structure", {})
+        if s:
+            result.script_breakdowns.append({
+                "video_id": a["video_id"],
+                "views": a["views"],
+                "hook": a.get("hook_text", "")[:60],
+                "body": s.get("body_text", "")[:80],
+                "ending": a.get("ending_text", "")[:60],
+                "patterns": s.get("patterns", []),
+                "total_length": s.get("total_length", 0),
+            })
 
     # === フック手法の使用率（排他分類・合計100%） ===
     if transcribed_count > 0:

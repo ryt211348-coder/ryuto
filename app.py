@@ -143,6 +143,7 @@ def build_result(videos, transcripts, analysis):
         "appeal_types": [{"name": n, "count": c} for n, c in analysis.appeal_types],
         "emotional_triggers": [{"name": n, "count": c} for n, c in analysis.emotional_triggers],
         "structure_patterns": [{"name": n, "count": c} for n, c in analysis.structure_patterns],
+        "script_breakdowns": analysis.script_breakdowns,
         "hook_technique_rates": analysis.hook_technique_rates,
         "product_mentions": [{"name": n, "count": c} for n, c in analysis.product_mentions[:20]],
         "top_insights": analysis.top_performing_insights,

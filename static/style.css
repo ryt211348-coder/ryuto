@@ -404,13 +404,14 @@ body {
 
 .duration-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--purple));
+    background: linear-gradient(90deg, #6366f1, #818cf8);
     border-radius: 4px;
     display: flex;
     align-items: center;
     padding-left: 0.5rem;
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: 700;
+    color: #000;
     min-width: fit-content;
     transition: width 0.6s ease-out;
 }

@@ -123,6 +123,7 @@ function showResults(result) {
     renderAppeals(result.appeal_types, result.emotional_triggers);
     renderHookRates(result.hook_technique_rates);
     renderStructure(result.structure_patterns);
+    renderScriptBreakdowns(result.script_breakdowns);
     renderHooks(result.hooks);
     renderProducts(result.product_mentions);
     renderPhrases(result.phrases);
@@ -157,7 +158,7 @@ function renderBarChart(containerId, title, items, colorStart, colorEnd) {
         html += `<div class="duration-row">
             <span class="duration-label" style="width:140px;text-align:left">${item.name}</span>
             <div class="duration-bar-bg">
-                <div class="duration-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${colorStart},${colorEnd})">${item.count}本</div>
+                <div class="duration-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${colorStart},${colorEnd});color:#000;font-weight:700">${item.count}本</div>
             </div>
         </div>`;
     });
@@ -166,7 +167,7 @@ function renderBarChart(containerId, title, items, colorStart, colorEnd) {
 }
 
 function renderFormats(formats, insights) {
-    renderBarChart('formatsChart', '企画フォーマット（どんな形式の動画が伸びているか）', formats, 'var(--accent)', 'var(--purple)');
+    renderBarChart('formatsChart', '企画フォーマット（どんな形式の動画が伸びているか）', formats, '#7c3aed', '#a78bfa');
 
     const container = document.getElementById('topInsights');
     if (!insights || !insights.length) { container.innerHTML = ''; return; }
@@ -185,8 +186,8 @@ function renderFormats(formats, insights) {
 }
 
 function renderAppeals(appeals, emotions) {
-    renderBarChart('appealsChart', '訴求パターン（どんな切り口で視聴者を惹きつけているか）', appeals, 'var(--cyan)', 'var(--green)');
-    renderBarChart('emotionsChart', '感情トリガー（どの感情に訴えかけているか）', emotions, 'var(--yellow)', 'var(--accent)');
+    renderBarChart('appealsChart', '訴求パターン（どんな切り口で視聴者を惹きつけているか）', appeals, '#0891b2', '#22d3ee');
+    renderBarChart('emotionsChart', '感情トリガー（どの感情に訴えかけているか）', emotions, '#b45309', '#f59e0b');
 }
 
 function renderHookRates(rates) {
@@ -207,7 +208,39 @@ function renderHookRates(rates) {
 }
 
 function renderStructure(patterns) {
-    renderBarChart('structureChart', '台本構成パターン', patterns, 'var(--purple)', 'var(--cyan)');
+    renderBarChart('structureChart', '台本構成パターン', patterns, '#6366f1', '#818cf8');
+}
+
+function renderScriptBreakdowns(breakdowns) {
+    const container = document.getElementById('structureChart');
+    if (!breakdowns || !breakdowns.length) return;
+
+    let html = container.innerHTML;
+    html += '<div class="card" style="margin-top:1rem"><h3 style="font-size:.95rem;color:var(--text);margin-bottom:1rem">台本構成の詳細（再生数上位）</h3>';
+    breakdowns.forEach(b => {
+        const pats = (b.patterns || []).map(p => `<span class="badge badge-keyword" style="padding:.15rem .5rem">${p}</span>`).join(' ');
+        html += `<div style="background:var(--bg);border-radius:8px;padding:1rem;margin-bottom:.75rem;border-left:3px solid var(--cyan)">
+            <div style="display:flex;justify-content:space-between;margin-bottom:.5rem">
+                <span style="color:var(--cyan);font-weight:600">${formatNumber(b.views)}再生</span>
+                <span style="color:var(--dim);font-size:.8rem">${b.total_length}文字</span>
+            </div>
+            <div style="margin-bottom:.4rem">
+                <span style="color:var(--yellow);font-size:.75rem;font-weight:600">導入</span>
+                <span style="font-size:.85rem;margin-left:.5rem">「${escapeHtml(b.hook)}」</span>
+            </div>
+            <div style="margin-bottom:.4rem">
+                <span style="color:var(--green);font-size:.75rem;font-weight:600">本題</span>
+                <span style="font-size:.85rem;margin-left:.5rem">「${escapeHtml(b.body)}」</span>
+            </div>
+            <div style="margin-bottom:.4rem">
+                <span style="color:var(--accent);font-size:.75rem;font-weight:600">締め</span>
+                <span style="font-size:.85rem;margin-left:.5rem">「${escapeHtml(b.ending)}」</span>
+            </div>
+            ${pats ? `<div style="margin-top:.3rem">${pats}</div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 function renderProducts(products) {
@@ -275,16 +308,16 @@ function renderHooks(hooks) {
 function renderPhrases(phrases) {
     const container = document.getElementById('phrasesList');
     if (!phrases || !phrases.length) {
-        container.innerHTML = '<p style="color:var(--text-dim)">頻出フレーズがありません</p>';
+        container.innerHTML = '<p style="color:var(--dim)">頻出キーワードなし</p>';
         return;
     }
 
-    container.innerHTML = phrases.map(p =>
-        `<div class="phrase-row">
-            <span class="phrase-count">${p.count}</span>
-            <span class="phrase-text">${escapeHtml(p.phrase)}</span>
-        </div>`
-    ).join('');
+    let html = '<div class="card"><h3 style="font-size:.95rem;color:var(--text);margin-bottom:1rem">頻出キーワード</h3>';
+    phrases.forEach(p => {
+        html += `<span style="display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:.3rem .8rem;margin:.2rem .3rem;font-size:.85rem">${escapeHtml(p.phrase)} <span style="color:var(--cyan);font-weight:600">${p.count}</span></span>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 function renderVideos(videos) {
