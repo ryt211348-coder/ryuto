@@ -30,6 +30,10 @@ from tiktok_analyzer.researcher import (
     get_video_transcript,
     get_account_info,
     format_account_for_display,
+    discover_trending_keywords,
+    score_videos_by_engagement,
+    analyze_account_personality,
+    format_trend_keyword_for_display,
 )
 
 app = Flask(__name__)
@@ -261,48 +265,57 @@ def planner():
 planner_jobs = {}
 
 
-def run_research(job_id: str, keyword: str, min_views: int,
+def run_research(job_id: str, keywords: list, min_views: int,
                  hook_period_months: int, search_period_months: int,
                  max_plans: int, csv_content: str):
     """バックグラウンドでTikTokリサーチ→企画生成を実行する."""
     job = planner_jobs[job_id]
 
     try:
-        # Step 1: TikTok検索
+        # Step 1: 複数キーワードでTikTok検索
         job["status"] = "searching"
-        job["message"] = f"TikTokで「{keyword}」を検索中..."
-        videos = search_tiktok_videos(
-            keyword, min_views=min_views,
-            period_months=search_period_months, max_results=30,
-        )
+        all_videos = []
+        seen_ids = set()
 
-        if not videos:
+        for i, keyword in enumerate(keywords):
+            job["message"] = f"TikTokで「{keyword}」を検索中... ({i+1}/{len(keywords)})"
+            videos = search_tiktok_videos(
+                keyword, min_views=min_views,
+                period_months=search_period_months, max_results=20,
+            )
+            for v in videos:
+                if v.video_id not in seen_ids:
+                    all_videos.append(v)
+                    seen_ids.add(v.video_id)
+
+        if not all_videos:
             job["status"] = "error"
-            job["message"] = "動画が見つかりませんでした。キーワードを変えて試してください。"
+            job["message"] = "動画が見つかりませんでした。条件を緩めて試してください。"
             return
 
-        job["message"] = f"{len(videos)}本の動画を取得"
+        # エンゲージメントスコア付与
+        all_videos = score_videos_by_engagement(all_videos)
+        job["message"] = f"{len(all_videos)}本の動画を取得"
 
         # Step 2: 文字起こし取得
         job["status"] = "transcribing"
         job["progress"] = 0
-        job["total"] = len(videos)
-        job["message"] = f"文字起こし取得中 (0/{len(videos)})..."
+        job["total"] = len(all_videos)
 
-        for i, video in enumerate(videos):
+        for i, video in enumerate(all_videos):
             if not video.transcript:
                 transcript = get_video_transcript(video.url)
                 video.transcript = transcript
             job["progress"] = i + 1
-            job["message"] = f"文字起こし取得中 ({i + 1}/{len(videos)})..."
+            job["message"] = f"文字起こし取得中 ({i + 1}/{len(all_videos)})..."
 
-        transcribed = sum(1 for v in videos if v.transcript)
-        job["message"] = f"文字起こし完了: {transcribed}/{len(videos)}本"
+        transcribed = sum(1 for v in all_videos if v.transcript)
+        job["message"] = f"文字起こし完了: {transcribed}/{len(all_videos)}本"
 
         # Step 3: 分析
         job["status"] = "analyzing"
-        job["message"] = "フック・コンテンツを分析中..."
-        analysis = analyze_researched_videos(videos, hook_period_months=hook_period_months)
+        job["message"] = "フック・コンテンツ・エンゲージメントを分析中..."
+        analysis = analyze_researched_videos(all_videos, hook_period_months=hook_period_months)
 
         # Step 4: 企画生成
         job["status"] = "generating"
@@ -310,8 +323,11 @@ def run_research(job_id: str, keyword: str, min_views: int,
 
         # CSV参考台本のパース（オプション）
         reference_scripts = None
+        ref_style = {}
         if csv_content and csv_content.strip():
             reference_scripts = parse_csv(csv_content)
+            from tiktok_analyzer.planner import _extract_reference_style
+            ref_style = _extract_reference_style(reference_scripts)
 
         plans = generate_plans(analysis, reference_scripts=reference_scripts, max_plans=max_plans)
         plans_display = format_plans_for_display(plans)
@@ -322,6 +338,7 @@ def run_research(job_id: str, keyword: str, min_views: int,
         job["result"] = {
             "plans": plans_display,
             "summary": summary,
+            "reference_style": ref_style,
         }
 
     except Exception as e:
@@ -329,12 +346,32 @@ def run_research(job_id: str, keyword: str, min_views: int,
         job["message"] = f"エラーが発生しました: {str(e)}"
 
 
+@app.route("/api/planner/discover", methods=["POST"])
+def planner_discover():
+    """トレンドキーワードを自動発見する."""
+    data = request.get_json()
+    min_views = int(data.get("min_views", 500_000))
+    period_months = int(data.get("search_period_months", 6))
+
+    try:
+        keywords = discover_trending_keywords(
+            period_months=period_months,
+            min_views=min_views,
+            max_keywords=10,
+        )
+        return jsonify({
+            "keywords": [format_trend_keyword_for_display(kw) for kw in keywords],
+        })
+    except Exception as e:
+        return jsonify({"error": f"トレンド発見中にエラー: {str(e)}"}), 500
+
+
 @app.route("/api/planner/research", methods=["POST"])
 def planner_research():
     data = request.get_json()
-    keyword = data.get("keyword", "").strip()
-    if not keyword:
-        return jsonify({"error": "検索キーワードを入力してください"}), 400
+    keywords = data.get("keywords", [])
+    if not keywords:
+        return jsonify({"error": "キーワードを1つ以上選択してください"}), 400
 
     min_views = int(data.get("min_views", 500_000))
     hook_period_months = int(data.get("hook_period_months", 3))
@@ -352,7 +389,7 @@ def planner_research():
 
     thread = threading.Thread(
         target=run_research,
-        args=(job_id, keyword, min_views, hook_period_months,
+        args=(job_id, keywords, min_views, hook_period_months,
               search_period_months, max_plans, csv_content),
         daemon=True,
     )
@@ -379,6 +416,9 @@ def planner_account():
     account = get_account_info(account_url)
     if not account:
         return jsonify({"error": "アカウント情報を取得できませんでした"}), 404
+
+    # 属人性分析
+    account = analyze_account_personality(account)
 
     return jsonify({"account": format_account_for_display(account)})
 

@@ -50,6 +50,11 @@ class ReferenceScript:
     hook_text: str = ""
     topics: list = field(default_factory=list)
     structure: dict = field(default_factory=dict)
+    # リッチCSV用（分析メモ・声の雰囲気等）
+    analysis_note: str = ""        # 伸びた/伸びなかった理由
+    voice_style: str = ""          # 声の雰囲気メモ
+    is_successful: bool = False    # 伸びた動画かどうか
+    account_name: str = ""         # アカウント名（URLから抽出）
 
 
 @dataclass
@@ -78,42 +83,132 @@ class ScriptPlan:
 # ===== CSV参考台本パース =====
 
 def parse_csv(file_content: str) -> list[ReferenceScript]:
-    """CSVファイルを解析してReferenceScriptのリストを返す."""
+    """CSVファイルを解析してReferenceScriptのリストを返す.
+
+    ユーザーのCSVフォーマットに対応:
+    - 伸びていない動画テーブル（URL, 再生数, 伸びていない理由, キャラ雰囲気, 文字起こし）
+    - 伸びている動画テーブル（URL, 再生数, 伸びている理由, 声の雰囲気, 文字起こし）
+    - 総括メモ行
+    """
     scripts = []
 
     if file_content.startswith("\ufeff"):
         file_content = file_content[1:]
 
-    reader = csv.DictReader(io.StringIO(file_content))
-    if not reader.fieldnames:
-        return scripts
+    # 複数テーブルが同じCSV内にある場合を処理
+    # ヘッダー行を検出して分割
+    lines = file_content.split("\n")
+    tables = _split_csv_tables(lines)
 
-    col_map = _detect_columns(reader.fieldnames)
+    for table_lines, table_type in tables:
+        if not table_lines:
+            continue
 
-    for row in reader:
-        script = ReferenceScript()
+        table_content = "\n".join(table_lines)
+        reader = csv.DictReader(io.StringIO(table_content))
+        if not reader.fieldnames:
+            continue
 
-        if col_map.get("url"):
-            script.url = row.get(col_map["url"], "").strip()
-        if col_map.get("transcript"):
-            script.transcript = row.get(col_map["transcript"], "").strip()
-        if col_map.get("views"):
-            script.views = _parse_number(row.get(col_map["views"], "0"))
-        if col_map.get("date"):
-            script.date = row.get(col_map["date"], "").strip()
-        if col_map.get("title"):
-            script.title = row.get(col_map["title"], "").strip()
-        if col_map.get("duration"):
-            script.duration = _parse_number(row.get(col_map["duration"], "0"))
+        col_map = _detect_columns(reader.fieldnames)
 
-        if script.transcript or script.title:
-            text = script.transcript or script.title
-            script.hook_text = text[:30].strip()
-            script.topics = _detect_topics(text)
-            script.structure = _analyze_structure(text)
-            scripts.append(script)
+        for row in reader:
+            script = ReferenceScript()
+
+            if col_map.get("url"):
+                script.url = row.get(col_map["url"], "").strip()
+            if col_map.get("transcript"):
+                script.transcript = row.get(col_map["transcript"], "").strip()
+            if col_map.get("views"):
+                script.views = _parse_number(row.get(col_map["views"], "0"))
+            if col_map.get("date"):
+                script.date = row.get(col_map["date"], "").strip()
+            if col_map.get("title"):
+                script.title = row.get(col_map["title"], "").strip()
+            if col_map.get("duration"):
+                script.duration = _parse_number(row.get(col_map["duration"], "0"))
+
+            # リッチCSV用フィールド
+            if col_map.get("analysis"):
+                script.analysis_note = row.get(col_map["analysis"], "").strip()
+            if col_map.get("voice"):
+                script.voice_style = row.get(col_map["voice"], "").strip()
+
+            # テーブルタイプから成功/失敗を判定
+            script.is_successful = (table_type == "success")
+
+            # URLからアカウント名を抽出
+            if script.url and "tiktok.com/@" in script.url:
+                m = re.search(r'tiktok\.com/@([\w.]+)', script.url)
+                if m:
+                    script.account_name = m.group(1)
+
+            # 再生数が万単位の場合の変換（CSVヘッダーに「万」がある場合）
+            if col_map.get("views") and "万" in (col_map.get("views") or ""):
+                script.views = script.views * 10000
+
+            # 空行やメモ行はスキップ
+            if not script.url and not script.transcript and not script.title:
+                # 分析メモだけの行は別途保存されるがスクリプトとしては追加しない
+                continue
+
+            if script.transcript or script.title or script.url:
+                text = script.transcript or script.title or ""
+                if text:
+                    script.hook_text = text[:30].strip()
+                    script.topics = _detect_topics(text)
+                    script.structure = _analyze_structure(text)
+                scripts.append(script)
 
     return scripts
+
+
+def _split_csv_tables(lines: list[str]) -> list[tuple]:
+    """CSVの複数テーブルを検出して分割する."""
+    tables = []
+    current_lines = []
+    current_type = "unknown"
+    empty_count = 0
+
+    for line in lines:
+        stripped = line.strip()
+
+        # ヘッダー行の検出
+        if "伸びていない理由" in stripped or "伸びてない理由" in stripped:
+            if current_lines:
+                tables.append((current_lines, current_type))
+            current_lines = [line]
+            current_type = "failure"
+            empty_count = 0
+            continue
+        elif "伸びている理由" in stripped or "伸びてる理由" in stripped:
+            if current_lines:
+                tables.append((current_lines, current_type))
+            current_lines = [line]
+            current_type = "success"
+            empty_count = 0
+            continue
+
+        # 空行が連続したらテーブル区切り
+        if not stripped or all(c == ',' for c in stripped):
+            empty_count += 1
+            if empty_count >= 2 and current_lines:
+                tables.append((current_lines, current_type))
+                current_lines = []
+                current_type = "unknown"
+            continue
+        else:
+            empty_count = 0
+
+        current_lines.append(line)
+
+    if current_lines:
+        tables.append((current_lines, current_type))
+
+    # テーブルが見つからなかった場合、全体を1テーブルとして扱う
+    if not tables:
+        tables = [("\n".join(lines).split("\n"), "unknown")]
+
+    return tables
 
 
 def _detect_columns(fieldnames: list[str]) -> dict:
@@ -129,6 +224,9 @@ def _detect_columns(fieldnames: list[str]) -> dict:
                  "created", "公開日"],
         "title": ["title", "タイトル", "説明", "description", "desc", "概要"],
         "duration": ["duration", "動画長", "秒数", "長さ", "時間"],
+        "analysis": ["伸びていない理由", "伸びている理由", "伸びてない理由", "伸びてる理由",
+                     "理由", "分析", "analysis", "reason", "メモ", "notes"],
+        "voice": ["声の雰囲気", "キャラ雰囲気", "voice", "キャラ", "声", "character"],
     }
 
     for key, candidates in patterns.items():
@@ -321,13 +419,18 @@ def _extract_reference_style(scripts: list[ReferenceScript]) -> dict:
     if not scripts:
         return {}
 
-    # 平均的な構造を把握
+    # 成功/失敗の分類
+    successful = [s for s in scripts if s.is_successful]
+    failed = [s for s in scripts if not s.is_successful and s.analysis_note]
+
+    # 台本構造の把握
     intro_samples = []
     body_samples = []
     outro_samples = []
     total_lengths = []
+    voice_samples = []
 
-    for s in scripts:
+    for s in successful:
         st = s.structure
         if st:
             if st.get("intro"):
@@ -338,15 +441,42 @@ def _extract_reference_style(scripts: list[ReferenceScript]) -> dict:
                 outro_samples.append(st["outro"])
             if st.get("total_length"):
                 total_lengths.append(st["total_length"])
+        if s.voice_style:
+            voice_samples.append(s.voice_style)
 
     avg_length = int(sum(total_lengths) / len(total_lengths)) if total_lengths else 0
+
+    # 成功パターンの要点抽出
+    success_patterns = []
+    for s in successful[:5]:
+        if s.analysis_note:
+            success_patterns.append({
+                "views": s.views,
+                "note": s.analysis_note[:200],
+                "hook": s.hook_text,
+            })
+
+    # 失敗パターンの要点抽出
+    failure_patterns = []
+    for s in failed[:5]:
+        if s.analysis_note:
+            failure_patterns.append({
+                "views": s.views,
+                "note": s.analysis_note[:200],
+                "hook": s.hook_text,
+            })
 
     return {
         "avg_length": avg_length,
         "intro_samples": intro_samples[:3],
         "body_samples": body_samples[:3],
         "outro_samples": outro_samples[:3],
+        "voice_samples": voice_samples[:3],
         "script_count": len(scripts),
+        "success_count": len(successful),
+        "failure_count": len(failed),
+        "success_patterns": success_patterns,
+        "failure_patterns": failure_patterns,
     }
 
 
@@ -574,7 +704,7 @@ def get_research_summary(analysis: dict) -> dict:
             "account_url": a.video.account_url,
         })
 
-    # リサーチ動画一覧
+    # リサーチ動画一覧（エンゲージメント情報付き）
     all_videos = []
     for a in analysis.get("analyzed", []):
         v = a.video
@@ -584,6 +714,8 @@ def get_research_summary(analysis: dict) -> dict:
             "title": v.title,
             "views": v.views,
             "likes": v.likes,
+            "comments": v.comments,
+            "shares": v.shares,
             "duration": v.duration,
             "upload_date": v.upload_date,
             "account_name": v.account_name,
@@ -593,8 +725,11 @@ def get_research_summary(analysis: dict) -> dict:
             "hook_text": a.hook_text,
             "hook_type": a.hook_type,
             "topics": a.topics,
+            "engagement_rate": round(v.engagement_rate * 100, 2) if v.engagement_rate else 0,
+            "comment_rate": round(v.comment_rate * 100, 3) if v.comment_rate else 0,
+            "engagement_score": round(v.engagement_score, 0) if v.engagement_score else 0,
         })
-    all_videos.sort(key=lambda x: x["views"], reverse=True)
+    all_videos.sort(key=lambda x: x["engagement_score"] or x["views"], reverse=True)
 
     return {
         "total_videos": analysis.get("total_videos", 0),

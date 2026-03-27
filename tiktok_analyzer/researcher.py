@@ -1,4 +1,4 @@
-"""TikTok リサーチャー - キーワードでTikTok動画を検索・収集する."""
+"""TikTok リサーチャー - トレンド自動発見・エンゲージメント分析・アカウント属人性チェック."""
 
 import asyncio
 import json
@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -16,6 +17,23 @@ import requests as http_requests
 from rich.console import Console
 
 console = Console()
+
+
+# ===== トレンドキーワード候補（スキンケア系） =====
+TREND_SEED_KEYWORDS = [
+    # 肌悩み系
+    "ニキビ スキンケア", "毛穴 ケア", "シミ 消す", "乾燥肌 保湿", "美白 透明感",
+    "赤み 敏感肌", "ニキビ跡 治し方", "毛穴 黒ずみ", "いちご鼻", "肌荒れ 原因",
+    "テカリ 皮脂", "シワ たるみ", "くすみ 対策", "角栓 除去",
+    # ハウツー系
+    "スキンケア ルーティン", "正しい洗顔", "化粧水 塗り方", "美容液 効果",
+    "日焼け止め 塗り方", "クレンジング 方法",
+    # トレンド系
+    "韓国 スキンケア", "ドラコス おすすめ", "プチプラ スキンケア",
+    "美容 ライフハック", "擬人化 スキンケア", "コスメ 擬人化",
+    # 成分系
+    "レチノール 使い方", "ナイアシンアミド", "ビタミンC 美容液", "CICA 効果",
+]
 
 
 @dataclass
@@ -37,6 +55,11 @@ class TikTokVideo:
     account_url: str = ""
     account_id: str = ""
     thumbnail: str = ""
+    # エンゲージメント指標（後で計算）
+    engagement_rate: float = 0.0      # (likes+comments+shares) / views
+    comment_rate: float = 0.0         # comments / views
+    like_rate: float = 0.0            # likes / views
+    engagement_score: float = 0.0     # 総合スコア
 
 
 @dataclass
@@ -53,6 +76,195 @@ class TikTokAccount:
     first_post_date: str = ""
     recent_month_views: int = 0
     avatar: str = ""
+    # 属人性分析
+    activity_months: int = 0          # 活動期間（月）
+    avg_views_per_video: int = 0      # 動画あたり平均再生数
+    is_personality_driven: bool = False  # 属人アカウントか
+    personality_reason: str = ""       # 判定理由
+    trending_products: list = field(default_factory=list)  # 扱っているトレンド商品
+
+
+@dataclass
+class TrendKeyword:
+    """トレンドキーワード候補."""
+    keyword: str = ""
+    estimated_volume: int = 0       # 推定ボリューム（検索結果の動画再生数合計）
+    avg_views: int = 0              # 平均再生数
+    avg_engagement: float = 0.0     # 平均エンゲージメント率
+    top_video_views: int = 0        # トップ動画の再生数
+    video_count: int = 0            # 見つかった動画数
+    sample_hooks: list = field(default_factory=list)  # サンプルフック
+
+
+# ===== トレンドキーワード自動発見 =====
+
+def discover_trending_keywords(period_months: int = 3,
+                               min_views: int = 500_000,
+                               max_keywords: int = 10) -> list[TrendKeyword]:
+    """スキンケア系のトレンドキーワードを自動発見する."""
+    console.print("\n[bold cyan]トレンドキーワードを自動発見中...[/bold cyan]")
+    results = []
+
+    for seed in TREND_SEED_KEYWORDS:
+        try:
+            videos = search_tiktok_videos(
+                seed, min_views=min_views,
+                period_months=period_months, max_results=10,
+            )
+            if not videos:
+                continue
+
+            total_views = sum(v.views for v in videos)
+            avg_views = total_views // len(videos) if videos else 0
+            avg_eng = sum(_calc_engagement_rate(v) for v in videos) / len(videos)
+            top_views = max(v.views for v in videos)
+
+            # サンプルフック（冒頭30文字）
+            hooks = []
+            for v in sorted(videos, key=lambda x: x.views, reverse=True)[:3]:
+                text = v.transcript or v.description or v.title
+                if text:
+                    hooks.append(text[:30])
+
+            kw = TrendKeyword(
+                keyword=seed,
+                estimated_volume=total_views,
+                avg_views=avg_views,
+                avg_engagement=avg_eng,
+                top_video_views=top_views,
+                video_count=len(videos),
+                sample_hooks=hooks,
+            )
+            results.append(kw)
+            console.print(f"  [green]{seed}: {len(videos)}本, 平均{avg_views:,}再生[/green]")
+
+        except Exception as e:
+            console.print(f"  [dim]{seed}: {e}[/dim]")
+
+    # エンゲージメント×ボリュームでソート
+    results.sort(key=lambda k: k.estimated_volume * (1 + k.avg_engagement), reverse=True)
+    return results[:max_keywords]
+
+
+def _calc_engagement_rate(video: TikTokVideo) -> float:
+    """エンゲージメント率を計算する."""
+    if video.views <= 0:
+        return 0.0
+    return (video.likes + video.comments * 3 + video.shares * 2) / video.views
+
+
+# ===== エンゲージメント分析 =====
+
+def score_videos_by_engagement(videos: list[TikTokVideo]) -> list[TikTokVideo]:
+    """動画にエンゲージメントスコアを付与する."""
+    for v in videos:
+        if v.views > 0:
+            v.like_rate = v.likes / v.views
+            v.comment_rate = v.comments / v.views
+            v.engagement_rate = (v.likes + v.comments + v.shares) / v.views
+            # コメント率を重視したスコア（コメント多い=本当に刺さっている）
+            v.engagement_score = (
+                v.views * 0.3
+                + v.likes * 1.0
+                + v.comments * 5.0   # コメント重視
+                + v.shares * 3.0
+            )
+        else:
+            v.engagement_score = 0
+    return videos
+
+
+# ===== アカウント属人性チェック =====
+
+def analyze_account_personality(account: TikTokAccount,
+                                recent_videos: list[TikTokVideo] = None) -> TikTokAccount:
+    """アカウントが属人（人に人気）かコンテンツ型かを判定する."""
+    reasons = []
+
+    # 1. 活動期間チェック
+    if account.first_post_date:
+        parsed = _parse_date(account.first_post_date)
+        if parsed:
+            months = (datetime.now() - parsed).days // 30
+            account.activity_months = months
+
+    # 2. フォロワーと動画数の比率
+    if account.video_count > 0 and account.follower_count > 0:
+        followers_per_video = account.follower_count / account.video_count
+        account.avg_views_per_video = account.like_count // account.video_count if account.video_count else 0
+
+        # フォロワーが動画数に比べて異常に多い → 属人の可能性
+        if followers_per_video > 50000:
+            reasons.append(f"フォロワー/動画比が高い({followers_per_video:,.0f})")
+
+    # 3. bio分析 - 個人名・肩書きがある場合は属人
+    if account.bio:
+        personality_markers = [
+            "美容師", "皮膚科", "医師", "ドクター", "先生", "モデル",
+            "インフルエンサー", "YouTuber", "歳", "才",
+            "私の", "僕の", "俺の",
+        ]
+        for marker in personality_markers:
+            if marker in account.bio:
+                reasons.append(f"bioに「{marker}」を含む")
+                break
+
+    # 4. ユーザー名分析 - 個人名っぽいかどうか
+    if account.username:
+        name_lower = account.username.lower()
+        # 個人名っぽい（ひらがな・カタカナ中心、短い）
+        if not any(kw in name_lower for kw in [
+            "hack", "lab", "tips", "info", "cosme", "beauty", "skin",
+            "health", "life", "ai", "bot", "official", "review",
+        ]):
+            if len(account.username) < 12:
+                reasons.append("ユーザー名が個人名風")
+
+    # 5. 最近の動画のばらつきチェック
+    if recent_videos and len(recent_videos) >= 3:
+        views_list = [v.views for v in recent_videos]
+        avg = sum(views_list) / len(views_list)
+        # 標準偏差が平均に比べて小さい→安定したファン層
+        if avg > 0:
+            variance = sum((x - avg) ** 2 for x in views_list) / len(views_list)
+            std = variance ** 0.5
+            cv = std / avg  # 変動係数
+            if cv < 0.5:
+                reasons.append(f"再生数が安定（変動係数{cv:.2f}）→固定ファン")
+
+    # 判定
+    account.is_personality_driven = len(reasons) >= 2
+    account.personality_reason = "、".join(reasons) if reasons else "コンテンツ型の可能性が高い"
+
+    # トレンド商品検出
+    if recent_videos:
+        account.trending_products = _detect_trending_products(recent_videos)
+
+    return account
+
+
+def _detect_trending_products(videos: list[TikTokVideo]) -> list[str]:
+    """動画群からトレンド商品を検出する."""
+    product_counter = Counter()
+    product_patterns = [
+        # ブランド名
+        "アヌア", "クオリティファースト", "メディキューブ", "VT", "COSRX",
+        "魔女工場", "ONE THING", "ナンバーズイン", "イニスフリー", "ラロッシュポゼ",
+        "オルビス", "キュレル", "ミノン", "白潤", "肌ラボ",
+        "セタフィル", "ドクターシーラボ", "アベンヌ", "ビオデルマ",
+        "ナーズ", "スキンライフ",
+        # 成分・施術名
+        "レチノール", "ナイアシンアミド", "CICA", "シカ", "ビタミンC美容液",
+        "ダーマペン", "ハーブピーリング", "美顔器",
+    ]
+
+    for v in videos:
+        text = (v.transcript or "") + " " + (v.description or "")
+        for product in product_patterns:
+            if product.lower() in text.lower():
+                product_counter[product] += 1
+
+    return [p for p, _ in product_counter.most_common(10)]
 
 
 def search_tiktok_videos(keyword: str, min_views: int = 500_000,
@@ -569,4 +781,21 @@ def format_account_for_display(account: TikTokAccount) -> dict:
         "first_post_date": account.first_post_date,
         "recent_month_views": account.recent_month_views,
         "avatar": account.avatar,
+        "activity_months": account.activity_months,
+        "is_personality_driven": account.is_personality_driven,
+        "personality_reason": account.personality_reason,
+        "trending_products": account.trending_products,
+    }
+
+
+def format_trend_keyword_for_display(kw: TrendKeyword) -> dict:
+    """TrendKeywordをフロント表示用に整形する."""
+    return {
+        "keyword": kw.keyword,
+        "estimated_volume": kw.estimated_volume,
+        "avg_views": kw.avg_views,
+        "avg_engagement": round(kw.avg_engagement * 100, 1),
+        "top_video_views": kw.top_video_views,
+        "video_count": kw.video_count,
+        "sample_hooks": kw.sample_hooks,
     }
