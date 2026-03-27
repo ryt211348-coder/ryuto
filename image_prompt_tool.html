@@ -57,6 +57,8 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
 .gallery-card img{width:100%;aspect-ratio:9/16;object-fit:cover;display:block}
 .gallery-label{padding:.5rem .75rem;font-size:.8rem;color:var(--dim);display:flex;align-items:center;gap:.5rem}
 .gallery-err{width:100%;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;background:var(--bg);color:#ff6b6b;font-size:.8rem;padding:1rem;text-align:center}
+.prompt-edit{width:100%;padding:1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--green);font-size:.85rem;line-height:1.6;font-family:monospace;resize:vertical}
+.prompt-edit:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,240,255,.2)}
 .done-mark{color:var(--green);font-weight:700;font-size:1.1rem}
 .tracker-bar{text-align:center;font-size:.9rem;color:var(--text)}
 @media(max-width:640px){.container{padding:1rem}.btn-row{flex-direction:column}.result-header{flex-direction:column;align-items:flex-start}.meta-grid{grid-template-columns:1fr}}
@@ -87,6 +89,7 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
     <div class="result-actions">
       <button class="btn btn-outline btn-sm" onclick="copyAllPrompts()">全プロンプトをコピー</button>
       <button class="btn btn-outline btn-sm" onclick="exportCSV()">CSV出力</button>
+      <button class="btn btn-outline btn-sm" onclick="exportToSheet()">Googleスプレッドシートに出力</button>
       <button class="btn btn-outline btn-sm" onclick="resetAll()">リセット</button>
     </div>
   </div>
@@ -235,18 +238,25 @@ function renderScenes(){
   const rc={"悪役":"#ff2d55","黒幕":"#a78bfa","弱者":"#fbbf24","ヒーロー":"#34d399","説明役":"#00f0ff","締め":"#ff6b8a"};
   currentScenes.forEach((s,i)=>{
     const cl=rc[s.role]||"#888",d=document.createElement("div");d.className="scene-card";
-    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span><span class="done-mark hidden" id="done${i}">✓</span></div><div style="display:flex;gap:.5rem;align-items:center"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyOne(${i})" id="copyBtn${i}" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();markDone(${i})" id="doneBtn${i}">完了</button><span class="expand-icon">▼</span></div></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="prompt-hdr"><h4>画像生成プロンプト</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button></div><pre class="prompt-box">${esc(s.prompt)}</pre></div>`;
+    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span><span class="done-mark hidden" id="done${i}">✓</span></div><div style="display:flex;gap:.5rem;align-items:center"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyOne(${i})" id="copyBtn${i}" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();toggleDone(${i})" id="doneBtn${i}">完了</button><span class="expand-icon">▼</span></div></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="prompt-hdr"><h4>画像生成プロンプト（編集可能）</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button></div><textarea class="prompt-edit" id="prompt${i}" rows="10" oninput="currentScenes[${i}].prompt=this.value">${esc(s.prompt)}</textarea></div>`;
     c.appendChild(d);
   });
 }
 let doneSet=new Set();
 function toggle(i){document.getElementById("sb"+i).classList.toggle("open");document.getElementById("sb"+i).closest(".scene-card").classList.toggle("open")}
 function copyOne(i){navigator.clipboard.writeText(currentScenes[i].prompt);const b=document.getElementById("copyBtn"+i);if(b){b.textContent="コピー済み!";setTimeout(()=>b.textContent="コピー",1500)}}
-function markDone(i){
-  doneSet.add(i);
-  const btn=document.getElementById("doneBtn"+i);btn.textContent="完了!";btn.style.background="var(--green)";btn.style.color="#000";btn.style.borderColor="var(--green)";
-  document.getElementById("done"+i).classList.remove("hidden");
-  document.getElementById("sb"+i).closest(".scene-card").style.opacity="0.5";
+function toggleDone(i){
+  if(doneSet.has(i)){
+    doneSet.delete(i);
+    const btn=document.getElementById("doneBtn"+i);btn.textContent="完了";btn.style.background="";btn.style.color="";btn.style.borderColor="";
+    document.getElementById("done"+i).classList.add("hidden");
+    document.getElementById("sb"+i).closest(".scene-card").style.opacity="1";
+  }else{
+    doneSet.add(i);
+    const btn=document.getElementById("doneBtn"+i);btn.textContent="完了!";btn.style.background="var(--green)";btn.style.color="#000";btn.style.borderColor="var(--green)";
+    document.getElementById("done"+i).classList.remove("hidden");
+    document.getElementById("sb"+i).closest(".scene-card").style.opacity="0.5";
+  }
   updateTracker();
   if(doneSet.size===currentScenes.length){alert("全シーンの画像生成が完了しました！\n「CSV出力」で編集者に渡せます。")}
 }
@@ -316,6 +326,20 @@ async function listModels(){
     const names=(d.models||[]).map(m=>m.name+" | "+((m.supportedGenerationMethods||[]).join(", "))).join("\n");
     el.textContent=names||"モデルが見つかりません";
   }catch(e){el.textContent="エラー: "+e.message}
+}
+
+// === Googleスプレッドシート出力 ===
+function exportToSheet(){
+  if(!currentScenes.length){alert("先にプロンプトを生成してください");return}
+  // TSV形式でクリップボードにコピー → スプレッドシートに貼り付けるだけ
+  let tsv="シーン番号\t話者\tセリフ\t役割\t感情\t声の雰囲気\t画像生成プロンプト\t画像ステータス\n";
+  currentScenes.forEach((s,i)=>{
+    const status=doneSet.has(i)?"完了":"未生成";
+    tsv+=[s.n,s.speaker,s.dialogue.replace(/\n/g," "),s.role,s.emotion,s.voice,s.prompt.replace(/\n/g," "),status].join("\t")+"\n";
+  });
+  navigator.clipboard.writeText(tsv).then(()=>{
+    alert("スプレッドシート用のデータをコピーしました！\n\n手順:\n1. Googleスプレッドシートを開く\n2. A1セルを選択\n3. Cmd+V で貼り付け\n\n画像はGeminiで生成後、スプレッドシートに手動で挿入してください。\nGoogleドライブに画像フォルダを作成し、編集者と共有するのがおすすめです。");
+  });
 }
 
 function loadSample(){document.getElementById("scriptInput").value=`（皮脂）
