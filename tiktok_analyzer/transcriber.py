@@ -1,6 +1,10 @@
-"""Whisperを使った動画音声の文字起こし."""
+"""TikTok動画の文字起こし - 複数の方法で取得を試みる."""
 
 import json
+import os
+import re
+import subprocess
+import sys
 from pathlib import Path
 
 from rich.console import Console
@@ -8,57 +12,194 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCo
 
 console = Console()
 
-_model_cache = {}
+
+def _try_supadata(video_url, lang="ja"):
+    """Supadata API で TikTok の字幕を取得する（無料100回/月）."""
+    api_key = os.environ.get("SUPADATA_API_KEY", "")
+    if not api_key:
+        return None
+
+    try:
+        from supadata import Supadata
+        client = Supadata(api_key=api_key)
+        result = client.transcript(url=video_url, lang=lang, text=True)
+        if result and hasattr(result, "text") and result.text:
+            return result.text
+        if isinstance(result, str) and result.strip():
+            return result
+    except Exception as e:
+        console.print(f"    [dim]Supadata: {e}[/dim]")
+    return None
 
 
-def load_whisper_model(model_size: str = "base"):
-    """Whisperモデルをロードする（キャッシュ付き）."""
-    if model_size in _model_cache:
-        return _model_cache[model_size]
+def _try_ytdlp_subs(video_url, output_dir):
+    """yt-dlp でTikTokの自動字幕を抽出する."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    import whisper
+    # 字幕ファイルのベース名
+    base = output_dir / "temp_sub"
 
-    console.print(f"[cyan]Whisperモデル ({model_size}) をロード中...[/cyan]")
-    model = whisper.load_model(model_size)
-    _model_cache[model_size] = model
-    return model
+    cmd = [
+        sys.executable, "-m", "yt_dlp",
+        "--write-auto-subs",
+        "--write-subs",
+        "--sub-langs", "ja,en,all",
+        "--sub-format", "vtt/srt/best",
+        "--skip-download",
+        "-o", str(base) + ".%(ext)s",
+        "--no-warnings",
+        "--quiet",
+        video_url,
+    ]
+
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+
+    # 生成された字幕ファイルを探す
+    for ext in ["vtt", "srt"]:
+        for f in output_dir.glob(f"temp_sub*.{ext}"):
+            text = _parse_subtitle_file(f)
+            # 一時ファイル削除
+            try:
+                f.unlink()
+            except OSError:
+                pass
+            if text and len(text.strip()) > 5:
+                return text.strip()
+
+    return None
 
 
-def transcribe_audio(audio_path: Path, model_size: str = "base", language: str = "ja") -> dict:
-    """音声ファイルを文字起こしする."""
-    model = load_whisper_model(model_size)
+def _parse_subtitle_file(filepath):
+    """VTT/SRTファイルからテキストだけを抽出する."""
+    try:
+        content = Path(filepath).read_text(encoding="utf-8")
+    except Exception:
+        return None
 
-    result = model.transcribe(
-        str(audio_path),
-        language=language,
-        verbose=False,
-    )
+    lines = content.split("\n")
+    text_lines = []
+    for line in lines:
+        line = line.strip()
+        # タイムスタンプ行をスキップ
+        if re.match(r"^\d{2}:\d{2}", line):
+            continue
+        if re.match(r"^\d+$", line):
+            continue
+        if line.startswith("WEBVTT") or line.startswith("Kind:") or line.startswith("Language:"):
+            continue
+        if "-->" in line:
+            continue
+        if not line:
+            continue
+        # HTMLタグを除去
+        line = re.sub(r"<[^>]+>", "", line)
+        if line and line not in text_lines:
+            text_lines.append(line)
 
-    return {
-        "text": result["text"],
-        "segments": [
-            {
-                "start": seg["start"],
-                "end": seg["end"],
-                "text": seg["text"],
-            }
-            for seg in result.get("segments", [])
-        ],
-        "language": result.get("language", language),
-    }
+    return " ".join(text_lines)
 
 
-def transcribe_videos(
-    audio_dir: Path,
-    transcript_dir: Path,
-    video_ids: list[str],
-    model_size: str = "base",
-) -> "dict[str, str]":
-    """複数の動画音声を一括文字起こしする."""
+def _try_whisper(audio_path, model_size="base", language="ja"):
+    """Whisper で音声からテキストに変換する（フォールバック）."""
+    try:
+        import whisper
+    except ImportError:
+        console.print("    [dim]Whisper未インストール[/dim]")
+        return None
+
+    try:
+        model = whisper.load_model(model_size)
+        result = model.transcribe(str(audio_path), language=language, verbose=False)
+        return result.get("text", "")
+    except Exception as e:
+        console.print(f"    [dim]Whisper: {e}[/dim]")
+        return None
+
+
+def _download_audio(video_url, output_dir):
+    """yt-dlp で動画の音声をダウンロードする."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "temp_audio.mp3"
+
+    cmd = [
+        sys.executable, "-m", "yt_dlp",
+        "-x", "--audio-format", "mp3",
+        "--audio-quality", "0",
+        "-o", str(output_path).replace(".mp3", ".%(ext)s"),
+        "--no-warnings", "--quiet",
+        video_url,
+    ]
+
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if output_path.exists():
+            return output_path
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    return None
+
+
+def transcribe_single_video(video_url, video_id, output_dir, whisper_model="base"):
+    """1本の動画を文字起こしする。複数の方法を順番に試す."""
+    output_dir = Path(output_dir)
+    cache_path = output_dir / f"{video_id}.txt"
+
+    # キャッシュチェック
+    if cache_path.exists():
+        text = cache_path.read_text(encoding="utf-8")
+        if text.strip():
+            return text.strip()
+
+    text = None
+
+    # 方法1: Supadata API（TikTokの字幕を直接取得）
+    text = _try_supadata(video_url)
+    if text:
+        console.print(f"    [green]Supadata で取得成功[/green]")
+        cache_path.write_text(text, encoding="utf-8")
+        return text
+
+    # 方法2: yt-dlp で自動字幕を抽出
+    text = _try_ytdlp_subs(video_url, output_dir / "_subs")
+    if text:
+        console.print(f"    [green]yt-dlp 字幕で取得成功[/green]")
+        cache_path.write_text(text, encoding="utf-8")
+        return text
+
+    # 方法3: Whisper（音声をダウンロードして文字起こし）
+    audio_path = _download_audio(video_url, output_dir / "_audio")
+    if audio_path:
+        text = _try_whisper(str(audio_path), whisper_model)
+        # 一時音声ファイル削除
+        try:
+            audio_path.unlink()
+        except OSError:
+            pass
+        if text:
+            console.print(f"    [green]Whisper で取得成功[/green]")
+            cache_path.write_text(text, encoding="utf-8")
+            return text
+
+    console.print(f"    [yellow]文字起こし取得失敗[/yellow]")
+    return ""
+
+
+def transcribe_videos(video_list, transcript_dir, whisper_model="base"):
+    """複数の動画を一括文字起こしする.
+
+    video_list: [(video_url, video_id), ...] のリスト
+    """
+    transcript_dir = Path(transcript_dir)
     transcript_dir.mkdir(parents=True, exist_ok=True)
     transcripts = {}
 
-    console.print(f"\n[bold cyan]文字起こし開始 ({len(video_ids)} 本)[/bold cyan]\n")
+    console.print(f"\n[bold cyan]文字起こし開始 ({len(video_list)} 本)[/bold cyan]")
+    console.print(f"  [dim]方法: Supadata API → yt-dlp字幕 → Whisper[/dim]\n")
 
     with Progress(
         SpinnerColumn(),
@@ -67,40 +208,18 @@ def transcribe_videos(
         MofNCompleteColumn(),
         console=console,
     ) as progress:
-        task = progress.add_task("文字起こし中...", total=len(video_ids))
+        task = progress.add_task("文字起こし中...", total=len(video_list))
 
-        for video_id in video_ids:
-            audio_path = audio_dir / f"{video_id}.mp3"
-            transcript_path = transcript_dir / f"{video_id}.json"
-            text_path = transcript_dir / f"{video_id}.txt"
-
-            # 既存の文字起こしがあればスキップ
-            if text_path.exists():
-                transcripts[video_id] = text_path.read_text(encoding="utf-8")
-                progress.update(task, advance=1)
-                continue
-
-            if not audio_path.exists():
-                console.print(f"  [yellow]スキップ: {video_id} (音声ファイルなし)[/yellow]")
-                progress.update(task, advance=1)
-                continue
-
-            try:
-                result = transcribe_audio(audio_path, model_size)
-                transcripts[video_id] = result["text"]
-
-                # JSON保存（セグメント情報付き）
-                transcript_path.write_text(
-                    json.dumps(result, ensure_ascii=False, indent=2),
-                    encoding="utf-8",
-                )
-                # プレーンテキスト保存
-                text_path.write_text(result["text"], encoding="utf-8")
-
-            except Exception as e:
-                console.print(f"  [red]エラー ({video_id}): {e}[/red]")
-
+        for video_url, video_id in video_list:
+            progress.update(task, description=f"文字起こし: {video_id}")
+            text = transcribe_single_video(
+                video_url, video_id, transcript_dir, whisper_model
+            )
+            if text:
+                transcripts[video_id] = text
             progress.update(task, advance=1)
 
-    console.print(f"\n  [green]文字起こし完了: {len(transcripts)}/{len(video_ids)} 本[/green]")
+    success = len(transcripts)
+    total = len(video_list)
+    console.print(f"\n  [green]文字起こし完了: {success}/{total} 本[/green]")
     return transcripts

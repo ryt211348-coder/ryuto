@@ -10,7 +10,6 @@ from flask import Flask, render_template, request, jsonify, Response
 from tiktok_analyzer.extractor import (
     extract_account_videos,
     filter_viral_videos,
-    download_video_audio,
     save_videos_metadata,
 )
 from tiktok_analyzer.transcriber import transcribe_videos
@@ -68,30 +67,16 @@ def run_analysis(job_id: str, account_url: str, min_views: int, whisper_model: s
 
         save_videos_metadata(viral_videos, output / "videos.json")
 
-        # Step 3
-        job["status"] = "downloading"
-        job["progress"] = 0
-        job["total"] = len(viral_videos)
-        downloaded_ids = []
-
-        for i, video in enumerate(viral_videos):
-            job["message"] = f"音声ダウンロード中 ({i + 1}/{len(viral_videos)})"
-            job["progress"] = i
-            result = download_video_audio(video, audio_dir)
-            if result:
-                downloaded_ids.append(video.video_id)
-
-        # Step 4
+        # Step 3: 文字起こし（字幕抽出 → Whisperフォールバック）
         job["status"] = "transcribing"
         job["progress"] = 0
-        job["total"] = len(downloaded_ids)
-        job["message"] = f"文字起こし中 (0/{len(downloaded_ids)})"
+        job["total"] = len(viral_videos)
+        job["message"] = f"文字起こし中 (0/{len(viral_videos)})"
 
-        transcripts = {}
-        if downloaded_ids:
-            transcripts = transcribe_videos(
-                audio_dir, transcript_dir, downloaded_ids, whisper_model
-            )
+        video_list = [(v.url, v.video_id) for v in viral_videos]
+        transcripts = transcribe_videos(
+            video_list, transcript_dir, whisper_model
+        )
 
         # Step 5
         job["status"] = "analyzing"
