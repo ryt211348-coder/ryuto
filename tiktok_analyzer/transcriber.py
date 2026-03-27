@@ -144,6 +144,8 @@ def _try_ytdlp_subs(video_url, output_dir):
 
 def _try_whisper(video_url, output_dir, model_size="base"):
     """動画の音声をダウンロードしてWhisperで文字起こし."""
+    import time as _time
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     audio_path = output_dir / "temp_audio.mp3"
@@ -151,28 +153,44 @@ def _try_whisper(video_url, output_dir, model_size="base"):
     # 既存の一時ファイルを削除
     if audio_path.exists():
         audio_path.unlink()
+    for f in output_dir.glob("temp_audio.*"):
+        try:
+            f.unlink()
+        except OSError:
+            pass
 
-    # 音声ダウンロード
-    cmd = [
-        sys.executable, "-m", "yt_dlp",
-        "-x", "--audio-format", "mp3", "--audio-quality", "0",
-        "-o", str(audio_path).replace(".mp3", ".%(ext)s"),
-        "--no-warnings",
-        "--force-overwrites",
-        video_url,
-    ]
+    # TikTokのIPブロック回避のためリトライ
+    max_retries = 3
+    for attempt in range(max_retries):
+        cmd = [
+            sys.executable, "-m", "yt_dlp",
+            "-x", "--audio-format", "mp3", "--audio-quality", "0",
+            "-o", str(audio_path).replace(".mp3", ".%(ext)s"),
+            "--no-warnings",
+            "--force-overwrites",
+            "--sleep-requests", "1",
+            video_url,
+        ]
 
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-        if result.returncode != 0:
-            err = result.stderr.strip()[-200:] if result.stderr else "不明なエラー"
-            console.print(f"    [dim]yt-dlp DL失敗: {err}[/dim]")
-    except subprocess.TimeoutExpired:
-        console.print(f"    [dim]yt-dlp DL: タイムアウト[/dim]")
-        return None
-    except FileNotFoundError:
-        console.print(f"    [dim]yt-dlp: コマンドが見つかりません[/dim]")
-        return None
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            if result.returncode == 0:
+                break
+            err = (result.stderr or "") + (result.stdout or "")
+            if "blocked" in err.lower() or "IP" in err:
+                wait = (attempt + 1) * 5
+                console.print(f"    [dim]IPブロック検出、{wait}秒待機して再試行 ({attempt+1}/{max_retries})[/dim]")
+                _time.sleep(wait)
+                continue
+            else:
+                console.print(f"    [dim]yt-dlp DL失敗: {err.strip()[-150:]}[/dim]")
+                break
+        except subprocess.TimeoutExpired:
+            console.print(f"    [dim]yt-dlp DL: タイムアウト[/dim]")
+            return None
+        except FileNotFoundError:
+            console.print(f"    [dim]yt-dlp: コマンドが見つかりません[/dim]")
+            return None
 
     # mp3以外の拡張子で保存された場合もチェック
     if not audio_path.exists():
@@ -302,12 +320,16 @@ def transcribe_videos(video_list, transcript_dir, whisper_model="base"):
     ) as progress:
         task = progress.add_task("文字起こし中...", total=len(video_list))
 
-        for video_url, video_id in video_list:
+        for i, (video_url, video_id) in enumerate(video_list):
             progress.update(task, description=f"文字起こし: {video_id}")
             text = transcribe_single_video(video_url, video_id, transcript_dir, whisper_model)
             if text:
                 transcripts[video_id] = text
             progress.update(task, advance=1)
+            # TikTokのIPブロック回避: 動画間に3秒待機
+            if i < len(video_list) - 1:
+                import time as _time
+                _time.sleep(3)
 
     success = len(transcripts)
     total = len(video_list)
