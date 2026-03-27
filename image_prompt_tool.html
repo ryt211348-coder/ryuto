@@ -57,6 +57,8 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
 .gallery-card img{width:100%;aspect-ratio:9/16;object-fit:cover;display:block}
 .gallery-label{padding:.5rem .75rem;font-size:.8rem;color:var(--dim);display:flex;align-items:center;gap:.5rem}
 .gallery-err{width:100%;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;background:var(--bg);color:#ff6b6b;font-size:.8rem;padding:1rem;text-align:center}
+.done-mark{color:var(--green);font-weight:700;font-size:1.1rem}
+.tracker-bar{text-align:center;font-size:.9rem;color:var(--text)}
 @media(max-width:640px){.container{padding:1rem}.btn-row{flex-direction:column}.result-header{flex-direction:column;align-items:flex-start}.meta-grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -67,13 +69,6 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
 
 <!-- 入力エリア -->
 <div class="card" id="inputSection">
-  <div style="margin-bottom:1rem">
-    <label for="apiKey">Gemini APIキー</label>
-    <input type="password" id="apiKey" placeholder="AIza...（画像生成に必要）">
-    <p class="hint">Google AI Studio で取得できます。プロンプト生成だけなら不要です。</p>
-    <button class="btn btn-outline btn-sm" onclick="listModels()" style="margin-top:.5rem">使えるモデルを確認</button>
-    <pre id="modelList" style="font-size:.75rem;color:var(--cyan);max-height:200px;overflow-y:auto;margin-top:.5rem;display:none"></pre>
-  </div>
   <div style="margin-bottom:1rem">
     <label for="scriptInput">台本テキスト</label>
     <textarea id="scriptInput" rows="14" placeholder="（皮脂）&#10;いちご鼻から卒業したいなら絶対に聞け！&#10;俺は皮脂、こいつは角質！&#10;&#10;（角質）&#10;俺たちが毛穴に溜まり..."></textarea>
@@ -90,24 +85,18 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
   <div class="result-header">
     <span class="stat-badge" id="sceneCount">0 シーン</span>
     <div class="result-actions">
-      <button class="btn btn-green btn-sm" onclick="generateAllImages()">Geminiで全画像を一括生成</button>
-      <button class="btn btn-outline btn-sm" onclick="copyAllPrompts()">全コピー</button>
+      <button class="btn btn-outline btn-sm" onclick="copyAllPrompts()">全プロンプトをコピー</button>
       <button class="btn btn-outline btn-sm" onclick="exportCSV()">CSV出力</button>
       <button class="btn btn-outline btn-sm" onclick="resetAll()">リセット</button>
     </div>
   </div>
-  <!-- 画像生成プログレス -->
-  <div class="card hidden" id="progressCard">
-    <div class="progress-card">
-      <p class="progress-msg" id="progressMsg">準備中...</p>
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+  <!-- 進捗トラッカー -->
+  <div class="card" id="trackerCard">
+    <p style="font-size:.85rem;color:var(--dim);margin-bottom:.75rem">シーンの「コピー」→ Geminiに貼り付けて生成 →「完了」を押す</p>
+    <div class="tracker-bar">
+      <span id="trackerText">0 / 0 完了</span>
+      <div class="progress-bar-bg" style="margin-top:.5rem"><div class="progress-bar-fill" id="trackerBar"></div></div>
     </div>
-  </div>
-  <!-- 画像ギャラリー -->
-  <div class="hidden" id="gallerySection">
-    <h3 style="color:var(--text);margin-bottom:1rem">生成された画像</h3>
-    <div class="gallery-grid" id="galleryGrid"></div>
-    <button class="btn btn-outline btn-sm" onclick="exportCSVWithImages()" style="margin-top:.5rem">画像パス付きCSV</button>
   </div>
   <!-- シーンカード -->
   <div id="scenesList"></div>
@@ -235,27 +224,43 @@ function generatePrompts(){
   if(!t){alert("台本を入力してください");return}
   currentScenes=parseScript(t);
   if(!currentScenes.length){alert("（話者名）形式で入力してください");return}
+  doneSet=new Set();
   document.getElementById("sceneCount").textContent=currentScenes.length+" シーン";
   renderScenes();
   document.getElementById("resultSection").classList.remove("hidden");
+  updateTracker();
 }
 function renderScenes(){
   const c=document.getElementById("scenesList");c.innerHTML="";
   const rc={"悪役":"#ff2d55","黒幕":"#a78bfa","弱者":"#fbbf24","ヒーロー":"#34d399","説明役":"#00f0ff","締め":"#ff6b8a"};
   currentScenes.forEach((s,i)=>{
     const cl=rc[s.role]||"#888",d=document.createElement("div");d.className="scene-card";
-    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span></div><span class="expand-icon">▼</span></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="prompt-hdr"><h4>画像生成プロンプト</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})">コピー</button></div><pre class="prompt-box">${esc(s.prompt)}</pre></div>`;
+    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span><span class="done-mark hidden" id="done${i}">✓</span></div><div style="display:flex;gap:.5rem;align-items:center"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyOne(${i})" id="copyBtn${i}" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();markDone(${i})" id="doneBtn${i}">完了</button><span class="expand-icon">▼</span></div></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="prompt-hdr"><h4>画像生成プロンプト</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button></div><pre class="prompt-box">${esc(s.prompt)}</pre></div>`;
     c.appendChild(d);
   });
 }
+let doneSet=new Set();
 function toggle(i){document.getElementById("sb"+i).classList.toggle("open");document.getElementById("sb"+i).closest(".scene-card").classList.toggle("open")}
-function copyOne(i){navigator.clipboard.writeText(currentScenes[i].prompt)}
+function copyOne(i){navigator.clipboard.writeText(currentScenes[i].prompt);const b=document.getElementById("copyBtn"+i);if(b){b.textContent="コピー済み!";setTimeout(()=>b.textContent="コピー",1500)}}
+function markDone(i){
+  doneSet.add(i);
+  const btn=document.getElementById("doneBtn"+i);btn.textContent="完了!";btn.style.background="var(--green)";btn.style.color="#000";btn.style.borderColor="var(--green)";
+  document.getElementById("done"+i).classList.remove("hidden");
+  document.getElementById("sb"+i).closest(".scene-card").style.opacity="0.5";
+  updateTracker();
+  if(doneSet.size===currentScenes.length){alert("全シーンの画像生成が完了しました！\n「CSV出力」で編集者に渡せます。")}
+}
+function updateTracker(){
+  const n=doneSet.size,t=currentScenes.length;
+  document.getElementById("trackerText").textContent=`${n} / ${t} 完了`;
+  document.getElementById("trackerBar").style.width=(n/t*100)+"%";
+}
 function copyAllPrompts(){navigator.clipboard.writeText(currentScenes.map(s=>`=== #${s.n} ${s.speaker} ===\n${s.prompt}`).join("\n\n---\n\n")).then(()=>alert("コピーしました"))}
 function exportCSV(){let c="シーン番号,話者,セリフ,役割,感情,声の雰囲気,プロンプト\n";currentScenes.forEach(s=>{c+=[s.n,q(s.speaker),q(s.dialogue),q(s.role),q(s.emotion),q(s.voice),q(s.prompt)].join(",")+"\n"});dl(c,"image_prompts.csv","text/csv")}
 function q(s){return'"'+String(s).replace(/"/g,'""')+'"'}
 function dl(c,n,t){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=n;a.click()}
 function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
-function resetAll(){document.getElementById("resultSection").classList.add("hidden");document.getElementById("progressCard").classList.add("hidden");document.getElementById("gallerySection").classList.add("hidden");currentScenes=[];imageResults=[]}
+function resetAll(){document.getElementById("resultSection").classList.add("hidden");currentScenes=[];doneSet=new Set()}
 
 // === Gemini画像生成 ===
 async function generateAllImages(){
