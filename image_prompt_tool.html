@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI画像プロンプト生成ツール</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0f;--card:#13131a;--border:#2a2a3a;--text:#e4e4ec;--dim:#8888a0;--accent:#ff2d55;--cyan:#00f0ff;--green:#34d399;--yellow:#fbbf24;--purple:#a78bfa;--r:12px}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans JP',sans-serif;line-height:1.6;min-height:100vh}
+.container{max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+h1{font-size:2rem;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin-bottom:.5rem}
+.subtitle{color:var(--dim);font-size:.95rem;text-align:center;margin-bottom:2rem}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:2rem;margin-bottom:1.5rem}
+label{display:block;font-size:.85rem;font-weight:600;color:var(--dim);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em}
+textarea,input{width:100%;padding:.75rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.95rem;font-family:inherit;line-height:1.7;resize:vertical}
+textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,45,85,.3)}
+.hint{font-size:.8rem;color:var(--dim);margin-top:.5rem}
+.btn-row{display:flex;gap:.75rem;margin-top:1rem}
+.btn{padding:.8rem 1.5rem;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-primary{flex:1;background:linear-gradient(135deg,var(--accent),#ff6b8a);color:#fff}
+.btn-green{background:linear-gradient(135deg,var(--green),var(--cyan));color:#fff}
+.btn-outline{background:transparent;color:var(--dim);border:1px solid var(--border)}
+.btn-outline:hover{border-color:var(--text);color:var(--text)}
+.btn-sm{padding:.4rem .8rem;font-size:.8rem}
+.hidden{display:none!important}
+.badge{font-size:.7rem;padding:.15rem .6rem;border-radius:999px;font-weight:600}
+.stat-badge{padding:.4rem 1rem;background:rgba(0,240,255,.1);color:var(--cyan);border-radius:999px;font-size:.9rem;font-weight:600}
+.result-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem}
+.result-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+.scene-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:.75rem;overflow:hidden}
+.scene-card.open{border-color:var(--cyan)}
+.scene-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;cursor:pointer}
+.scene-header:hover{background:#1a1a24}
+.scene-info{display:flex;align-items:center;gap:.75rem}
+.scene-num{font-size:.85rem;font-weight:700;color:var(--cyan)}
+.scene-speaker{font-size:1rem;font-weight:600}
+.expand-icon{color:var(--dim);font-size:.8rem;transition:transform .2s}
+.scene-card.open .expand-icon{transform:rotate(180deg)}
+.scene-body{display:none;padding:0 1.25rem 1.25rem;border-top:1px solid var(--border)}
+.scene-body.open{display:block}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin:1rem 0;padding:.75rem;background:var(--bg);border-radius:8px}
+.meta-label{font-size:.7rem;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.meta-val{font-size:.85rem;color:var(--text);margin-top:.15rem}
+.dialogue-box{background:var(--bg);padding:.75rem 1rem;border-radius:8px;font-size:.95rem;line-height:1.7;white-space:pre-wrap;margin:.75rem 0}
+.prompt-box{background:var(--bg);padding:1rem;border-radius:8px;border:1px solid var(--border);font-size:.85rem;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;color:var(--green);max-height:300px;overflow-y:auto;margin:.5rem 0}
+.prompt-hdr{display:flex;justify-content:space-between;align-items:center}
+.prompt-hdr h4,.section-label{font-size:.8rem;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.progress-card{text-align:center;padding:1.5rem}
+.progress-msg{color:var(--dim);font-size:.9rem;margin-bottom:.75rem}
+.progress-bar-bg{width:100%;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--cyan));width:0%;transition:width .5s}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin:1rem 0}
+.gallery-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.gallery-card img{width:100%;aspect-ratio:9/16;object-fit:cover;display:block}
+.gallery-label{padding:.5rem .75rem;font-size:.8rem;color:var(--dim);display:flex;align-items:center;gap:.5rem}
+.gallery-err{width:100%;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;background:var(--bg);color:#ff6b6b;font-size:.8rem;padding:1rem;text-align:center}
+@media(max-width:640px){.container{padding:1rem}.btn-row{flex-direction:column}.result-header{flex-direction:column;align-items:flex-start}.meta-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>AI画像プロンプト生成ツール</h1>
+<p class="subtitle">台本入力 → プロンプト自動生成 → Gemini画像一括生成 → CSV出力</p>
+
+<!-- 入力エリア -->
+<div class="card" id="inputSection">
+  <div style="margin-bottom:1rem">
+    <label for="apiKey">Gemini APIキー</label>
+    <input type="password" id="apiKey" placeholder="AIza...（画像生成に必要）">
+    <p class="hint">Google AI Studio で取得できます。プロンプト生成だけなら不要です。</p>
+  </div>
+  <div style="margin-bottom:1rem">
+    <label for="scriptInput">台本テキスト</label>
+    <textarea id="scriptInput" rows="14" placeholder="（皮脂）&#10;いちご鼻から卒業したいなら絶対に聞け！&#10;俺は皮脂、こいつは角質！&#10;&#10;（角質）&#10;俺たちが毛穴に溜まり..."></textarea>
+    <p class="hint">（話者名）の形式でシーンを区切ってください</p>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="generatePrompts()">プロンプトを一括生成</button>
+    <button class="btn btn-outline" onclick="loadSample()">サンプル台本</button>
+  </div>
+</div>
+
+<!-- 結果エリア -->
+<div id="resultSection" class="hidden">
+  <div class="result-header">
+    <span class="stat-badge" id="sceneCount">0 シーン</span>
+    <div class="result-actions">
+      <button class="btn btn-green btn-sm" onclick="generateAllImages()">Geminiで全画像を一括生成</button>
+      <button class="btn btn-outline btn-sm" onclick="copyAllPrompts()">全コピー</button>
+      <button class="btn btn-outline btn-sm" onclick="exportCSV()">CSV出力</button>
+      <button class="btn btn-outline btn-sm" onclick="resetAll()">リセット</button>
+    </div>
+  </div>
+  <!-- 画像生成プログレス -->
+  <div class="card hidden" id="progressCard">
+    <div class="progress-card">
+      <p class="progress-msg" id="progressMsg">準備中...</p>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+    </div>
+  </div>
+  <!-- 画像ギャラリー -->
+  <div class="hidden" id="gallerySection">
+    <h3 style="color:var(--text);margin-bottom:1rem">生成された画像</h3>
+    <div class="gallery-grid" id="galleryGrid"></div>
+    <button class="btn btn-outline btn-sm" onclick="exportCSVWithImages()" style="margin-top:.5rem">画像パス付きCSV</button>
+  </div>
+  <!-- シーンカード -->
+  <div id="scenesList"></div>
+</div>
+</div>
+
+<script>
+// === キャラクター設定 ===
+const CHARS = {
+"髪の毛":{base:"A single anthropomorphic hair strand character standing upright on a real human scalp. Dark brown, textured realistic hair fiber. Tiny compared to surrounding hair strands that tower like a forest.",env:"Real human scalp surface with visible pores. Other hair strands tower around it. Partial human finger visible for scale.",role:"説明役",anchor:"Human scalp, real hair strands as forest, partial finger for scale"},
+"皮脂":{base:"An anthropomorphic sebum/oil blob — glistening yellowish-gold translucent body, sitting smugly inside a real pore cavity. Oily, sticky, gross-looking but with a cute face.",env:"Inside a real pore cavity. Reddish skin walls. Oily sheen. Other pores visible on real skin surface.",role:"悪役",anchor:"Real skin pore interior, realistic sebum texture"},
+"毛穴":{base:"An anthropomorphic pore — a round reddened opening on real skin surface with a face in the pore rim. Slightly inflamed, surrounded by realistic skin texture and tiny hair follicles.",env:"Extreme macro of real human skin. Other pores and fine hairs visible. Sebum buildup inside.",role:"弱者",anchor:"Real human skin at macro scale, visible pores, human finger approaching"},
+"角質":{base:"An anthropomorphic dead skin cell / keratin character — flat flaky greyish-white layered figure with a tough stubborn face. Stacked like bricks inside a pore.",env:"Inside a real pore on human nose/face. Stacked dead cell layers filling the pore. Sebum mixed between layers.",role:"悪役",anchor:"Real facial skin pore interior, layered dead cells, realistic skin texture"},
+"いちご鼻":{base:"An anthropomorphic strawberry-nose character — a human nose tip covered in visible dark dots (oxidized sebum plugs), with a taunting villainous face. Reddish strawberry-like appearance.",env:"Real human face close-up centered on nose. Each pore has a dark plug visible. Mirror/bathroom lighting.",role:"悪役",anchor:"Real human face/nose close-up, visible clogged pores"},
+"クレンジング":{base:"An anthropomorphic cleansing product — sleek bottle-shaped female figure with a determined fierce face. Clear/golden oil body. Emulsified milky droplets swirling like a battle aura.",env:"Bathroom counter. Human hand nearby. Water droplets. Makeup residue visualized as a dark fortress being dissolved.",role:"ヒーロー",anchor:"Real bathroom counter, human hand, water droplets"},
+"洗顔料":{base:"An anthropomorphic face wash — tube-shaped muscular male figure with a tough face. Rich foamy lather surrounding like armor. Charcoal/enzyme particles visible in foam like tiny soldiers.",env:"Real bathroom. Thick foam clouds. Remnants of dissolved dirt being swept away. Bright clean lighting.",role:"ヒーロー",anchor:"Real bathroom shelf, foamy lather, human hands in background"},
+"美容成分":{base:"An anthropomorphic serum squad — tiny glowing colorful droplet soldiers in formation. Leader is a golden glowing droplet with a commanding face. 5-6 smaller droplets in different colors behind.",env:"On real human skin after cleansing — clean open pores visible. Squad marching into pores like an army. Dramatic golden backlight.",role:"ヒーロー",anchor:"Real cleansed human skin, open empty pores"},
+"シルクシャンプー":{base:"An anthropomorphic shampoo foam — heroic muscular figure made of white pearlescent shimmering foam. Silk-like iridescent surface. Emerging dramatically from foam cloud.",env:"Wet hair strands and scalp in background. Foam bubbles floating. Bright clean bathroom lighting.",role:"ヒーロー",anchor:"Real wet hair strands, water droplets, bathroom shower"},
+"後頭部":{base:"The back of a real human head with an annoyed anthropomorphic face on the posterior scalp. Wet hair parted to reveal the face. Realistic skin and hair.",env:"Bathroom/shower with water droplets and steam. Real shower head visible.",role:"説明役",anchor:"Real human head, shower environment, steam"},
+"ニキビ":{base:"An anthropomorphic pimple — red inflamed bump on real human skin with an angry face. Yellowish-white pus at top. Tiny arms crossed defiantly.",env:"On real human facial skin. Other pores visible. Human finger approaching from above.",role:"悪役",anchor:"Real human facial skin, approaching finger, visible pores"},
+"赤ニキビ":{base:"An anthropomorphic red acne — intensely red inflamed bump on real skin. Angry face with glowing red eyes. Tiny military hat, holding walkie-talkie, screaming.",env:"On real human facial skin. White blood cells attacking bacteria. Human finger looming overhead.",role:"悪役",anchor:"Real facial skin close-up, human finger for scale"},
+"白ニキビ":{base:"An anthropomorphic whitehead — pale white sealed bump on real skin with a sly cool expression. Smooth rounded translucent body. Bacteria floating nearby.",env:"On real skin surface. Floating bacteria. Clean but threatening atmosphere.",role:"黒幕",anchor:"Real skin surface, microscopic bacteria"},
+"黒ニキビ":{base:"An anthropomorphic blackhead — dark oxidized bump on real skin with a young energetic face. Dark crumbly particles falling from head. Standing proudly in an open pore.",env:"On real human skin, inside open pore. Oxidized sebum particles falling.",role:"悪役",anchor:"Real skin pore opening, oxidized sebum particles"},
+"角栓":{base:"An anthropomorphic keratin plug — yellowish waxy cylindrical figure with a cheeky grin, arms crossed, wedged inside a pore on real human nose (strawberry nose).",env:"Real human nose skin with multiple clogged pores. Gross but cute character.",role:"悪役",anchor:"Real human nose close-up, clogged pores"},
+"クレンジングオイル":{base:"An anthropomorphic cleansing oil — clear golden oil bottle-shaped figure with a stern caring female face. Hands on hips. Milky emulsified droplets surrounding.",env:"Bathroom. Real woman's face partially visible in background. Water and steam.",role:"説明役",anchor:"Real bathroom, partial human face, shower water"},
+"美容液":{base:"An anthropomorphic serum — sleek glass dropper bottle figure with a serious commanding face. Glowing golden liquid body. On a real bathroom counter.",env:"Real bathroom vanity. Other skincare bottles visible. Post-shower steam.",role:"説明役",anchor:"Real bathroom counter, skincare products for scale"},
+"日焼け止め":{base:"An anthropomorphic sunscreen tube — white tube-shaped figure with a gentle professional face. Clean trustworthy appearance. Holding a tiny UV shield.",env:"Bright sunny window. UV rays as golden arrows being blocked. Real vanity table.",role:"ヒーロー",anchor:"Real window with sunlight, real vanity"},
+"フェイスパック":{base:"An anthropomorphic sheet mask — flat white sheet-shaped figure with cute pink cheeks and energetic face. Dripping with essence. Tiny arms waving.",env:"Real woman's face partially visible. Bathroom mirror. Soft warm lighting.",role:"説明役",anchor:"Real human face, bathroom mirror"},
+"枕":{base:"An anthropomorphic pillow — rectangular yellowed dirty pillow with a villainous face. Evil glowing eyes. Bacteria crawling on surface.",env:"Real bed at night. Real person sleeping on the pillow. Dark moody lighting.",role:"悪役",anchor:"Real bedroom, sleeping person's face"},
+"バスタオル":{base:"An anthropomorphic bath towel — damp towel with a scared young face. Bacteria multiplying on surface. Shivering and dripping.",env:"Real bathroom towel rack. Damp steamy environment.",role:"弱者",anchor:"Real bathroom towel rack, steam, tiles"},
+"スポンジ":{base:"An anthropomorphic sponge — rectangular porous sponge with a nerdy intelligent face. Bacteria hidden in pores.",env:"Real kitchen/bathroom sink. Wet surface. Cleaning supplies for scale.",role:"説明役",anchor:"Real sink, cleaning supplies"},
+};
+
+const STYLE = "Pixar/Disney-style 3D CGI rendering, photorealistic textures with cute cartoon facial features (big round expressive eyes, eyebrows, small mouth). The character has tiny arms and hands for emotional gestures. Vertical 9:16 composition. Highly detailed, cinematic lighting, shallow depth of field. No text, no watermark, no UI elements.";
+const RULES = "IMPORTANT: The character must be microscopic/tiny scale compared to human body. Do NOT make the character human-sized. Do NOT make the background abstract or fantasy. Keep all non-character elements photorealistic. Only the character itself is stylized/cartoon.";
+
+const ROLES = {
+"悪役":"evil/mischievous expression, sinister smirk, narrowed eyes, dark aura",
+"黒幕":"sly grin, scheming expression, half-closed cunning eyes, shadowy lighting",
+"弱者":"distressed expression, teary big eyes, trembling, calling for help",
+"ヒーロー":"heroic determined expression, confident stance, backlit golden glow, power pose",
+"説明役":"serious but friendly expression, one hand raised explaining, neutral warm lighting",
+"締め":"hopeful determined expression, looking directly at viewer, warm golden light",
+};
+
+const EMOTIONS = {
+"怒り":"angry expression, furrowed brows, gritted teeth, yelling, intense red lighting",
+"叫び":"screaming, wide open mouth, dramatic lighting, motion blur",
+"恐怖":"terrified, wide panicked eyes, trembling, dark ominous atmosphere",
+"得意":"smug, evil confident smirk, chin up, one eyebrow raised, golden lighting",
+"説明":"serious explaining, one hand raised, neutral warm lighting",
+"苦しみ":"agonized, squinting eyes, grimacing, being crushed, dramatic shadows",
+"訴え":"pleading desperate, big teary eyes, reaching out, emotional lighting",
+"威圧":"intimidating, looking down at viewer, crossed arms, dark dramatic lighting, glowing eyes",
+"ヒーロー":"heroic determined, dramatic wind, backlit golden glow, power pose, fist raised",
+"嘲笑":"mocking, tongue out, taunting gesture, looking down at viewer",
+"焦り":"panicking, sweating, looking around frantically",
+"決意":"determined, focused sharp eyes, clenched fist, bold dramatic lighting",
+"安堵":"relieved, gentle smile, soft warm golden lighting",
+};
+
+// === 検出関数 ===
+function detectEmotion(d){
+  if(/ぐあぁ|うわぁぁ|やめてくれぇ/.test(d))return"叫び";
+  if(/やめて|ぇぇ|うわ|近づけるな/.test(d))return"恐怖";
+  if(/ハハハ|ヒヒヒ|ガハハ|愚か/.test(d))return"嘲笑";
+  if(/聞け|引っ込めろ|！！|なれない/.test(d))return"怒り";
+  if(/絶望|お手上げ|一生消えない|一生ない|放っておいても/.test(d))return"威圧";
+  if(/身動き|とれない|助けて|溺れ|苦し/.test(d))return"苦しみ";
+  if(/根こそぎ|引き剥が|鎧|守る|踏み潰|切る|崩す|溶かせ|流してやる|攻め込め|送り込め|俺たちの番/.test(d))return"ヒーロー";
+  if(/うんざり|待たされ|いつも最後/.test(d))return"怒り";
+  if(/お願い|させないで|2度と|頼む|続けてくれ/.test(d))return"訴え";
+  if(/守れば|サラサラ|行くぞ/.test(d))return"決意";
+  if(/しなさい|ちゃんと|でしょ？|温めなさい/.test(d))return"訴え";
+  if(/知ってた？|実は|正体|分かってんのか/.test(d))return"得意";
+  if(/選べよ|だぞ|だから|するんだ|使っとけ/.test(d))return"説明";
+  return"説明";
+}
+function detectRole(d,ch){
+  if(/根こそぎ|守る|鎧|踏み潰|召喚しろ|切る|崩す|溶かせ|流してやる|攻め込め|送り込め|俺たちの番/.test(d))return"ヒーロー";
+  if(/やめて|助けて|身動き|溺れ|苦し|とれない/.test(d))return"弱者";
+  if(/ハハハ|ヒヒヒ|ガハハ|愚か|食い荒ら/.test(d))return"悪役";
+  if(/頼む|守れば|手順|お願い|続けてくれ/.test(d))return"締め";
+  return ch?.role||"説明役";
+}
+function detectVoice(d){
+  if(/あたし|わよ！|のよ！|するわ|崩すわ|なさい|私にしか/.test(d))return"女性・芯の通った声";
+  if(/俺様|貴様|愚か|ハハハ/.test(d))return"男性・20代・威圧的";
+  if(/僕|だよ|ちゃう/.test(d))return"男性・10代〜20代・若い";
+  if(/俺は|だぜ|だぞ|してやる/.test(d))return"男性・20代・芯のある声";
+  if(/我が名|甘いな|行くぞ/.test(d))return"男性・イケボ・低め";
+  if(/こんにちは|しましょう|です/.test(d))return"アナウンサー風・丁寧";
+  return"20代男性・感情豊か";
+}
+
+// === 台本パース ===
+function parseScript(text){
+  const parts=text.split(/（([^）]+)）/);
+  const scenes=[];
+  for(let i=1;i<parts.length;i+=2){
+    if(i+1>=parts.length)break;
+    const speaker=parts[i].trim();
+    const speakerBase=speaker.includes("・")?speaker.split("・")[0]:speaker;
+    const dialogue=parts[i+1].trim();
+    if(!dialogue)continue;
+    const ch=CHARS[speakerBase]||null;
+    scenes.push({n:scenes.length+1,speaker,speakerBase,dialogue,emotion:detectEmotion(dialogue),role:detectRole(dialogue,ch),voice:detectVoice(dialogue),anchor:ch?ch.anchor:"Real environment with human hand/body for scale",prompt:""});
+  }
+  scenes.forEach(s=>{s.prompt=buildPrompt(s)});
+  return scenes;
+}
+
+// === プロンプト構築 ===
+function buildPrompt(s){
+  const ch=CHARS[s.speakerBase];
+  const base=ch?ch.base:`An anthropomorphic ${s.speakerBase} character with a cute face (big round eyes, eyebrows), tiny arms and hands, in a photorealistic environment. Microscopic/tiny scale.`;
+  const env=ch?ch.env:`Photorealistic environment where a ${s.speakerBase} naturally exists. Real human hand partially visible for scale.`;
+  return`${base}\n\n[Expression] ${EMOTIONS[s.emotion]||"neutral expression"}\n[Character role] ${ROLES[s.role]||""}\n[Environment] ${env}\n[Reality anchor] ${s.anchor}\n\n[Style] ${STYLE}\n[Rules] ${RULES}`;
+}
+
+// === UI ===
+let currentScenes=[],imageResults=[];
+function generatePrompts(){
+  const t=document.getElementById("scriptInput").value.trim();
+  if(!t){alert("台本を入力してください");return}
+  currentScenes=parseScript(t);
+  if(!currentScenes.length){alert("（話者名）形式で入力してください");return}
+  document.getElementById("sceneCount").textContent=currentScenes.length+" シーン";
+  renderScenes();
+  document.getElementById("resultSection").classList.remove("hidden");
+}
+function renderScenes(){
+  const c=document.getElementById("scenesList");c.innerHTML="";
+  const rc={"悪役":"#ff2d55","黒幕":"#a78bfa","弱者":"#fbbf24","ヒーロー":"#34d399","説明役":"#00f0ff","締め":"#ff6b8a"};
+  currentScenes.forEach((s,i)=>{
+    const cl=rc[s.role]||"#888",d=document.createElement("div");d.className="scene-card";
+    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span></div><span class="expand-icon">▼</span></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="prompt-hdr"><h4>画像生成プロンプト</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})">コピー</button></div><pre class="prompt-box">${esc(s.prompt)}</pre></div>`;
+    c.appendChild(d);
+  });
+}
+function toggle(i){document.getElementById("sb"+i).classList.toggle("open");document.getElementById("sb"+i).closest(".scene-card").classList.toggle("open")}
+function copyOne(i){navigator.clipboard.writeText(currentScenes[i].prompt)}
+function copyAllPrompts(){navigator.clipboard.writeText(currentScenes.map(s=>`=== #${s.n} ${s.speaker} ===\n${s.prompt}`).join("\n\n---\n\n")).then(()=>alert("コピーしました"))}
+function exportCSV(){let c="シーン番号,話者,セリフ,役割,感情,声の雰囲気,プロンプト\n";currentScenes.forEach(s=>{c+=[s.n,q(s.speaker),q(s.dialogue),q(s.role),q(s.emotion),q(s.voice),q(s.prompt)].join(",")+"\n"});dl(c,"image_prompts.csv","text/csv")}
+function q(s){return'"'+String(s).replace(/"/g,'""')+'"'}
+function dl(c,n,t){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=n;a.click()}
+function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function resetAll(){document.getElementById("resultSection").classList.add("hidden");document.getElementById("progressCard").classList.add("hidden");document.getElementById("gallerySection").classList.add("hidden");currentScenes=[];imageResults=[]}
+
+// === Gemini画像生成 ===
+async function generateAllImages(){
+  const key=document.getElementById("apiKey").value.trim();
+  if(!key){alert("APIキーを入力してください");return}
+  if(!currentScenes.length)return;
+  const prog=document.getElementById("progressCard"),msg=document.getElementById("progressMsg"),bar=document.getElementById("progressBar");
+  prog.classList.remove("hidden");document.getElementById("gallerySection").classList.add("hidden");imageResults=[];
+  for(let i=0;i<currentScenes.length;i++){
+    msg.textContent=`画像生成中 (${i+1}/${currentScenes.length}) — ${currentScenes[i].speaker}`;
+    bar.style.width=((i+1)/currentScenes.length*100)+"%";
+    try{
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:"Generate this image:\n\n"+currentScenes[i].prompt}]}],generationConfig:{responseModalities:["TEXT","IMAGE"]}})});
+      const d=await r.json();let url="";
+      for(const c of(d.candidates||[]))for(const p of(c.content?.parts||[]))if(p.inlineData?.mimeType?.startsWith("image/")){url="data:"+p.inlineData.mimeType+";base64,"+p.inlineData.data;break}
+      imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:!!url,url,err:url?"":"画像なし"});
+    }catch(e){imageResults.push({n:currentScenes[i].n,speaker:currentScenes[i].speaker,ok:false,url:"",err:e.message})}
+    if(i<currentScenes.length-1)await new Promise(r=>setTimeout(r,2000));
+  }
+  prog.classList.add("hidden");showGallery();
+}
+function showGallery(){
+  const g=document.getElementById("gallerySection"),grid=document.getElementById("galleryGrid");
+  g.classList.remove("hidden");grid.innerHTML="";
+  imageResults.forEach(r=>{const d=document.createElement("div");d.className="gallery-card";d.innerHTML=r.ok?`<img src="${r.url}"><div class="gallery-label"><span class="scene-num">#${r.n}</span>${esc(r.speaker)}</div>`:`<div class="gallery-err">${esc(r.err)}</div><div class="gallery-label">#${r.n} ${esc(r.speaker)}</div>`;grid.appendChild(d)});
+}
+function exportCSVWithImages(){let c="シーン番号,話者,役割,感情,声,画像\n";imageResults.forEach(r=>{const s=currentScenes.find(x=>x.n===r.n);if(s)c+=[r.n,q(s.speaker),q(s.role),q(s.emotion),q(s.voice),q(r.ok?"成功":"エラー")].join(",")+"\n"});dl(c,"scenes_with_images.csv","text/csv")}
+
+function loadSample(){document.getElementById("scriptInput").value=`（皮脂）
+いちご鼻から卒業したいなら絶対に聞け！
+俺は皮脂、こいつは角質！
+お前の鼻に
+今いくら美容成分を入れても
+意味ないの分かってんのか！？
+
+（角質）
+俺たちが毛穴に溜まり
+毛穴がたるんで
+広がって
+詰まった後
+
+（いちご鼻）
+一番上の皮脂が
+外気に触れて
+錆びることで
+いちご鼻ができあがるんだ！
+俺を放っておいても
+毛穴に住んでる汚れが
+減ることは一生ないぜ？
+
+（クレンジング）
+私はクレンジング
+メイクや皮脂でできた
+油の要塞は
+私にしか溶かせないの！
+まずは私で乳化して
+奴らを崩すわよ！
+
+（洗顔料）
+俺は洗顔
+必ず酵素・炭・角質ケア成分が
+入ったものを選べよ！
+乳化で崩れた要塞の残骸は
+俺らが根こそぎ包んで
+流してやる！
+
+（美容成分）
+…要塞が崩壊したな
+今度は俺たちの番だ
+この精鋭部隊が
+ようやく肌に攻め込める！
+お前の悩みに合った成分を
+今すぐ送り込め！
+
+（毛穴）
+…やっと空になった
+2度とこんな思いさせないでくれよな…
+乾燥すると肌がパニック起こして
+あいつらがまた
+ドバドバ戻ってくる…
+脂性はジェル、乾燥肌はセラミドで蓋だ！
+この3ステップは毎日続けてくれ…お願いだ`}
+</script>
+</body>
+</html>
