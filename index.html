@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok バイラル分析ツール</title>
+    <style>
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        :root {
+            --bg:#0a0a0f; --bg2:#13131a; --bg3:#1a1a24; --border:#2a2a3a;
+            --text:#e4e4ec; --dim:#8888a0; --accent:#ff2d55; --cyan:#00f0ff;
+            --green:#34d399; --yellow:#fbbf24; --purple:#a78bfa;
+            --r:12px; --rs:8px;
+        }
+        body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans JP',sans-serif; line-height:1.6; min-height:100vh; }
+        .container { max-width:960px; margin:0 auto; padding:2rem 1.5rem; }
+        header { text-align:center; margin-bottom:2rem; }
+        header h1 { font-size:2rem; font-weight:700; background:linear-gradient(135deg,var(--accent),var(--cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        header p { color:var(--dim); font-size:.95rem; margin-top:.4rem; }
+        .card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:1.5rem; margin-bottom:1.5rem; }
+        label { display:block; font-size:.8rem; font-weight:600; color:var(--dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:.4rem; }
+        input, select, textarea { width:100%; padding:.7rem 1rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--rs); color:var(--text); font-size:.95rem; }
+        input:focus, textarea:focus, select:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(255,45,85,.2); }
+        textarea { min-height:200px; resize:vertical; font-family:monospace; font-size:.85rem; line-height:1.5; }
+        .row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+        .btn { width:100%; padding:.85rem; border:none; border-radius:var(--rs); font-size:1rem; font-weight:600; cursor:pointer; transition:transform .15s,box-shadow .15s; }
+        .btn-primary { background:linear-gradient(135deg,var(--accent),#ff6b8a); color:#fff; }
+        .btn-primary:hover { transform:translateY(-1px); box-shadow:0 4px 20px rgba(255,45,85,.3); }
+        .btn-secondary { background:transparent; color:var(--dim); border:1px solid var(--border); margin-top:1rem; }
+        .btn-secondary:hover { border-color:var(--text); color:var(--text); }
+        .hidden { display:none!important; }
+
+        /* ステップインジケーター */
+        .steps { display:flex; justify-content:center; gap:.5rem; margin-bottom:2rem; }
+        .step-dot { width:10px; height:10px; border-radius:50%; background:var(--border); transition:.3s; }
+        .step-dot.active { background:var(--cyan); box-shadow:0 0 8px rgba(0,240,255,.4); }
+        .step-dot.done { background:var(--green); }
+
+        /* 統計 */
+        .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:.75rem; margin-bottom:1.5rem; }
+        .stat { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:1rem; text-align:center; }
+        .stat-val { font-size:1.4rem; font-weight:700; background:linear-gradient(135deg,var(--cyan),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        .stat-lbl { font-size:.75rem; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; margin-top:.2rem; }
+
+        /* タブ */
+        .tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:1.5rem; overflow-x:auto; }
+        .tab { padding:.7rem 1.2rem; background:none; border:none; color:var(--dim); font-size:.85rem; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
+        .tab:hover { color:var(--text); }
+        .tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+        .tab-body { display:none; }
+        .tab-body.active { display:block; }
+
+        /* パターンバー */
+        .pat { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:1rem; margin-bottom:.75rem; }
+        .pat-name { font-size:.85rem; color:var(--dim); margin-bottom:.4rem; }
+        .pat-bar-bg { width:100%; height:8px; background:var(--border); border-radius:4px; overflow:hidden; margin-bottom:.3rem; }
+        .pat-bar { height:100%; border-radius:4px; transition:width .6s; }
+        .pat-val { font-size:1.1rem; font-weight:700; }
+        .pat-desc { font-size:.72rem; color:var(--dim); margin-top:.15rem; }
+
+        /* フック */
+        .hook { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:1rem; margin-bottom:.6rem; transition:border-color .2s; }
+        .hook:hover { border-color:var(--cyan); }
+        .hook-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:.4rem; flex-wrap:wrap; gap:.3rem; }
+        .hook-views { font-size:.85rem; color:var(--cyan); font-weight:600; }
+        .badges { display:flex; gap:.3rem; flex-wrap:wrap; }
+        .badge { font-size:.65rem; padding:.1rem .45rem; border-radius:999px; font-weight:600; }
+        .badge-q { background:rgba(251,191,36,.15); color:var(--yellow); }
+        .badge-n { background:rgba(255,45,85,.15); color:var(--accent); }
+        .badge-k { background:rgba(0,240,255,.1); color:var(--cyan); }
+        .hook-txt { font-size:.9rem; line-height:1.5; }
+
+        /* 動画 */
+        .vid { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); margin-bottom:.75rem; overflow:hidden; }
+        .vid-hdr { display:flex; justify-content:space-between; align-items:center; padding:1rem; cursor:pointer; }
+        .vid-hdr:hover { background:var(--bg3); }
+        .vid-meta { display:flex; gap:1rem; font-size:.8rem; color:var(--dim); flex-wrap:wrap; }
+        .vid-views { color:var(--cyan); font-weight:600; }
+        .vid-body { display:none; padding:0 1rem 1rem; border-top:1px solid var(--border); }
+        .vid-body.open { display:block; }
+        .vid-script { background:var(--bg); border-radius:var(--rs); padding:1rem; margin-top:.5rem; font-size:.85rem; line-height:1.7; white-space:pre-wrap; max-height:400px; overflow-y:auto; }
+        .arrow { color:var(--dim); font-size:.7rem; transition:transform .2s; }
+        .vid.open .arrow { transform:rotate(180deg); }
+
+        /* フレーズ */
+        .phrase { display:flex; align-items:center; gap:.75rem; padding:.5rem 0; border-bottom:1px solid var(--border); }
+        .phrase-cnt { font-size:1.1rem; font-weight:700; color:var(--cyan); min-width:35px; text-align:center; }
+
+        /* 時間分布 */
+        .dur-row { display:flex; align-items:center; gap:.75rem; margin-bottom:.5rem; }
+        .dur-label { width:80px; font-size:.82rem; text-align:right; color:var(--dim); }
+        .dur-bar-bg { flex:1; height:24px; background:var(--border); border-radius:4px; overflow:hidden; }
+        .dur-bar { height:100%; background:linear-gradient(90deg,var(--accent),var(--purple)); border-radius:4px; display:flex; align-items:center; padding-left:.5rem; font-size:.78rem; font-weight:600; }
+
+        .info-box { background:var(--bg3); border-left:3px solid var(--cyan); border-radius:0 var(--rs) var(--rs) 0; padding:1rem; margin-bottom:1rem; font-size:.85rem; color:var(--dim); line-height:1.6; }
+
+        @media(max-width:640px) {
+            .container { padding:1rem; }
+            header h1 { font-size:1.5rem; }
+            .row { grid-template-columns:1fr; }
+            .stats { grid-template-columns:repeat(2,1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>TikTok バイラル分析ツール</h1>
+        <p>100万再生以上の動画を抽出 → 台本を分析 → 伸びる共通項を発見</p>
+    </header>
+
+    <div class="steps">
+        <div class="step-dot active" id="sd1"></div>
+        <div class="step-dot" id="sd2"></div>
+        <div class="step-dot" id="sd3"></div>
+    </div>
+
+    <!-- Step 1: データ入力 -->
+    <section id="step1">
+        <div class="card">
+            <div class="info-box">
+                <strong>使い方:</strong><br>
+                1. 分析したいTikTokアカウントのページを開く<br>
+                2. 各動画の再生数・タイトル・台本(キャプション)をコピーして下に貼り付ける<br>
+                3. 「分析開始」を押すと自動で共通項を分析します<br><br>
+                <strong>入力フォーマット（1動画1行）:</strong><br>
+                <code>再生数, いいね数, 動画の秒数, タイトルまたは台本テキスト</code><br>
+                例: <code>1500000, 85000, 30, 知らないと損する美容法3選！実は...</code>
+            </div>
+
+            <div class="row">
+                <div>
+                    <label>アカウント名（メモ用）</label>
+                    <input type="text" id="acctName" placeholder="@username">
+                </div>
+                <div>
+                    <label>最低再生数</label>
+                    <select id="minViews">
+                        <option value="100000">10万再生</option>
+                        <option value="500000">50万再生</option>
+                        <option value="1000000" selected>100万再生</option>
+                        <option value="5000000">500万再生</option>
+                    </select>
+                </div>
+            </div>
+
+            <label>動画データ（1行1動画）</label>
+            <textarea id="rawData" placeholder="1500000, 85000, 30, 知らないと損する美容法3選！実は毎日やってるアレが原因...
+2300000, 120000, 45, 【衝撃】プロが絶対やらない5つの習慣。3つ目がヤバすぎた
+800000, 45000, 25, 朝のルーティン紹介します
+5000000, 250000, 60, マジでこれ知らない人多すぎ。たった1つの方法で人生変わった"></textarea>
+
+            <button class="btn btn-primary" onclick="analyze()">分析開始</button>
+        </div>
+    </section>
+
+    <!-- Step 2: 結果 -->
+    <section id="step2" class="hidden">
+        <div id="statsGrid" class="stats"></div>
+
+        <div class="tabs" id="tabsBar"></div>
+
+        <div class="tab-body active" id="tb-patterns"></div>
+        <div class="tab-body" id="tb-hooks"></div>
+        <div class="tab-body" id="tb-phrases"></div>
+        <div class="tab-body" id="tb-videos"></div>
+
+        <button class="btn btn-secondary" onclick="reset()">新しい分析を開始</button>
+    </section>
+</div>
+
+<script>
+// ===== キーワード定義 =====
+const HOOK_KW = ["知ってた","知ってますか","実は","衝撃","ヤバい","やばい","マジで","まじで","びっくり","驚き","秘密","裏技","知らないと損","損してる","危険","注意","絶対","必ず","最強","神","プロ","99%","誰も知らない","禁断","閲覧注意","これ見て","聞いて","待って","えっ"];
+const CTA_KW = ["フォロー","いいね","コメント","シェア","保存","プロフィール","リンク","詳しく","続き","パート2","part2","次回","また","お楽しみに"];
+const URG_KW = ["今すぐ","急いで","早く","限定","期間","最後","ラスト","終了","なくなる","売り切れ","残り"];
+const NEG_KW = ["やめて","ダメ","危険","注意","失敗","後悔","損","最悪","絶対にやるな","知らないと"];
+
+// ===== データパース =====
+function parseVideos(raw, minViews) {
+    const lines = raw.trim().split("\n").filter(l => l.trim());
+    const videos = [];
+    for (const line of lines) {
+        // カンマ区切り: 再生数, いいね, 秒数, テキスト
+        const parts = line.split(",");
+        if (parts.length < 2) continue;
+        const views = parseInt(parts[0].replace(/[^0-9]/g, "")) || 0;
+        const likes = parts.length >= 3 ? parseInt(parts[1].replace(/[^0-9]/g, "")) || 0 : 0;
+        const duration = parts.length >= 4 ? parseInt(parts[2].replace(/[^0-9]/g, "")) || 0 : 0;
+        const text = parts.length >= 4 ? parts.slice(3).join(",").trim() : (parts.length >= 3 ? parts.slice(2).join(",").trim() : parts.slice(1).join(",").trim());
+        videos.push({ views, likes, duration, text });
+    }
+    return videos.filter(v => v.views >= minViews).sort((a, b) => b.views - a.views);
+}
+
+// ===== 分析 =====
+function analyzeVideos(videos) {
+    const total = videos.length;
+    if (!total) return null;
+
+    const avgViews = videos.reduce((s, v) => s + v.views, 0) / total;
+    const avgLikes = videos.reduce((s, v) => s + v.likes, 0) / total;
+    const avgDur = videos.reduce((s, v) => s + v.duration, 0) / total;
+    const avgLen = videos.reduce((s, v) => s + v.text.length, 0) / total;
+
+    // パターン分析
+    let qCount = 0, negCount = 0, numCount = 0, ctaCount = 0, urgCount = 0;
+    const hooks = [];
+    const allPhrases = [];
+
+    for (const v of videos) {
+        const t = v.text;
+        const hook = t.slice(0, 50);
+        const ending = t.slice(-50);
+
+        const hasQ = /[?？]/.test(hook);
+        const hasNeg = NEG_KW.some(k => hook.includes(k));
+        const hasNum = /\d+/.test(hook);
+        const hasCta = CTA_KW.some(k => ending.includes(k));
+        const hasUrg = URG_KW.some(k => t.includes(k));
+        const matchedKw = HOOK_KW.filter(k => hook.includes(k));
+
+        if (hasQ) qCount++;
+        if (hasNeg) negCount++;
+        if (hasNum) numCount++;
+        if (hasCta) ctaCount++;
+        if (hasUrg) urgCount++;
+
+        hooks.push({ views: v.views, text: hook, hasQ, hasNeg, keywords: matchedKw });
+
+        // フレーズ抽出
+        const parts = t.split(/[。、！？!?\s\n,.]+/);
+        for (const p of parts) {
+            const s = p.trim();
+            if (s.length >= 3 && s.length <= 15) allPhrases.push(s);
+        }
+    }
+
+    // 頻出フレーズ
+    const phraseCounts = {};
+    for (const p of allPhrases) {
+        phraseCounts[p] = (phraseCounts[p] || 0) + 1;
+    }
+    const phrases = Object.entries(phraseCounts)
+        .filter(([_, c]) => c >= 2)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 30);
+
+    // 時間分布
+    const durDist = { "~15秒": 0, "16~30秒": 0, "31~60秒": 0, "1~3分": 0, "3分以上": 0 };
+    for (const v of videos) {
+        if (v.duration <= 0) continue;
+        if (v.duration <= 15) durDist["~15秒"]++;
+        else if (v.duration <= 30) durDist["16~30秒"]++;
+        else if (v.duration <= 60) durDist["31~60秒"]++;
+        else if (v.duration <= 180) durDist["1~3分"]++;
+        else durDist["3分以上"]++;
+    }
+
+    return {
+        total, avgViews, avgLikes, avgDur, avgLen,
+        rates: {
+            question: qCount / total,
+            negative: negCount / total,
+            number: numCount / total,
+            cta: ctaCount / total,
+            urgency: urgCount / total,
+        },
+        hooks, phrases, durDist, videos
+    };
+}
+
+// ===== 表示 =====
+function fmt(n) {
+    if (n >= 1e8) return (n/1e8).toFixed(1) + "億";
+    if (n >= 1e4) return (n/1e4).toFixed(1) + "万";
+    return n.toLocaleString();
+}
+function esc(s) { const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+
+function render(r) {
+    // 統計
+    document.getElementById("statsGrid").innerHTML = [
+        { v: r.total, l: "分析動画数", s: "本" },
+        { v: fmt(Math.round(r.avgViews)), l: "平均再生数", s: "" },
+        { v: fmt(Math.round(r.avgLikes)), l: "平均いいね", s: "" },
+        { v: Math.round(r.avgDur), l: "平均動画長", s: "秒" },
+        { v: Math.round(r.avgLen), l: "平均台本文字数", s: "字" },
+    ].map(i => `<div class="stat"><div class="stat-val">${i.v}${i.s}</div><div class="stat-lbl">${i.l}</div></div>`).join("");
+
+    // タブ
+    const tabNames = [
+        { id:"patterns", name:"共通項分析" },
+        { id:"hooks", name:"フック例" },
+        { id:"phrases", name:"頻出フレーズ" },
+        { id:"videos", name:"動画一覧・台本" },
+    ];
+    document.getElementById("tabsBar").innerHTML = tabNames.map((t, i) =>
+        `<button class="tab${i===0?' active':''}" onclick="switchTab('${t.id}',this)">${t.name}</button>`
+    ).join("");
+
+    // パターン
+    const pats = [
+        { name:"冒頭で疑問文", val:r.rates.question, color:"var(--yellow)", desc:"視聴者の注意を引く" },
+        { name:"ネガティブフック", val:r.rates.negative, color:"var(--accent)", desc:"不安・好奇心を刺激" },
+        { name:"冒頭に数字", val:r.rates.number, color:"var(--cyan)", desc:"具体性で信頼感UP" },
+        { name:"CTA（行動喚起）", val:r.rates.cta, color:"var(--green)", desc:"フォロー・いいね誘導" },
+        { name:"緊急性キーワード", val:r.rates.urgency, color:"var(--purple)", desc:"即時行動を促す" },
+    ];
+    let patHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.5rem">';
+    for (const p of pats) {
+        patHtml += `<div class="pat">
+            <div class="pat-name">${p.name}</div>
+            <div class="pat-bar-bg"><div class="pat-bar" style="width:${p.val*100}%;background:${p.color}"></div></div>
+            <div class="pat-val" style="color:${p.color}">${Math.round(p.val*100)}%</div>
+            <div class="pat-desc">${p.desc}</div>
+        </div>`;
+    }
+    patHtml += '</div>';
+
+    // 時間分布
+    const maxDur = Math.max(...Object.values(r.durDist), 1);
+    const hasDur = Object.values(r.durDist).some(v => v > 0);
+    if (hasDur) {
+        patHtml += '<div class="card"><h3 style="font-size:.9rem;color:var(--dim);margin-bottom:1rem">動画長の分布</h3>';
+        for (const [label, count] of Object.entries(r.durDist)) {
+            const pct = (count / maxDur) * 100;
+            patHtml += `<div class="dur-row"><span class="dur-label">${label}</span><div class="dur-bar-bg"><div class="dur-bar" style="width:${pct}%">${count}本</div></div></div>`;
+        }
+        patHtml += '</div>';
+    }
+    document.getElementById("tb-patterns").innerHTML = patHtml;
+
+    // フック
+    let hookHtml = '';
+    if (r.hooks.length) {
+        for (const h of r.hooks.slice(0, 15)) {
+            let badges = '';
+            if (h.hasQ) badges += '<span class="badge badge-q">疑問文</span>';
+            if (h.hasNeg) badges += '<span class="badge badge-n">ネガティブ</span>';
+            h.keywords.forEach(k => badges += `<span class="badge badge-k">${esc(k)}</span>`);
+            hookHtml += `<div class="hook">
+                <div class="hook-top"><span class="hook-views">${fmt(h.views)}再生</span><div class="badges">${badges}</div></div>
+                <div class="hook-txt">「${esc(h.text)}」</div>
+            </div>`;
+        }
+    } else {
+        hookHtml = '<p style="color:var(--dim)">データなし</p>';
+    }
+    document.getElementById("tb-hooks").innerHTML = hookHtml;
+
+    // フレーズ
+    let phHtml = '';
+    if (r.phrases.length) {
+        for (const [phrase, count] of r.phrases) {
+            phHtml += `<div class="phrase"><span class="phrase-cnt">${count}</span><span>${esc(phrase)}</span></div>`;
+        }
+    } else {
+        phHtml = '<p style="color:var(--dim)">2回以上出現したフレーズなし</p>';
+    }
+    document.getElementById("tb-phrases").innerHTML = phHtml;
+
+    // 動画一覧
+    let vidHtml = '';
+    r.videos.forEach((v, i) => {
+        vidHtml += `<div class="vid" id="vc${i}">
+            <div class="vid-hdr" onclick="toggleVid(${i})">
+                <div>
+                    <strong>${esc(v.text.slice(0, 60)) || '(テキストなし)'}</strong>
+                    <div class="vid-meta">
+                        <span class="vid-views">${fmt(v.views)}再生</span>
+                        ${v.likes ? `<span>${fmt(v.likes)}いいね</span>` : ''}
+                        ${v.duration ? `<span>${v.duration}秒</span>` : ''}
+                    </div>
+                </div>
+                <span class="arrow">&#9660;</span>
+            </div>
+            <div class="vid-body" id="vb${i}">
+                <div class="vid-script">${esc(v.text)}</div>
+            </div>
+        </div>`;
+    });
+    document.getElementById("tb-videos").innerHTML = vidHtml;
+}
+
+function switchTab(id, el) {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-body").forEach(t => t.classList.remove("active"));
+    el.classList.add("active");
+    document.getElementById("tb-" + id).classList.add("active");
+}
+
+function toggleVid(i) {
+    const card = document.getElementById("vc" + i);
+    const body = document.getElementById("vb" + i);
+    card.classList.toggle("open");
+    body.classList.toggle("open");
+}
+
+// ===== メイン =====
+function analyze() {
+    const raw = document.getElementById("rawData").value.trim();
+    if (!raw) { alert("動画データを入力してください"); return; }
+
+    const minViews = parseInt(document.getElementById("minViews").value);
+    const videos = parseVideos(raw, minViews);
+
+    if (!videos.length) {
+        alert(`${fmt(minViews)}再生以上の動画が見つかりませんでした。\n最低再生数を下げるか、データを確認してください。`);
+        return;
+    }
+
+    const result = analyzeVideos(videos);
+    if (!result) return;
+
+    render(result);
+
+    document.getElementById("step1").classList.add("hidden");
+    document.getElementById("step2").classList.remove("hidden");
+    document.getElementById("sd1").className = "step-dot done";
+    document.getElementById("sd2").className = "step-dot done";
+    document.getElementById("sd3").className = "step-dot active";
+}
+
+function reset() {
+    document.getElementById("step1").classList.remove("hidden");
+    document.getElementById("step2").classList.add("hidden");
+    document.getElementById("sd1").className = "step-dot active";
+    document.getElementById("sd2").className = "step-dot";
+    document.getElementById("sd3").className = "step-dot";
+}
+</script>
+</body>
+</html>
