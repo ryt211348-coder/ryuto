@@ -23,6 +23,7 @@ from tiktok_analyzer.prompt_generator import (
     scenes_to_csv,
     scenes_to_json,
 )
+from tiktok_analyzer.image_generator import generate_all_images
 
 app = Flask(__name__)
 
@@ -265,6 +266,101 @@ def export_csv():
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=image_prompts.csv"},
     )
+
+
+# === 画像生成API ===
+
+image_jobs = {}
+
+
+def run_image_generation(job_id: str, script_text: str, api_key: str):
+    """バックグラウンドで画像を一括生成."""
+    job = image_jobs[job_id]
+    try:
+        scenes = generate_all_prompts(script_text)
+        job["total"] = len(scenes)
+        job_dir = f"generated_images/{job_id}"
+
+        def on_progress(current, total, status):
+            job["progress"] = current
+            job["total"] = total
+            job["message"] = f"画像生成中 ({current}/{total})"
+            job["status"] = status
+
+        results = generate_all_images(scenes, job_dir, api_key, on_progress)
+
+        job["status"] = "completed"
+        job["message"] = "全画像の生成が完了しました"
+        job["results"] = []
+        for r, s in zip(results, scenes):
+            job["results"].append({
+                "scene_number": s.scene_number,
+                "speaker": s.speaker,
+                "dialogue": s.dialogue,
+                "role": s.role,
+                "emotion": s.emotion,
+                "voice_note": s.voice_note,
+                "success": r["success"],
+                "image_path": r["path"],
+                "error": r.get("error", ""),
+            })
+
+    except Exception as e:
+        job["status"] = "error"
+        job["message"] = f"エラー: {str(e)}"
+
+
+@app.route("/api/generate-images", methods=["POST"])
+def start_image_generation():
+    """台本から画像を一括生成（バックグラウンド）."""
+    data = request.get_json()
+    script_text = data.get("script", "").strip()
+    api_key = data.get("api_key", "").strip()
+
+    if not script_text:
+        return jsonify({"error": "台本テキストを入力してください"}), 400
+
+    # APIキーはリクエストから、なければ環境変数から
+    if not api_key:
+        from tiktok_analyzer.image_generator import get_api_key
+        api_key = get_api_key()
+
+    if not api_key:
+        return jsonify({"error": "Gemini APIキーが必要です"}), 400
+
+    job_id = str(uuid.uuid4())[:8]
+    image_jobs[job_id] = {
+        "status": "starting",
+        "message": "画像生成を開始しています...",
+        "progress": 0,
+        "total": 0,
+        "results": [],
+    }
+
+    thread = threading.Thread(
+        target=run_image_generation,
+        args=(job_id, script_text, api_key),
+        daemon=True,
+    )
+    thread.start()
+
+    return jsonify({"job_id": job_id})
+
+
+@app.route("/api/image-status/<job_id>")
+def image_job_status(job_id):
+    """画像生成ジョブの進捗確認."""
+    job = image_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    return jsonify(job)
+
+
+@app.route("/generated_images/<path:filepath>")
+def serve_generated_image(filepath):
+    """生成された画像を配信."""
+    from flask import send_from_directory
+    return send_from_directory("generated_images", filepath)
 
 
 if __name__ == "__main__":

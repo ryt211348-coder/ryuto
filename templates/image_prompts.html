@@ -60,9 +60,29 @@
                     <span id="sceneCount" class="stat-badge">0 シーン</span>
                 </div>
                 <div class="result-actions">
+                    <button class="btn-action btn-generate-images" id="generateImagesBtn" onclick="startImageGeneration()">Geminiで全画像を一括生成</button>
                     <button class="btn-action" onclick="copyAllPrompts()">全プロンプトをコピー</button>
                     <button class="btn-action" onclick="exportCSV()">CSV出力</button>
                     <button class="btn-secondary" onclick="resetForm()">新しい台本</button>
+                </div>
+            </div>
+
+            <!-- 画像生成プログレス -->
+            <div class="image-progress hidden" id="imageProgress">
+                <div class="progress-card">
+                    <p class="progress-message" id="imageProgressMsg">画像生成準備中...</p>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="imageProgressBar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 生成画像一覧 -->
+            <div class="image-gallery hidden" id="imageGallery">
+                <h3>生成された画像</h3>
+                <div class="gallery-grid" id="galleryGrid"></div>
+                <div class="gallery-actions">
+                    <button class="btn-action" onclick="exportCSVWithImages()">画像パス付きCSV出力</button>
                 </div>
             </div>
 
@@ -278,10 +298,141 @@
         }
     }
 
+    // === 画像生成 ===
+    let imageJobId = null;
+    let imageResults = [];
+
+    async function startImageGeneration() {
+        const script = document.getElementById('scriptInput').value.trim();
+        if (!script) return;
+
+        const btn = document.getElementById('generateImagesBtn');
+        btn.disabled = true;
+        btn.textContent = '生成開始中...';
+
+        document.getElementById('imageProgress').classList.remove('hidden');
+        document.getElementById('imageGallery').classList.add('hidden');
+
+        try {
+            const res = await fetch('/api/generate-images', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ script }),
+            });
+            const data = await res.json();
+
+            if (data.error) {
+                alert(data.error);
+                btn.disabled = false;
+                btn.textContent = 'Geminiで全画像を一括生成';
+                return;
+            }
+
+            imageJobId = data.job_id;
+            pollImageStatus();
+        } catch (err) {
+            alert('エラー: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = 'Geminiで全画像を一括生成';
+        }
+    }
+
+    function pollImageStatus() {
+        if (!imageJobId) return;
+
+        fetch(`/api/image-status/${imageJobId}`)
+            .then(r => r.json())
+            .then(data => {
+                const msg = document.getElementById('imageProgressMsg');
+                const bar = document.getElementById('imageProgressBar');
+
+                msg.textContent = data.message || '処理中...';
+                if (data.total > 0) {
+                    bar.style.width = `${(data.progress / data.total) * 100}%`;
+                }
+
+                if (data.status === 'completed') {
+                    imageResults = data.results || [];
+                    showImageGallery(imageResults);
+                    document.getElementById('imageProgress').classList.add('hidden');
+                    document.getElementById('generateImagesBtn').disabled = false;
+                    document.getElementById('generateImagesBtn').textContent = 'Geminiで全画像を一括生成';
+                } else if (data.status === 'error') {
+                    msg.textContent = data.message;
+                    document.getElementById('generateImagesBtn').disabled = false;
+                    document.getElementById('generateImagesBtn').textContent = 'Geminiで全画像を一括生成';
+                } else {
+                    setTimeout(pollImageStatus, 2000);
+                }
+            });
+    }
+
+    function showImageGallery(results) {
+        const gallery = document.getElementById('imageGallery');
+        const grid = document.getElementById('galleryGrid');
+        gallery.classList.remove('hidden');
+        grid.innerHTML = '';
+
+        results.forEach(r => {
+            const card = document.createElement('div');
+            card.className = 'gallery-card';
+            if (r.success) {
+                card.innerHTML = `
+                    <img src="/${r.image_path}" alt="シーン${r.scene_number}">
+                    <div class="gallery-label">
+                        <span class="scene-number">#${r.scene_number}</span>
+                        <span>${escapeHtml(r.speaker)}</span>
+                        <span class="badge-role">${escapeHtml(r.role)}</span>
+                    </div>
+                `;
+            } else {
+                card.innerHTML = `
+                    <div class="gallery-error">生成失敗: ${escapeHtml(r.error)}</div>
+                    <div class="gallery-label">
+                        <span class="scene-number">#${r.scene_number}</span>
+                        <span>${escapeHtml(r.speaker)}</span>
+                    </div>
+                `;
+            }
+            grid.appendChild(card);
+        });
+    }
+
+    function exportCSVWithImages() {
+        let csvContent = 'シーン番号,話者,セリフ,役割,感情,声の雰囲気,画像パス\n';
+        imageResults.forEach(r => {
+            const scene = currentScenes.find(s => s.scene_number === r.scene_number);
+            if (scene) {
+                const row = [
+                    r.scene_number,
+                    `"${scene.speaker}"`,
+                    `"${scene.dialogue.replace(/"/g, '""')}"`,
+                    `"${scene.role}"`,
+                    `"${scene.emotion}"`,
+                    `"${scene.voice_note}"`,
+                    `"${r.success ? r.image_path : 'エラー'}"`,
+                ].join(',');
+                csvContent += row + '\n';
+            }
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'scenes_with_images.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
     function resetForm() {
         document.getElementById('resultSection').classList.add('hidden');
+        document.getElementById('imageProgress').classList.add('hidden');
+        document.getElementById('imageGallery').classList.add('hidden');
         document.getElementById('scriptInput').value = '';
         currentScenes = [];
+        imageResults = [];
+        imageJobId = null;
     }
 
     function escapeHtml(str) {
