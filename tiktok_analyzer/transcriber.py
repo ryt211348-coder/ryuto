@@ -148,21 +148,41 @@ def _try_whisper(video_url, output_dir, model_size="base"):
     output_dir.mkdir(parents=True, exist_ok=True)
     audio_path = output_dir / "temp_audio.mp3"
 
+    # 既存の一時ファイルを削除
+    if audio_path.exists():
+        audio_path.unlink()
+
     # 音声ダウンロード
     cmd = [
         sys.executable, "-m", "yt_dlp",
         "-x", "--audio-format", "mp3", "--audio-quality", "0",
         "-o", str(audio_path).replace(".mp3", ".%(ext)s"),
-        "--no-warnings", "--quiet",
+        "--no-warnings",
+        "--force-overwrites",
         video_url,
     ]
 
     try:
-        subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        if result.returncode != 0:
+            err = result.stderr.strip()[-200:] if result.stderr else "不明なエラー"
+            console.print(f"    [dim]yt-dlp DL失敗: {err}[/dim]")
+    except subprocess.TimeoutExpired:
+        console.print(f"    [dim]yt-dlp DL: タイムアウト[/dim]")
+        return None
+    except FileNotFoundError:
+        console.print(f"    [dim]yt-dlp: コマンドが見つかりません[/dim]")
         return None
 
+    # mp3以外の拡張子で保存された場合もチェック
     if not audio_path.exists():
+        for f in output_dir.glob("temp_audio.*"):
+            if f.suffix in [".mp3", ".m4a", ".wav", ".ogg", ".webm", ".mp4"]:
+                audio_path = f
+                break
+
+    if not audio_path.exists():
+        console.print(f"    [dim]音声ファイルが見つかりません[/dim]")
         return None
 
     # Whisper文字起こし
