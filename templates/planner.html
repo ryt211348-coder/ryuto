@@ -19,24 +19,12 @@
             <p class="subtitle">TikTokを自動リサーチ → トレンドキーワード提案 → フック×ハウツーをマッチング → 企画台本を生成</p>
         </header>
 
-        <!-- Step 1: 設定 & CSV -->
+        <!-- Step 1: 設定 -->
         <section class="input-section" id="inputSection">
             <div class="form-card">
-                <h2 class="section-title">1. 参考台本CSV</h2>
-                <p class="section-desc">台本の構成・声の雰囲気・成功/失敗パターンを参考にします。</p>
+                <p class="section-desc" style="margin-bottom:1.5rem">参考台本の成功/失敗パターン・声の雰囲気はビルトイン済みです。</p>
 
-                <div class="upload-area" id="uploadArea">
-                    <input type="file" id="csvFile" accept=".csv,.tsv,.txt" hidden>
-                    <div class="upload-icon">📄</div>
-                    <p class="upload-text">CSVをドラッグ＆ドロップ or クリック</p>
-                    <p class="upload-hint">URL, 再生数, 理由, 文字起こし 等</p>
-                </div>
-                <div class="file-info hidden" id="fileInfo">
-                    <span class="file-name" id="fileName"></span>
-                    <button class="btn-text" onclick="clearFile()">削除</button>
-                </div>
-
-                <h2 class="section-title" style="margin-top:2rem">2. リサーチ条件</h2>
+                <h2 class="section-title">リサーチ条件</h2>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="minViews">最低再生数</label>
