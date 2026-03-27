@@ -238,7 +238,8 @@ function renderVideos(videos) {
     container.innerHTML = videos.map((v, i) =>
         `<div class="video-card" id="vc-${i}">
             <div class="video-header" onclick="toggleVideo(${i})">
-                <div>
+                ${v.thumbnail ? `<img src="${escapeHtml(v.thumbnail)}" alt="" class="video-thumb">` : '<div class="video-thumb-placeholder"></div>'}
+                <div class="video-info">
                     <strong>${escapeHtml(v.title || '(タイトルなし)')}</strong>
                     <div class="video-meta">
                         <span class="video-views">${formatNumber(v.views)}再生</span>
@@ -250,7 +251,7 @@ function renderVideos(videos) {
             </div>
             <div class="video-body" id="vb-${i}">
                 ${v.description ? `<p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:0.5rem">${escapeHtml(v.description)}</p>` : ''}
-                <a href="${escapeHtml(v.url)}" target="_blank" rel="noopener" class="video-link">TikTokで見る</a>
+                <a href="${escapeHtml(v.url)}" target="_blank" rel="noopener" class="video-link">TikTokで開く ↗</a>
                 <div class="video-transcript">${v.transcript ? escapeHtml(v.transcript) : '（文字起こしなし）'}</div>
             </div>
         </div>`

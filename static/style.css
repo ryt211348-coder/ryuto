@@ -507,8 +507,8 @@ body {
 
 .video-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 1rem;
     padding: 1rem 1.25rem;
     cursor: pointer;
     transition: background 0.2s;
@@ -518,11 +518,34 @@ body {
     background: var(--bg-card-hover);
 }
 
+.video-thumb {
+    width: 70px;
+    height: 94px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+    background: var(--border);
+}
+
+.video-thumb-placeholder {
+    width: 70px;
+    height: 94px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    background: var(--border);
+}
+
+.video-info {
+    flex: 1;
+    min-width: 0;
+}
+
 .video-meta {
     display: flex;
     gap: 1.5rem;
     font-size: 0.85rem;
     color: var(--text-dim);
+    margin-top: 0.3rem;
 }
 
 .video-meta span {
@@ -562,13 +585,19 @@ body {
 .video-link {
     display: inline-block;
     margin-top: 0.5rem;
-    color: var(--accent);
+    padding: 0.4rem 1rem;
+    background: linear-gradient(135deg, var(--accent), #ff6b8a);
+    color: white;
     text-decoration: none;
     font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 6px;
+    transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .video-link:hover {
-    text-decoration: underline;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 12px rgba(255, 45, 85, 0.3);
 }
 
 .expand-icon {

@@ -112,6 +112,7 @@ def build_result(videos, transcripts, analysis):
             "date": v.upload_date,
             "description": v.description,
             "transcript": transcript,
+            "thumbnail": getattr(v, "thumbnail", ""),
         })
 
     hook_examples = []

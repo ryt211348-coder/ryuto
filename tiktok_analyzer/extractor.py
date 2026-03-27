@@ -25,6 +25,7 @@ class VideoInfo:
     duration: int
     upload_date: str
     description: str
+    thumbnail: str = ""
 
 
 async def _fetch_with_tiktokapi(username):
@@ -43,6 +44,12 @@ async def _fetch_with_tiktokapi(username):
             duration = vd.get("video", {}).get("duration", 0)
             create_time = vd.get("createTime", "")
 
+            cover = vd.get("video", {}).get("cover", "")
+            if not cover:
+                cover = vd.get("video", {}).get("dynamicCover", "")
+            if not cover:
+                cover = vd.get("video", {}).get("originCover", "")
+
             videos_data.append({
                 "id": vid_id,
                 "desc": desc,
@@ -52,6 +59,7 @@ async def _fetch_with_tiktokapi(username):
                 "shares": stats.get("shareCount", 0),
                 "duration": duration,
                 "createTime": create_time,
+                "thumbnail": cover,
             })
     return videos_data
 
@@ -87,6 +95,7 @@ def _fetch_with_ytdlp(account_url):
                 "shares": int(data.get("share_count", 0) or 0),
                 "duration": int(data.get("duration", 0) or 0),
                 "createTime": data.get("upload_date", ""),
+                "thumbnail": data.get("thumbnail", "") or data.get("thumbnails", [{}])[0].get("url", "") if data.get("thumbnails") else "",
             })
         except (json.JSONDecodeError, ValueError):
             continue
@@ -136,10 +145,11 @@ def extract_account_videos(account_url):
     # VideoInfoに変換
     videos = []
     for d in videos_data:
+        vid_id = str(d.get("id", ""))
         video = VideoInfo(
-            video_id=str(d.get("id", "")),
+            video_id=vid_id,
             title=d.get("desc", "")[:100],
-            url=f"https://www.tiktok.com/@{username}/video/{d.get('id', '')}",
+            url=f"https://www.tiktok.com/@{username}/video/{vid_id}",
             view_count=int(d.get("views", 0) or 0),
             like_count=int(d.get("likes", 0) or 0),
             comment_count=int(d.get("comments", 0) or 0),
@@ -147,6 +157,7 @@ def extract_account_videos(account_url):
             duration=int(d.get("duration", 0) or 0),
             upload_date=str(d.get("createTime", "")),
             description=d.get("desc", ""),
+            thumbnail=d.get("thumbnail", ""),
         )
         videos.append(video)
 
