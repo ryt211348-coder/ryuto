@@ -18,8 +18,10 @@ from tiktok_analyzer.analyzer import (
     analyze_viral_patterns,
     generate_report,
 )
+from research_tool.routes import research_bp
 
 app = Flask(__name__)
+app.register_blueprint(research_bp)
 
 # ジョブの進捗を管理
 jobs = {}

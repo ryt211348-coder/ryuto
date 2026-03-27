@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNSリサーチツール - 食品 & 美容</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="stylesheet" href="/static/research.css">
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="header">
+        <div class="header-left">
+            <h1 class="logo">SNS Research Tool</h1>
+            <span class="logo-sub">食品 & 美容 キーワードマインドマップ</span>
+        </div>
+        <div class="header-right">
+            <a href="/" class="btn btn-outline">TikTok分析ツール</a>
+        </div>
+    </header>
+
+    <!-- コントロールバー -->
+    <div class="control-bar">
+        <div class="control-group">
+            <label>ジャンル</label>
+            <div class="toggle-group" id="genreToggle">
+                <button class="toggle-btn active" data-value="food">🍱 食品</button>
+                <button class="toggle-btn" data-value="beauty">💄 美容</button>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>プラットフォーム</label>
+            <div class="toggle-group" id="platformToggle">
+                <button class="toggle-btn active" data-value="both">両方</button>
+                <button class="toggle-btn" data-value="tiktok">TikTok</button>
+                <button class="toggle-btn" data-value="instagram">Instagram</button>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>期間</label>
+            <div class="toggle-group" id="periodToggle">
+                <button class="toggle-btn" data-value="1week">1週間</button>
+                <button class="toggle-btn active" data-value="1month">1ヶ月</button>
+                <button class="toggle-btn" data-value="3months">3ヶ月</button>
+                <button class="toggle-btn" data-value="6months">半年</button>
+                <button class="toggle-btn" data-value="1year">1年</button>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>表示</label>
+            <div class="toggle-group" id="viewToggle">
+                <button class="toggle-btn active" data-value="mindmap">マインドマップ</button>
+                <button class="toggle-btn" data-value="videos">動画一覧</button>
+                <button class="toggle-btn" data-value="accounts">アカウント</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- パンくずリスト -->
+    <div class="breadcrumb" id="breadcrumb">
+        <span class="crumb active" data-level="1">トップ</span>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="main-content">
+        <!-- マインドマップエリア -->
+        <div class="mindmap-area" id="mindmapArea">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>データを読み込み中...</p>
+            </div>
+            <div class="mindmap-container" id="mindmapContainer"></div>
+        </div>
+
+        <!-- 動画一覧エリア -->
+        <div class="videos-area hidden" id="videosArea">
+            <div class="videos-header">
+                <h2 id="videosTitle">バズり動画一覧</h2>
+                <div class="sort-control">
+                    <select id="videoSort">
+                        <option value="views">再生数順</option>
+                        <option value="likes">いいね順</option>
+                        <option value="comments">コメント順</option>
+                        <option value="engagement">エンゲージメント順</option>
+                        <option value="recent">新しい順</option>
+                    </select>
+                </div>
+            </div>
+            <div class="videos-grid" id="videosGrid"></div>
+        </div>
+
+        <!-- アカウント一覧エリア -->
+        <div class="accounts-area hidden" id="accountsArea">
+            <div class="accounts-header">
+                <h2 id="accountsTitle">注目アカウント</h2>
+                <div class="sort-control">
+                    <select id="accountSort">
+                        <option value="growth">成長率順</option>
+                        <option value="followers">フォロワー順</option>
+                        <option value="engagement">エンゲージメント順</option>
+                        <option value="avg_views">平均再生数順</option>
+                    </select>
+                </div>
+            </div>
+            <div class="accounts-grid" id="accountsGrid"></div>
+        </div>
+
+        <!-- 詳細サイドパネル -->
+        <div class="side-panel hidden" id="sidePanel">
+            <div class="panel-header">
+                <h3 id="panelTitle">詳細</h3>
+                <button class="panel-close" id="panelClose">&times;</button>
+            </div>
+            <div class="panel-body" id="panelBody"></div>
+        </div>
+    </div>
+
+    <script src="/static/research.js"></script>
+</body>
+</html>
