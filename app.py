@@ -24,6 +24,7 @@ from tiktok_analyzer.planner import (
     generate_plans,
     format_plans_for_display,
     get_research_summary,
+    get_builtin_reference_style,
 )
 from tiktok_analyzer.researcher import (
     search_tiktok_videos,
@@ -272,7 +273,7 @@ planner_jobs = {}
 
 def run_research(job_id: str, keywords: list, min_views: int,
                  hook_period_months: int, search_period_months: int,
-                 max_plans: int, csv_content: str):
+                 max_plans: int):
     """バックグラウンドでTikTokリサーチ→企画生成を実行する."""
     job = planner_jobs[job_id]
 
@@ -326,15 +327,10 @@ def run_research(job_id: str, keywords: list, min_views: int,
         job["status"] = "generating"
         job["message"] = "企画台本を生成中..."
 
-        # CSV参考台本のパース（オプション）
-        reference_scripts = None
-        ref_style = {}
-        if csv_content and csv_content.strip():
-            reference_scripts = parse_csv(csv_content)
-            from tiktok_analyzer.planner import _extract_reference_style
-            ref_style = _extract_reference_style(reference_scripts)
+        # ビルトイン参考台本データを使用
+        ref_style = get_builtin_reference_style()
 
-        plans = generate_plans(analysis, reference_scripts=reference_scripts, max_plans=max_plans)
+        plans = generate_plans(analysis, max_plans=max_plans)
         plans_display = format_plans_for_display(plans)
         summary = get_research_summary(analysis)
 
@@ -382,7 +378,6 @@ def planner_research():
     hook_period_months = int(data.get("hook_period_months", 3))
     search_period_months = int(data.get("search_period_months", 6))
     max_plans = int(data.get("max_plans", 6))
-    csv_content = data.get("csv_content", "")
 
     job_id = str(uuid.uuid4())[:8]
     planner_jobs[job_id] = {
@@ -395,7 +390,7 @@ def planner_research():
     thread = threading.Thread(
         target=run_research,
         args=(job_id, keywords, min_views, hook_period_months,
-              search_period_months, max_plans, csv_content),
+              search_period_months, max_plans),
         daemon=True,
     )
     thread.start()
