@@ -78,17 +78,37 @@ def fetch_video_details(video_ids: list, progress_callback=None) -> list:
 
 
 def classify_video(video: dict) -> str:
-    """動画をショートまたは長尺に分類する."""
-    duration = video.get("duration") or 0
+    """動画をショートまたは長尺に分類する.
 
-    # ショート動画の判定: 60秒以下
-    if duration and duration <= 60:
+    判定基準（優先順）:
+    1. URLに /shorts/ パスが含まれる（最も確実）
+    2. webpage_url / original_url に /shorts/ が含まれる
+    3. タイトルに #shorts タグが含まれる
+    4. 動画の縦横比が縦型（height > width）かつ60秒以下
+    5. duration が60秒以下かつ上記のいずれかに該当
+    """
+    # flat-playlistで既にショートと判定されている場合
+    if video.get("_short_hint"):
         return "short"
 
-    # タイトルやURLに #shorts が含まれる場合
+    # URL系フィールドをすべてチェック
+    url_fields = ["url", "webpage_url", "original_url", "display_id"]
+    for field in url_fields:
+        val = (video.get(field) or "").lower()
+        if "/shorts/" in val:
+            return "short"
+
+    # タイトルに #shorts が含まれる
     title = (video.get("title") or "").lower()
-    url = (video.get("url") or video.get("webpage_url") or "").lower()
-    if "#shorts" in title or "/shorts/" in url:
+    description = (video.get("description") or "").lower()
+    if "#shorts" in title or "#shorts" in description:
+        return "short"
+
+    # 縦型動画（height > width）かつ60秒以下 → ショートの可能性が高い
+    duration = video.get("duration") or 0
+    width = video.get("width") or 0
+    height = video.get("height") or 0
+    if duration and duration <= 60 and height > width and height > 0:
         return "short"
 
     return "long"
@@ -103,14 +123,21 @@ def analyze_channel(channel_url: str, progress_callback=None) -> dict:
     # Step 1: flat-playlistで動画ID一覧を取得
     playlist_videos = fetch_channel_videos(channel_url)
 
-    video_ids = []
+    # flat-playlistのURL情報からショート判定用のヒントを保持
+    video_entries = []
     for v in playlist_videos:
         vid = v.get("id") or v.get("url")
         if vid:
-            video_ids.append(vid)
+            # flat-playlistのURLに /shorts/ が含まれるかチェック
+            entry_url = v.get("url") or ""
+            is_short_hint = "/shorts/" in entry_url
+            video_entries.append({"id": vid, "is_short_hint": is_short_hint})
 
-    if not video_ids:
+    if not video_entries:
         raise RuntimeError("動画が見つかりませんでした。")
+
+    video_ids = [e["id"] for e in video_entries]
+    short_hints = {e["id"]: e["is_short_hint"] for e in video_entries}
 
     if progress_callback:
         progress_callback("details", f"{len(video_ids)}本の動画の詳細を取得中...")
@@ -121,6 +148,12 @@ def analyze_channel(channel_url: str, progress_callback=None) -> dict:
             progress_callback("details", f"動画詳細を取得中 ({current}/{total})...")
 
     details = fetch_video_details(video_ids, progress_callback=detail_progress)
+
+    # flat-playlistで得たショートヒントを詳細データにマージ
+    for d in details:
+        vid = d.get("id", "")
+        if short_hints.get(vid):
+            d["_short_hint"] = True
 
     if not details:
         raise RuntimeError("動画の詳細情報を取得できませんでした。")
