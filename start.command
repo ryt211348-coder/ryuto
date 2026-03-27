@@ -14,7 +14,10 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 # 依存パッケージの確認・インストール
-python3 -c "import flask" 2>/dev/null || pip3 install -q flask rich click jinja2 requests TikTokApi playwright yt-dlp 2>/dev/null
+python3 -c "import flask" 2>/dev/null || {
+    echo "必要なパッケージをインストール中..."
+    pip3 install flask rich click jinja2 requests TikTokApi playwright yt-dlp 2>&1 | tail -3
+}
 
 # サーバー起動 & ブラウザ自動オープン
 echo "サーバーを起動しています..."
