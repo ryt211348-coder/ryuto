@@ -235,8 +235,11 @@ def generate_prompts():
                 "scene_number": s.scene_number,
                 "speaker": s.speaker,
                 "dialogue": s.dialogue,
+                "role": s.role,
                 "emotion": s.emotion,
+                "voice_note": s.voice_note,
                 "camera_note": s.camera_note,
+                "reality_anchor": s.reality_anchor,
                 "image_prompt": s.image_prompt,
             }
             for s in scenes

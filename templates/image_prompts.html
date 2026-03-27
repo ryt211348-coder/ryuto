@@ -176,16 +176,41 @@
         scenes.forEach((scene, idx) => {
             const card = document.createElement('div');
             card.className = 'scene-card';
+            const roleColors = {
+                '悪役': '#ff2d55', '黒幕': '#a78bfa', '弱者': '#fbbf24',
+                'ヒーロー': '#34d399', '説明役': '#00f0ff', '締め': '#ff6b8a'
+            };
+            const roleColor = roleColors[scene.role] || '#888';
+
             card.innerHTML = `
                 <div class="scene-header" onclick="toggleScene(${idx})">
                     <div class="scene-info">
                         <span class="scene-number">#${scene.scene_number}</span>
                         <span class="scene-speaker">${escapeHtml(scene.speaker)}</span>
+                        <span class="badge-role" style="background:${roleColor}22;color:${roleColor}">${escapeHtml(scene.role)}</span>
                         <span class="scene-emotion badge-emotion">${escapeHtml(scene.emotion)}</span>
                     </div>
                     <span class="expand-icon">&#9660;</span>
                 </div>
                 <div class="scene-body" id="sceneBody${idx}">
+                    <div class="scene-meta-grid">
+                        <div class="meta-item">
+                            <span class="meta-label">役割</span>
+                            <span class="meta-value" style="color:${roleColor}">${escapeHtml(scene.role)}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">感情</span>
+                            <span class="meta-value">${escapeHtml(scene.emotion)}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">声の雰囲気</span>
+                            <span class="meta-value">${escapeHtml(scene.voice_note)}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">現実接続</span>
+                            <span class="meta-value">${escapeHtml(scene.reality_anchor || 'なし')}</span>
+                        </div>
+                    </div>
                     <div class="scene-dialogue">
                         <h4>セリフ</h4>
                         <p>${escapeHtml(scene.dialogue)}</p>
