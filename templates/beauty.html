@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beauty Content Planner</title>
+    <style>
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        :root {
+            --bg: #0a0a0f;
+            --bg2: #13131a;
+            --bg3: #1a1a24;
+            --border: #2a2a3a;
+            --text: #e4e4ec;
+            --dim: #8888a0;
+            --accent: #ff2d55;
+            --pink: #ff6b8a;
+            --cyan: #00f0ff;
+            --green: #34d399;
+            --yellow: #fbbf24;
+            --purple: #a78bfa;
+            --r: 12px;
+            --rs: 8px;
+        }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+
+        /* Header */
+        header { text-align: center; margin-bottom: 1.5rem; }
+        header h1 {
+            font-size: 1.8rem; font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), var(--cyan));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        header p { color: var(--dim); font-size: .9rem; margin-top: .3rem; }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex; border-bottom: 2px solid var(--border);
+            margin-bottom: 1.5rem; overflow-x: auto; gap: 2px;
+        }
+        .nav-tab {
+            padding: .75rem 1.2rem; background: none; border: none;
+            color: var(--dim); font-size: .85rem; cursor: pointer;
+            border-bottom: 3px solid transparent; white-space: nowrap;
+            transition: all .2s;
+        }
+        .nav-tab:hover { color: var(--text); background: var(--bg2); }
+        .nav-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+        .nav-tab .tab-icon { margin-right: .4rem; }
+
+        /* Cards */
+        .card {
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: var(--r); padding: 1.25rem; margin-bottom: 1rem;
+        }
+        .card-title {
+            font-size: 1rem; font-weight: 600; margin-bottom: .75rem;
+            display: flex; align-items: center; gap: .5rem;
+        }
+
+        /* Forms */
+        label {
+            display: block; font-size: .78rem; font-weight: 600;
+            color: var(--dim); text-transform: uppercase;
+            letter-spacing: .04em; margin-bottom: .3rem;
+        }
+        input, select, textarea {
+            width: 100%; padding: .6rem .8rem; background: var(--bg);
+            border: 1px solid var(--border); border-radius: var(--rs);
+            color: var(--text); font-size: .9rem;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none; border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(255,45,85,.15);
+        }
+        textarea { min-height: 120px; resize: vertical; font-family: monospace; font-size: .82rem; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: .75rem; }
+        .form-group { margin-bottom: .75rem; }
+
+        /* Buttons */
+        .btn {
+            padding: .65rem 1.2rem; border: none; border-radius: var(--rs);
+            font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .15s;
+            display: inline-flex; align-items: center; gap: .4rem;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--pink));
+            color: #fff;
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(255,45,85,.3); }
+        .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: var(--bg3); color: var(--dim); border: 1px solid var(--border); }
+        .btn-secondary:hover { border-color: var(--text); color: var(--text); }
+        .btn-sm { padding: .4rem .8rem; font-size: .8rem; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-success { background: var(--green); color: #000; }
+        .btn-cyan { background: var(--cyan); color: #000; }
+        .btn-full { width: 100%; justify-content: center; }
+
+        /* Tags / Badges */
+        .badge {
+            display: inline-block; padding: .15rem .5rem; border-radius: 99px;
+            font-size: .72rem; font-weight: 600;
+        }
+        .badge-pink { background: rgba(255,45,85,.15); color: var(--accent); }
+        .badge-cyan { background: rgba(0,240,255,.15); color: var(--cyan); }
+        .badge-green { background: rgba(52,211,153,.15); color: var(--green); }
+        .badge-yellow { background: rgba(251,191,36,.15); color: var(--yellow); }
+        .badge-purple { background: rgba(167,139,250,.15); color: var(--purple); }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: .6rem; margin-bottom: 1rem;
+        }
+        .stat-card {
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: var(--rs); padding: .8rem; text-align: center;
+        }
+        .stat-val {
+            font-size: 1.3rem; font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .stat-lbl { font-size: .7rem; color: var(--dim); text-transform: uppercase; margin-top: .15rem; }
+
+        /* Lists */
+        .list-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: .6rem .8rem; background: var(--bg); border: 1px solid var(--border);
+            border-radius: var(--rs); margin-bottom: .4rem; gap: .5rem;
+        }
+        .list-item:hover { border-color: var(--accent); }
+        .list-item-info { flex: 1; min-width: 0; }
+        .list-item-name { font-size: .88rem; font-weight: 500; }
+        .list-item-meta { font-size: .75rem; color: var(--dim); }
+
+        /* Product Cards */
+        .product-card {
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: var(--rs); padding: .8rem; margin-bottom: .5rem;
+        }
+        .product-rank {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; border-radius: 50%;
+            background: var(--accent); color: #fff; font-size: .7rem; font-weight: 700;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            display: flex; flex-wrap: wrap; gap: .5rem;
+            padding: .75rem; background: var(--bg3); border-radius: var(--rs);
+            margin-bottom: 1rem; align-items: center;
+        }
+        .filter-bar select, .filter-bar input {
+            width: auto; min-width: 140px; padding: .4rem .6rem; font-size: .82rem;
+        }
+        .chip-group { display: flex; flex-wrap: wrap; gap: .3rem; }
+        .chip {
+            padding: .25rem .6rem; border-radius: 99px; font-size: .75rem;
+            border: 1px solid var(--border); background: var(--bg2);
+            cursor: pointer; color: var(--dim); transition: all .15s;
+        }
+        .chip.active { background: rgba(0,240,255,.15); border-color: var(--cyan); color: var(--cyan); }
+        .chip:hover { border-color: var(--text); }
+
+        /* Script Output */
+        .script-output {
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: var(--rs); padding: 1rem;
+            font-family: monospace; font-size: .85rem;
+            white-space: pre-wrap; line-height: 1.7; max-height: 500px; overflow-y: auto;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex; align-items: center; gap: .5rem;
+            padding: 1rem; color: var(--dim); font-size: .9rem;
+        }
+        .spinner {
+            width: 18px; height: 18px; border: 2px solid var(--border);
+            border-top-color: var(--cyan); border-radius: 50%;
+            animation: spin .8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Tab Panels */
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* Utilities */
+        .hidden { display: none !important; }
+        .mt-1 { margin-top: .5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .mb-1 { margin-bottom: .5rem; }
+        .text-dim { color: var(--dim); }
+        .text-sm { font-size: .82rem; }
+        .text-accent { color: var(--accent); }
+        .text-cyan { color: var(--cyan); }
+        .text-green { color: var(--green); }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .gap-1 { gap: .5rem; }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .form-row { grid-template-columns: 1fr; }
+            .nav-tab { padding: .6rem .8rem; font-size: .8rem; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <header>
+        <h1>Beauty Content Planner</h1>
+        <p>競合分析 → トレンド発見 → 企画生成 → 台本生成</p>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav-tabs" id="navTabs">
+        <button class="nav-tab active" data-tab="channels">
+            <span class="tab-icon">1</span> チャンネル管理
+        </button>
+        <button class="nav-tab" data-tab="trends">
+            <span class="tab-icon">2</span> トレンド分析
+        </button>
+        <button class="nav-tab" data-tab="plans">
+            <span class="tab-icon">3</span> 企画一覧
+        </button>
+        <button class="nav-tab" data-tab="scripts">
+            <span class="tab-icon">4</span> 台本生成
+        </button>
+        <button class="nav-tab" data-tab="settings">
+            設定
+        </button>
+    </nav>
+
+    <!-- ===== 設定タブ ===== -->
+    <div class="tab-panel" id="panel-settings">
+        <div class="card">
+            <div class="card-title">API設定</div>
+            <div class="form-group">
+                <label>Anthropic API Key</label>
+                <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+            </div>
+            <div class="flex-between mt-1">
+                <span id="apiKeyStatus" class="text-sm text-dim"></span>
+                <button class="btn btn-primary btn-sm" onclick="saveApiKey()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== チャンネル管理タブ ===== -->
+    <div class="tab-panel active" id="panel-channels">
+        <div class="card">
+            <div class="card-title flex-between">
+                <span>競合チャンネル登録</span>
+                <button class="btn btn-primary btn-sm" onclick="addChannel()">+ 追加</button>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>アカウント名</label>
+                    <input type="text" id="chName" placeholder="@username" />
+                </div>
+                <div class="form-group">
+                    <label>プラットフォーム</label>
+                    <select id="chPlatform">
+                        <option value="TikTok">TikTok</option>
+                        <option value="Instagram">Instagram</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>URL</label>
+                <input type="text" id="chUrl" placeholder="https://www.tiktok.com/@..." />
+            </div>
+            <div class="form-group">
+                <label>メモ（任意）</label>
+                <input type="text" id="chNote" placeholder="辛口レビュー系、ずんだもん系 など" />
+            </div>
+        </div>
+
+        <!-- チャンネルリスト -->
+        <div class="card">
+            <div class="card-title">登録済みチャンネル (<span id="chCount">0</span>)</div>
+            <div id="channelList">
+                <p class="text-dim text-sm">まだチャンネルが登録されていません</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== トレンド分析タブ ===== -->
+    <div class="tab-panel" id="panel-trends">
+        <!-- フィルターバー -->
+        <div class="filter-bar">
+            <select id="filterPeriod">
+                <option value="1week">直近1週間</option>
+                <option value="3months">直近3ヶ月</option>
+                <option value="6months">直近6ヶ月</option>
+                <option value="1year">直近1年</option>
+                <option value="over1year">1年以上前</option>
+            </select>
+            <select id="filterViews">
+                <option value="0">再生数フィルターなし</option>
+                <option value="10000">1万再生以上</option>
+                <option value="300000">30万再生以上</option>
+                <option value="500000">50万再生以上</option>
+                <option value="1000000">100万再生以上</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="btnAnalyze" onclick="runTrendAnalysis()">
+                トレンド分析を実行
+            </button>
+        </div>
+
+        <!-- カテゴリ選択 -->
+        <div class="card">
+            <div class="card-title">注目カテゴリ（任意選択）</div>
+            <div class="chip-group" id="categoryChips"></div>
+        </div>
+
+        <!-- 分析結果: ローディング -->
+        <div id="trendLoading" class="loading hidden">
+            <div class="spinner"></div>
+            <span>Claude APIでトレンド分析中...（30秒〜1分程度）</span>
+        </div>
+
+        <!-- 分析結果: メイン -->
+        <div id="trendResults" class="hidden">
+            <!-- 統計サマリー -->
+            <div class="stats-grid" id="trendStats"></div>
+
+            <!-- トレンド商品TOP -->
+            <div class="card">
+                <div class="card-title">トレンド商品ランキング</div>
+                <div id="trendProducts"></div>
+            </div>
+
+            <!-- ホットキーワード -->
+            <div class="card">
+                <div class="card-title">ホットキーワード</div>
+                <div id="hotKeywords"></div>
+            </div>
+
+            <!-- 共通トピック -->
+            <div class="card">
+                <div class="card-title">共通トピック</div>
+                <div id="commonTopics"></div>
+            </div>
+
+            <!-- アカウントインサイト -->
+            <div class="card">
+                <div class="card-title">アカウント情報</div>
+                <div id="accountInsights"></div>
+            </div>
+
+            <!-- 季節トレンド -->
+            <div class="card">
+                <div class="card-title">季節トレンド</div>
+                <div id="seasonalTrends"></div>
+            </div>
+
+            <!-- 視聴者の悩み -->
+            <div class="card">
+                <div class="card-title">視聴者の悩み・ペインポイント</div>
+                <div id="painPoints"></div>
+            </div>
+
+            <!-- 企画生成ボタン -->
+            <button class="btn btn-cyan btn-full mt-2" onclick="goToPlansFromTrends()">
+                このトレンドデータから企画を生成 →
+            </button>
+        </div>
+
+        <!-- 過去の分析履歴 -->
+        <div class="card mt-2">
+            <div class="card-title flex-between">
+                <span>分析履歴</span>
+                <button class="btn btn-secondary btn-sm" onclick="loadTrendsHistory()">更新</button>
+            </div>
+            <div id="trendsHistory">
+                <p class="text-dim text-sm">まだ分析履歴がありません</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 企画一覧タブ ===== -->
+    <div class="tab-panel" id="panel-plans">
+        <div class="card">
+            <div class="card-title flex-between">
+                <span>企画生成</span>
+                <button class="btn btn-primary btn-sm" id="btnGenPlans" onclick="generatePlans()">
+                    企画を自動生成
+                </button>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>生成数</label>
+                    <select id="planCount">
+                        <option value="3">3本</option>
+                        <option value="5" selected>5本</option>
+                        <option value="8">8本</option>
+                        <option value="10">10本</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>使用トレンドデータ</label>
+                    <select id="planTrendSource">
+                        <option value="latest">最新の分析結果</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>追加リクエスト（任意）</label>
+                <input type="text" id="planCustomReq" placeholder="例: 夏向けの企画を多めに、韓国コスメ中心で..." />
+            </div>
+        </div>
+
+        <!-- 企画生成ローディング -->
+        <div id="planLoading" class="loading hidden">
+            <div class="spinner"></div>
+            <span>企画を生成中...</span>
+        </div>
+
+        <!-- 企画リスト -->
+        <div id="plansList"></div>
+
+        <!-- 企画履歴 -->
+        <div class="card mt-2">
+            <div class="card-title flex-between">
+                <span>企画履歴</span>
+                <button class="btn btn-secondary btn-sm" onclick="loadPlansHistory()">更新</button>
+            </div>
+            <div id="plansHistory">
+                <p class="text-dim text-sm">まだ企画履歴がありません</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 台本生成タブ（次のステップで追加） ===== -->
+    <div class="tab-panel" id="panel-scripts">
+        <div class="card">
+            <div class="card-title">台本生成</div>
+
+            <!-- 企画選択 -->
+            <div class="form-group">
+                <label>企画を選択</label>
+                <select id="scriptPlanSelect">
+                    <option value="">-- 企画を選んでください --</option>
+                </select>
+            </div>
+
+            <!-- 台本タイプ選択 -->
+            <div class="form-group">
+                <label>台本タイプ</label>
+                <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+                    <button class="btn btn-secondary script-type-btn active" data-type="karakuchi"
+                            onclick="selectScriptType('karakuchi')">
+                        辛口レビュー
+                    </button>
+                    <button class="btn btn-secondary script-type-btn" data-type="zundamon"
+                            onclick="selectScriptType('zundamon')">
+                        ずんだもん
+                    </button>
+                    <button class="btn btn-secondary script-type-btn" data-type="suno"
+                            onclick="selectScriptType('suno')">
+                        Suno AI歌詞
+                    </button>
+                </div>
+            </div>
+
+            <!-- タイプ説明 -->
+            <div id="scriptTypeDesc" class="text-sm text-dim mb-1">
+                参考チャンネル(@tettei_re)の辛口レビュー口調で台本を生成します。
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>目標秒数</label>
+                    <select id="scriptDuration">
+                        <option value="25">25秒</option>
+                        <option value="30">30秒</option>
+                        <option value="35" selected>35秒</option>
+                        <option value="40">40秒</option>
+                        <option value="45">45秒</option>
+                        <option value="50">50秒</option>
+                        <option value="60">60秒</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>紹介商品数</label>
+                    <select id="scriptProductCount">
+                        <option value="3">3商品</option>
+                        <option value="4" selected>4商品</option>
+                        <option value="5">5商品</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- カスタムトーン -->
+            <div class="form-group">
+                <label>追加トーン指定（任意）</label>
+                <textarea id="scriptCustomTone" rows="3"
+                    placeholder="例: もう少しマイルドに、韓国コスメ多めで、冒頭はこの曲の替え歌で..."></textarea>
+            </div>
+
+            <button class="btn btn-primary btn-full" id="btnGenScript" onclick="generateScript()">
+                台本を生成
+            </button>
+        </div>
+
+        <!-- 台本生成ローディング -->
+        <div id="scriptLoading" class="loading hidden">
+            <div class="spinner"></div>
+            <span>台本を生成中...</span>
+        </div>
+
+        <!-- 台本出力 -->
+        <div id="scriptResult" class="hidden">
+            <div class="card">
+                <div class="card-title flex-between">
+                    <span id="scriptResultTitle">生成された台本</span>
+                    <div>
+                        <button class="btn btn-secondary btn-sm" onclick="copyScript()">コピー</button>
+                        <button class="btn btn-primary btn-sm" onclick="regenerateScript()">再生成</button>
+                    </div>
+                </div>
+                <div class="script-output" id="scriptOutput"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ============================
+// 状態管理
+// ============================
+const state = {
+    channels: [],
+    latestTrends: null,
+    latestPlans: null,
+    selectedScriptType: 'karakuchi',
+    selectedCategories: [],
+};
+
+const CATEGORIES = [
+    "パウダー", "ファンデーション", "クッションファンデ", "コンシーラー",
+    "下地", "アイシャドウ", "リップ", "チーク", "マスカラ", "アイライナー",
+    "洗顔", "クレンジング", "化粧水", "乳液", "美容液", "パック・マスク",
+    "日焼け止め", "シャンプー", "トリートメント", "ヘアオイル",
+    "まつげ美容液", "ムダ毛処理", "ボディケア", "リップケア",
+];
+
+// ============================
+// ユーティリティ
+// ============================
+function $(id) { return document.getElementById(id); }
+function show(el) { el.classList.remove('hidden'); }
+function hide(el) { el.classList.add('hidden'); }
+
+async function api(url, method = 'GET', body = null) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    return res.json();
+}
+
+function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+}
+
+// ============================
+// API設定
+// ============================
+async function loadApiConfig() {
+    const data = await api('/api/config');
+    if (data.has_key) {
+        $('apiKeyStatus').textContent = 'Key設定済み: ' + data.masked_key;
+        $('apiKeyStatus').className = 'text-sm text-green';
+    } else {
+        $('apiKeyStatus').textContent = 'APIキー未設定';
+        $('apiKeyStatus').className = 'text-sm text-accent';
+    }
+}
+
+async function saveApiKey() {
+    const key = $('apiKeyInput').value.trim();
+    if (!key) return alert('APIキーを入力してください');
+    await api('/api/config', 'POST', { anthropic_api_key: key });
+    $('apiKeyInput').value = '';
+    await loadApiConfig();
+    alert('保存しました');
+}
+
+// ============================
+// チャンネル管理
+// ============================
+async function loadChannels() {
+    const data = await api('/api/channels');
+    state.channels = Array.isArray(data) ? data : [];
+    renderChannels();
+}
+
+function renderChannels() {
+    const list = $('channelList');
+    $('chCount').textContent = state.channels.length;
+    if (state.channels.length === 0) {
+        list.innerHTML = '<p class="text-dim text-sm">まだチャンネルが登録されていません</p>';
+        return;
+    }
+    list.innerHTML = state.channels.map((ch, i) => `
+        <div class="list-item">
+            <div class="list-item-info">
+                <div class="list-item-name">${escHtml(ch.name)}</div>
+                <div class="list-item-meta">
+                    <span class="badge ${ch.platform === 'TikTok' ? 'badge-pink' : 'badge-purple'}">${escHtml(ch.platform)}</span>
+                    ${ch.url ? `<a href="${escHtml(ch.url)}" target="_blank" style="color:var(--cyan);font-size:.75rem;margin-left:.3rem;">${escHtml(ch.url).substring(0, 40)}...</a>` : ''}
+                    ${ch.note ? `<span style="margin-left:.3rem;font-size:.72rem;">${escHtml(ch.note)}</span>` : ''}
+                </div>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="removeChannel(${i})">削除</button>
+        </div>
+    `).join('');
+}
+
+async function addChannel() {
+    const name = $('chName').value.trim();
+    const platform = $('chPlatform').value;
+    const url = $('chUrl').value.trim();
+    const note = $('chNote').value.trim();
+    if (!name) return alert('アカウント名を入力してください');
+
+    state.channels.push({ name, platform, url, note });
+    await api('/api/channels', 'POST', state.channels);
+    $('chName').value = '';
+    $('chUrl').value = '';
+    $('chNote').value = '';
+    renderChannels();
+}
+
+async function removeChannel(index) {
+    state.channels.splice(index, 1);
+    await api('/api/channels', 'POST', state.channels);
+    renderChannels();
+}
+
+// ============================
+// トレンド分析
+// ============================
+function renderCategoryChips() {
+    $('categoryChips').innerHTML = CATEGORIES.map(c => `
+        <span class="chip" data-cat="${escHtml(c)}" onclick="toggleCategory(this)">${escHtml(c)}</span>
+    `).join('');
+}
+
+function toggleCategory(el) {
+    el.classList.toggle('active');
+    const cat = el.dataset.cat;
+    if (el.classList.contains('active')) {
+        state.selectedCategories.push(cat);
+    } else {
+        state.selectedCategories = state.selectedCategories.filter(c => c !== cat);
+    }
+}
+
+async function runTrendAnalysis() {
+    const btn = $('btnAnalyze');
+    btn.disabled = true;
+    show($('trendLoading'));
+    hide($('trendResults'));
+
+    try {
+        const data = await api('/api/analyze-trends', 'POST', {
+            channels: state.channels,
+            period: $('filterPeriod').value,
+            min_views: parseInt($('filterViews').value),
+            categories: state.selectedCategories,
+        });
+
+        if (!data.ok) throw new Error(data.error || '分析に失敗しました');
+        state.latestTrends = data.data;
+        renderTrendResults(data.data);
+        show($('trendResults'));
+    } catch (e) {
+        alert('エラー: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        hide($('trendLoading'));
+    }
+}
+
+function renderTrendResults(data) {
+    // 統計サマリー
+    const products = data.trending_products || [];
+    const keywords = data.hot_keywords || [];
+    const topics = data.common_topics || [];
+    const accounts = data.account_insights || [];
+
+    $('trendStats').innerHTML = `
+        <div class="stat-card"><div class="stat-val">${products.length}</div><div class="stat-lbl">トレンド商品</div></div>
+        <div class="stat-card"><div class="stat-val">${keywords.length}</div><div class="stat-lbl">ホットKW</div></div>
+        <div class="stat-card"><div class="stat-val">${topics.length}</div><div class="stat-lbl">共通トピック</div></div>
+        <div class="stat-card"><div class="stat-val">${accounts.length}</div><div class="stat-lbl">アカウント</div></div>
+        <div class="stat-card"><div class="stat-val">${data.period || '-'}</div><div class="stat-lbl">分析期間</div></div>
+    `;
+
+    // トレンド商品
+    $('trendProducts').innerHTML = products.map(p => `
+        <div class="product-card">
+            <div class="flex-between">
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                    <span class="product-rank">${p.rank || '-'}</span>
+                    <strong>${escHtml(p.product_name)}</strong>
+                    <span class="badge badge-cyan">${escHtml(p.brand || '')}</span>
+                    <span class="badge badge-pink">${escHtml(p.category || '')}</span>
+                </div>
+                <span class="text-sm text-cyan">Buzz: ${p.buzz_score || '-'}/100</span>
+            </div>
+            <div class="text-sm text-dim mt-1">${escHtml(p.why_trending || '')}</div>
+            <div class="text-sm mt-1">
+                ${(p.platforms || []).map(pl => `<span class="badge badge-purple">${escHtml(pl)}</span>`).join(' ')}
+                ${(p.related_hashtags || []).map(h => `<span class="badge badge-yellow">${escHtml(h)}</span>`).join(' ')}
+            </div>
+        </div>
+    `).join('') || '<p class="text-dim text-sm">データなし</p>';
+
+    // ホットキーワード
+    $('hotKeywords').innerHTML = `<div class="chip-group">${
+        keywords.map(k => {
+            const cls = k.volume === '大' ? 'badge-pink' : k.volume === '中' ? 'badge-yellow' : 'badge-cyan';
+            const arrow = k.trend_direction === '上昇' ? ' ↑' : k.trend_direction === '下降' ? ' ↓' : '';
+            return `<span class="badge ${cls}" style="font-size:.8rem;padding:.3rem .7rem;">${escHtml(k.keyword)}${arrow}</span>`;
+        }).join(' ')
+    }</div>` || '<p class="text-dim text-sm">データなし</p>';
+
+    // 共通トピック
+    $('commonTopics').innerHTML = topics.map(t => `
+        <div class="product-card">
+            <strong>${escHtml(t.topic)}</strong>
+            <div class="text-sm text-dim">${escHtml(t.description || '')}</div>
+            <div class="text-sm mt-1">${escHtml(t.content_angle || '')}</div>
+        </div>
+    `).join('') || '<p class="text-dim text-sm">データなし</p>';
+
+    // アカウントインサイト
+    $('accountInsights').innerHTML = accounts.map(a => `
+        <div class="product-card">
+            <div class="flex-between">
+                <strong>${escHtml(a.account_name)}</strong>
+                <span class="badge ${a.platform === 'TikTok' ? 'badge-pink' : 'badge-purple'}">${escHtml(a.platform || '')}</span>
+            </div>
+            <div class="text-sm mt-1">
+                <span class="text-dim">投稿頻度:</span> ${escHtml(a.posting_frequency || '-')}
+                <span class="text-dim" style="margin-left:.5rem;">エンゲージ:</span> ${escHtml(a.engagement_trend || '-')}
+                <span class="text-dim" style="margin-left:.5rem;">月間再生:</span> ${escHtml(a.estimated_monthly_views || '-')}
+            </div>
+            <div class="text-sm text-dim mt-1">最近の注力: ${escHtml(a.recent_focus || '-')}</div>
+        </div>
+    `).join('') || '<p class="text-dim text-sm">データなし</p>';
+
+    // 季節トレンド
+    const seasonal = data.seasonal_trends || [];
+    $('seasonalTrends').innerHTML = seasonal.map(s => `
+        <div class="list-item">
+            <div class="list-item-info">
+                <div class="list-item-name">${escHtml(s.category)}</div>
+                <div class="list-item-meta">${escHtml(s.reason || '')} | ピーク: ${escHtml(s.peak_timing || '-')}</div>
+            </div>
+            <span class="badge ${s.demand_level === '高' ? 'badge-pink' : s.demand_level === '中' ? 'badge-yellow' : 'badge-cyan'}">${escHtml(s.demand_level || '')}</span>
+        </div>
+    `).join('') || '<p class="text-dim text-sm">データなし</p>';
+
+    // ペインポイント
+    const pains = data.viewer_pain_points || [];
+    $('painPoints').innerHTML = pains.map(p => `
+        <div class="product-card">
+            <div class="flex-between">
+                <strong>${escHtml(p.pain_point)}</strong>
+                <span class="badge ${p.frequency === '高' ? 'badge-pink' : 'badge-yellow'}">${escHtml(p.frequency || '')}</span>
+            </div>
+            <div class="text-sm text-dim">${escHtml(p.target_skin_type || '')} | ${escHtml(p.content_opportunity || '')}</div>
+        </div>
+    `).join('') || '<p class="text-dim text-sm">データなし</p>';
+}
+
+function goToPlansFromTrends() {
+    switchTab('plans');
+}
+
+async function loadTrendsHistory() {
+    const data = await api('/api/trends-history');
+    const list = Array.isArray(data) ? data : [];
+    $('trendsHistory').innerHTML = list.length === 0
+        ? '<p class="text-dim text-sm">まだ分析履歴がありません</p>'
+        : list.slice(0, 10).map((t, i) => `
+            <div class="list-item" style="cursor:pointer;" onclick="loadHistoricalTrend(${i})">
+                <div class="list-item-info">
+                    <div class="list-item-name">${escHtml(t.period || '分析結果')} - ${escHtml(t.analysis_date || '')}</div>
+                    <div class="list-item-meta">${(t.trending_products || []).length}商品 | ${(t.hot_keywords || []).length}キーワード</div>
+                </div>
+                <span class="text-sm text-dim">${escHtml((t._timestamp || '').substring(0, 16))}</span>
+            </div>
+        `).join('');
+}
+
+// ============================
+// 企画生成
+// ============================
+async function generatePlans() {
+    if (!state.latestTrends) {
+        alert('先にトレンド分析を実行してください');
+        return;
+    }
+    const btn = $('btnGenPlans');
+    btn.disabled = true;
+    show($('planLoading'));
+
+    try {
+        const data = await api('/api/generate-plans', 'POST', {
+            trend_data: state.latestTrends,
+            num_plans: parseInt($('planCount').value),
+            custom_request: $('planCustomReq').value.trim(),
+        });
+
+        if (!data.ok) throw new Error(data.error || '企画生成に失敗しました');
+        state.latestPlans = data.data;
+        renderPlans(data.data);
+        updateScriptPlanSelect();
+    } catch (e) {
+        alert('エラー: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        hide($('planLoading'));
+    }
+}
+
+function renderPlans(data) {
+    const plans = data.plans || [];
+    $('plansList').innerHTML = plans.map((p, i) => `
+        <div class="card">
+            <div class="flex-between mb-1">
+                <div class="card-title" style="margin-bottom:0;">
+                    <span class="product-rank">${i + 1}</span>
+                    ${escHtml(p.title)}
+                </div>
+                <span class="badge ${p.estimated_engagement === '高' ? 'badge-pink' : p.estimated_engagement === '中' ? 'badge-yellow' : 'badge-cyan'}">
+                    エンゲージ: ${escHtml(p.estimated_engagement || '-')}
+                </span>
+            </div>
+            <div class="text-sm mb-1">
+                <span class="badge badge-cyan">${escHtml(p.category || '')}</span>
+                <span class="badge badge-purple">${escHtml(p.recommended_script_type || '')}</span>
+                <span class="badge badge-yellow">${p.target_duration_sec || 35}秒</span>
+            </div>
+            <div class="text-sm mb-1"><strong>冒頭フック:</strong> ${escHtml(p.hook || '')}</div>
+            <div class="text-sm mb-1"><strong>構成:</strong> ${escHtml(p.structure || '')}</div>
+            <div class="text-sm mb-1"><strong>伸びる理由:</strong> ${escHtml(p.why_this_works || '')}</div>
+            <div class="text-sm mb-1"><strong>コメント誘発:</strong> ${escHtml(p.comment_bait || '')}</div>
+            ${p.target_products ? `<div class="text-sm mb-1"><strong>商品:</strong> ${(p.target_products || []).map(pr => `<span class="badge badge-green">${escHtml(pr)}</span>`).join(' ')}</div>` : ''}
+            ${p.keywords ? `<div class="text-sm">${(p.keywords || []).map(k => `<span class="badge badge-yellow">${escHtml(k)}</span>`).join(' ')}</div>` : ''}
+            <button class="btn btn-cyan btn-sm mt-1" onclick="goToScriptFromPlan(${i})">
+                この企画で台本生成 →
+            </button>
+        </div>
+    `).join('') || '<p class="text-dim text-sm">企画がありません</p>';
+}
+
+function goToScriptFromPlan(index) {
+    const plans = (state.latestPlans || {}).plans || [];
+    if (plans[index]) {
+        switchTab('scripts');
+        $('scriptPlanSelect').value = index.toString();
+    }
+}
+
+function updateScriptPlanSelect() {
+    const plans = (state.latestPlans || {}).plans || [];
+    const sel = $('scriptPlanSelect');
+    sel.innerHTML = '<option value="">-- 企画を選んでください --</option>' +
+        plans.map((p, i) => `<option value="${i}">${i + 1}. ${escHtml(p.title)}</option>`).join('');
+}
+
+async function loadPlansHistory() {
+    const data = await api('/api/plans-history');
+    const list = Array.isArray(data) ? data : [];
+    $('plansHistory').innerHTML = list.length === 0
+        ? '<p class="text-dim text-sm">まだ企画履歴がありません</p>'
+        : list.slice(0, 10).map((p, i) => `
+            <div class="list-item" style="cursor:pointer;" onclick="loadHistoricalPlan(${i})">
+                <div class="list-item-info">
+                    <div class="list-item-name">${(p.plans || []).length}企画</div>
+                    <div class="list-item-meta">${escHtml((p._timestamp || '').substring(0, 16))}</div>
+                </div>
+            </div>
+        `).join('');
+}
+
+function loadHistoricalPlan(index) {
+    api('/api/plans-history').then(data => {
+        const list = Array.isArray(data) ? data : [];
+        if (list[index]) {
+            state.latestPlans = list[index];
+            renderPlans(list[index]);
+            updateScriptPlanSelect();
+        }
+    });
+}
+
+function loadHistoricalTrend(index) {
+    api('/api/trends-history').then(data => {
+        const list = Array.isArray(data) ? data : [];
+        if (list[index]) {
+            state.latestTrends = list[index];
+            renderTrendResults(list[index]);
+            show($('trendResults'));
+        }
+    });
+}
+
+// ============================
+// 台本生成
+// ============================
+const SCRIPT_TYPE_DESCS = {
+    karakuchi: '参考チャンネル(@tettei_re)の辛口レビュー口調で台本を生成します。',
+    zundamon: 'ずんだもんキャラ（〜なのだ語尾）で美容レビュー台本を生成します。',
+    suno: 'Suno AI用の歌詞（メタタグ付き構成）を生成します。',
+};
+
+function selectScriptType(type) {
+    state.selectedScriptType = type;
+    document.querySelectorAll('.script-type-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.type === type);
+        if (b.dataset.type === type) {
+            b.style.background = 'rgba(0,240,255,.15)';
+            b.style.borderColor = 'var(--cyan)';
+            b.style.color = 'var(--cyan)';
+        } else {
+            b.style.background = '';
+            b.style.borderColor = '';
+            b.style.color = '';
+        }
+    });
+    $('scriptTypeDesc').textContent = SCRIPT_TYPE_DESCS[type] || '';
+}
+
+async function generateScript() {
+    const planIdx = $('scriptPlanSelect').value;
+    if (planIdx === '') {
+        alert('企画を選択してください');
+        return;
+    }
+    const plans = (state.latestPlans || {}).plans || [];
+    const plan = plans[parseInt(planIdx)];
+    if (!plan) {
+        alert('企画が見つかりません');
+        return;
+    }
+
+    const btn = $('btnGenScript');
+    btn.disabled = true;
+    show($('scriptLoading'));
+    hide($('scriptResult'));
+
+    try {
+        const data = await api('/api/generate-script', 'POST', {
+            plan: plan,
+            script_type: state.selectedScriptType,
+            custom_tone: $('scriptCustomTone').value.trim(),
+            target_duration: parseInt($('scriptDuration').value),
+        });
+
+        if (!data.ok) throw new Error(data.error || '台本生成に失敗しました');
+
+        const typeLabel = {karakuchi: '辛口レビュー', zundamon: 'ずんだもん', suno: 'Suno AI歌詞'}[data.script_type] || '';
+        $('scriptResultTitle').textContent = `${typeLabel} - ${escHtml(data.plan_title)}`;
+        $('scriptOutput').textContent = data.script;
+        show($('scriptResult'));
+    } catch (e) {
+        alert('エラー: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        hide($('scriptLoading'));
+    }
+}
+
+function copyScript() {
+    const text = $('scriptOutput').textContent;
+    navigator.clipboard.writeText(text).then(() => alert('コピーしました'));
+}
+
+function regenerateScript() {
+    generateScript();
+}
+
+// ============================
+// タブ切替
+// ============================
+function switchTab(tabId) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const tab = document.querySelector(`.nav-tab[data-tab="${tabId}"]`);
+    const panel = $('panel-' + tabId);
+    if (tab) tab.classList.add('active');
+    if (panel) panel.classList.add('active');
+}
+
+// タブクリックイベント
+document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+});
+
+// ============================
+// 初期化
+// ============================
+async function init() {
+    renderCategoryChips();
+    selectScriptType('karakuchi');
+    await Promise.all([
+        loadApiConfig(),
+        loadChannels(),
+    ]);
+    loadTrendsHistory();
+    loadPlansHistory();
+}
+
+init();
+</script>
+</body>
+</html>
