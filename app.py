@@ -1,4 +1,4 @@
-"""TikTok バイラル動画分析ツール - Webインターフェース."""
+"""TikTok バイラル動画分析ツール & YouTube チャンネル分析 - Webインターフェース."""
 
 import json
 import os
@@ -18,6 +18,7 @@ from tiktok_analyzer.analyzer import (
     analyze_viral_patterns,
     generate_report,
 )
+from youtube_analyzer.analyzer import analyze_channel
 
 app = Flask(__name__)
 
@@ -237,6 +238,69 @@ def set_config():
         return jsonify({"error": "APIキーを入力してください"}), 400
     save_api_key(key)
     return jsonify({"success": True, "message": "APIキーを保存しました"})
+
+
+# --- YouTube チャンネル分析 ---
+
+# YouTubeジョブの進捗管理
+youtube_jobs = {}
+
+
+@app.route("/youtube")
+def youtube_page():
+    return render_template("youtube.html")
+
+
+@app.route("/api/youtube/analyze", methods=["POST"])
+def youtube_analyze():
+    data = request.get_json()
+    channel_url = data.get("channel_url", "").strip()
+
+    if not channel_url:
+        return jsonify({"error": "チャンネルURLを入力してください"}), 400
+
+    job_id = str(uuid.uuid4())[:8]
+    youtube_jobs[job_id] = {
+        "status": "queued",
+        "message": "分析を開始しています...",
+    }
+
+    thread = threading.Thread(
+        target=run_youtube_analysis,
+        args=(job_id, channel_url),
+        daemon=True,
+    )
+    thread.start()
+
+    return jsonify({"job_id": job_id})
+
+
+def run_youtube_analysis(job_id: str, channel_url: str):
+    """YouTubeチャンネル分析をバックグラウンドで実行."""
+    job = youtube_jobs[job_id]
+
+    try:
+        def progress_callback(status, message):
+            job["status"] = status
+            job["message"] = message
+
+        result = analyze_channel(channel_url, progress_callback=progress_callback)
+
+        job["status"] = "completed"
+        job["message"] = "分析完了！"
+        job["result"] = result
+
+    except Exception as e:
+        job["status"] = "error"
+        job["message"] = f"エラーが発生しました: {str(e)}"
+
+
+@app.route("/api/youtube/status/<job_id>")
+def youtube_status(job_id):
+    job = youtube_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    return jsonify(job)
 
 
 if __name__ == "__main__":
