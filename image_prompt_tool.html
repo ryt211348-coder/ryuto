@@ -57,6 +57,9 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
 .gallery-card img{width:100%;aspect-ratio:9/16;object-fit:cover;display:block}
 .gallery-label{padding:.5rem .75rem;font-size:.8rem;color:var(--dim);display:flex;align-items:center;gap:.5rem}
 .gallery-err{width:100%;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;background:var(--bg);color:#ff6b6b;font-size:.8rem;padding:1rem;text-align:center}
+.img-drop{background:var(--bg);border:2px dashed var(--border);border-radius:8px;padding:1.5rem;text-align:center;cursor:pointer;color:var(--dim);font-size:.85rem;margin-top:.5rem;transition:border-color .2s}
+.img-drop:hover,.img-drop.drag-over{border-color:var(--cyan);color:var(--cyan)}
+.img-drop img{max-width:100%;max-height:300px;border-radius:8px}
 .prompt-edit{width:100%;padding:1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--green);font-size:.85rem;line-height:1.6;font-family:monospace;resize:vertical}
 .prompt-edit:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,240,255,.2)}
 .done-mark{color:var(--green);font-weight:700;font-size:1.1rem}
@@ -89,7 +92,8 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
     <div class="result-actions">
       <button class="btn btn-outline btn-sm" onclick="copyAllPrompts()">全プロンプトをコピー</button>
       <button class="btn btn-outline btn-sm" onclick="exportCSV()">CSV出力</button>
-      <button class="btn btn-outline btn-sm" onclick="exportToSheet()">Googleスプレッドシートに出力</button>
+      <button class="btn btn-outline btn-sm" onclick="exportToSheet()">スプレッドシートに出力</button>
+      <button class="btn btn-outline btn-sm" onclick="downloadAllImages()">画像を一括ダウンロード</button>
       <button class="btn btn-outline btn-sm" onclick="resetAll()">リセット</button>
     </div>
   </div>
@@ -238,7 +242,7 @@ function renderScenes(){
   const rc={"悪役":"#ff2d55","黒幕":"#a78bfa","弱者":"#fbbf24","ヒーロー":"#34d399","説明役":"#00f0ff","締め":"#ff6b8a"};
   currentScenes.forEach((s,i)=>{
     const cl=rc[s.role]||"#888",d=document.createElement("div");d.className="scene-card";
-    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span><span class="done-mark hidden" id="done${i}">✓</span></div><div style="display:flex;gap:.5rem;align-items:center"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyOne(${i})" id="copyBtn${i}" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();toggleDone(${i})" id="doneBtn${i}">完了</button><span class="expand-icon">▼</span></div></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="prompt-hdr"><h4>画像生成プロンプト（編集可能）</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button></div><textarea class="prompt-edit" id="prompt${i}" rows="10" oninput="currentScenes[${i}].prompt=this.value">${esc(s.prompt)}</textarea></div>`;
+    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span><span class="done-mark hidden" id="done${i}">✓</span></div><div style="display:flex;gap:.5rem;align-items:center"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyOne(${i})" id="copyBtn${i}" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();toggleDone(${i})" id="doneBtn${i}">完了</button><span class="expand-icon">▼</span></div></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="prompt-hdr"><h4>画像生成プロンプト（編集可能）</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button></div><textarea class="prompt-edit" id="prompt${i}" rows="10" oninput="currentScenes[${i}].prompt=this.value">${esc(s.prompt)}</textarea><div class="img-upload-area"><div class="section-label" style="margin-top:1rem">生成した画像を保存</div><div class="img-drop" id="imgDrop${i}" onclick="document.getElementById('imgFile${i}').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');handleImgDrop(${i},event)"><div id="imgPreview${i}">${s.imageUrl?`<img src="${s.imageUrl}">`:'クリックまたはドラッグ＆ドロップで画像を追加'}</div></div><input type="file" id="imgFile${i}" accept="image/*" style="display:none" onchange="handleImgSelect(${i},this)"></div></div>`;
     c.appendChild(d);
   });
 }
@@ -328,18 +332,56 @@ async function listModels(){
   }catch(e){el.textContent="エラー: "+e.message}
 }
 
-// === Googleスプレッドシート出力 ===
+// === 画像アップロード ===
+function handleImgSelect(i,input){if(input.files&&input.files[0])loadImg(i,input.files[0])}
+function handleImgDrop(i,e){if(e.dataTransfer.files&&e.dataTransfer.files[0])loadImg(i,e.dataTransfer.files[0])}
+function loadImg(i,file){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    currentScenes[i].imageUrl=e.target.result;
+    currentScenes[i].imageFile=file;
+    document.getElementById("imgPreview"+i).innerHTML=`<img src="${e.target.result}" style="max-width:100%;max-height:300px;border-radius:8px"><br><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();removeImg(${i})" style="margin-top:.5rem">画像を削除</button>`;
+  };
+  reader.readAsDataURL(file);
+}
+function removeImg(i){
+  currentScenes[i].imageUrl="";currentScenes[i].imageFile=null;
+  document.getElementById("imgPreview"+i).innerHTML="クリックまたはドラッグ＆ドロップで画像を追加";
+}
+
+// === Googleスプレッドシート出力（スプシフォーマット） ===
 function exportToSheet(){
   if(!currentScenes.length){alert("先にプロンプトを生成してください");return}
-  // TSV形式でクリップボードにコピー → スプレッドシートに貼り付けるだけ
-  let tsv="シーン番号\t話者\tセリフ\t役割\t感情\t声の雰囲気\t画像生成プロンプト\t画像ステータス\n";
+  const driveUrl=prompt("GoogleドライブのフォルダURLを入力してください（なければ空でOK）：","");
+  // スプシのヘッダー行
+  let tsv="参考動画\t\t\t\n";
+  tsv+="使用していただく画像\t"+(driveUrl||"")+"\t\t\n";
+  tsv+="話者\tセリフ\t画像番号\t音声・動画イメージ\n";
+  // 各シーンのデータ（セリフを1行ずつ分割）
   currentScenes.forEach((s,i)=>{
-    const status=doneSet.has(i)?"完了":"未生成";
-    tsv+=[s.n,s.speaker,s.dialogue.replace(/\n/g," "),s.role,s.emotion,s.voice,s.prompt.replace(/\n/g," "),status].join("\t")+"\n";
+    const lines=s.dialogue.split("\n").filter(l=>l.trim());
+    lines.forEach((line,li)=>{
+      if(li===0){
+        tsv+=`${s.speaker}\t${line.trim()}\t${s.n}\t${s.voice}\n`;
+      }else{
+        tsv+=`\t${line.trim()}\t\t\n`;
+      }
+    });
+    tsv+="\t\t\t\n"; // シーン間の空行
   });
   navigator.clipboard.writeText(tsv).then(()=>{
-    alert("スプレッドシート用のデータをコピーしました！\n\n手順:\n1. Googleスプレッドシートを開く\n2. A1セルを選択\n3. Cmd+V で貼り付け\n\n画像はGeminiで生成後、スプレッドシートに手動で挿入してください。\nGoogleドライブに画像フォルダを作成し、編集者と共有するのがおすすめです。");
+    alert("スプレッドシート用データをコピーしました！\n\n手順:\n1. Googleスプレッドシートを新規作成\n2. A1セルを選択\n3. Cmd+V で貼り付け\n4. 画像番号の列に、保存した画像を挿入\n\n画像はこのツールから一括ダウンロードして\nGoogleドライブにアップロードしてください。");
   });
+}
+
+// === 保存した画像を一括ダウンロード ===
+function downloadAllImages(){
+  const saved=currentScenes.filter(s=>s.imageUrl);
+  if(!saved.length){alert("保存された画像がありません");return}
+  saved.forEach(s=>{
+    const a=document.createElement("a");a.href=s.imageUrl;a.download=`scene_${s.n}_${s.speaker}.png`;a.click();
+  });
+  alert(`${saved.length}枚の画像をダウンロードしました。\nGoogleドライブにアップロードしてスプレッドシートに挿入してください。`);
 }
 
 function loadSample(){document.getElementById("scriptInput").value=`（皮脂）
