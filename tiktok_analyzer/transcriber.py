@@ -231,10 +231,8 @@ def transcribe_single_video(video_url, video_id, output_dir, whisper_model="base
             return text.strip()
 
     methods = [
-        ("ScrapeCreators API", lambda: _try_scrapecreators(video_url)),
-        ("Supadata API", lambda: _try_supadata(video_url)),
-        ("yt-dlp字幕", lambda: _try_ytdlp_subs(video_url, output_dir / "_subs")),
         ("Whisper", lambda: _try_whisper(video_url, output_dir / "_audio", whisper_model)),
+        ("yt-dlp字幕", lambda: _try_ytdlp_subs(video_url, output_dir / "_subs")),
     ]
 
     for method_name, method_fn in methods:
