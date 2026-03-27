@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok バイラル分析ツール</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <header class="header">
+            <h1>TikTok バイラル分析ツール</h1>
+            <p class="subtitle">100万再生以上の動画を抽出 → 台本を文字起こし → 伸びる共通項を分析</p>
+        </header>
+
+        <!-- 入力フォーム -->
+        <section class="input-section" id="inputSection">
+            <div class="form-card">
+                <div class="form-group">
+                    <label for="accountUrl">TikTokアカウントURL</label>
+                    <input
+                        type="text"
+                        id="accountUrl"
+                        placeholder="https://www.tiktok.com/@username"
+                        autocomplete="off"
+                    >
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="minViews">最低再生数</label>
+                        <select id="minViews">
+                            <option value="100000">10万再生</option>
+                            <option value="500000">50万再生</option>
+                            <option value="1000000" selected>100万再生</option>
+                            <option value="5000000">500万再生</option>
+                            <option value="10000000">1000万再生</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="whisperModel">文字起こし精度</label>
+                        <select id="whisperModel">
+                            <option value="tiny">低（高速）</option>
+                            <option value="base" selected>標準</option>
+                            <option value="small">高</option>
+                            <option value="medium">最高（低速）</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn-primary" id="analyzeBtn" onclick="startAnalysis()">
+                    分析を開始する
+                </button>
+            </div>
+        </section>
+
+        <!-- プログレス -->
+        <section class="progress-section hidden" id="progressSection">
+            <div class="progress-card">
+                <div class="progress-steps">
+                    <div class="step" id="step1" data-status="waiting">
+                        <div class="step-icon">1</div>
+                        <div class="step-label">動画取得</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="step2" data-status="waiting">
+                        <div class="step-icon">2</div>
+                        <div class="step-label">フィルタ</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="step3" data-status="waiting">
+                        <div class="step-icon">3</div>
+                        <div class="step-label">文字起こし</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="step4" data-status="waiting">
+                        <div class="step-icon">4</div>
+                        <div class="step-label">分析</div>
+                    </div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <p class="progress-message" id="progressMessage">準備中...</p>
+                <button class="btn-secondary hidden" id="cancelBtn" onclick="location.reload()">キャンセル</button>
+            </div>
+        </section>
+
+        <!-- エラー -->
+        <section class="error-section hidden" id="errorSection">
+            <div class="error-card">
+                <p id="errorMessage"></p>
+                <div id="topVideos"></div>
+                <button class="btn-secondary" onclick="resetForm()">やり直す</button>
+            </div>
+        </section>
+
+        <!-- 結果 -->
+        <section class="result-section hidden" id="resultSection">
+            <!-- 統計カード -->
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <!-- タブ -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('patterns')">共通項分析</button>
+                <button class="tab" onclick="switchTab('hooks')">フック例</button>
+                <button class="tab" onclick="switchTab('phrases')">頻出フレーズ</button>
+                <button class="tab" onclick="switchTab('videos')">動画一覧・台本</button>
+            </div>
+
+            <!-- 共通項分析タブ -->
+            <div class="tab-content active" id="tab-patterns">
+                <div class="patterns-grid" id="patternsGrid"></div>
+                <div class="duration-chart" id="durationChart"></div>
+            </div>
+
+            <!-- フック例タブ -->
+            <div class="tab-content" id="tab-hooks">
+                <div id="hooksList"></div>
+            </div>
+
+            <!-- 頻出フレーズタブ -->
+            <div class="tab-content" id="tab-phrases">
+                <div id="phrasesList"></div>
+            </div>
+
+            <!-- 動画一覧タブ -->
+            <div class="tab-content" id="tab-videos">
+                <div id="videosList"></div>
+            </div>
+
+            <button class="btn-secondary" onclick="resetForm()" style="margin-top:2rem">新しい分析を開始</button>
+        </section>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
