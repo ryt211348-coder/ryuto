@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from .researcher import TikTokVideo, search_tiktok_videos, get_video_transcript
+from .reference_data import SUCCESS_SCRIPTS, FAILURE_SCRIPTS, STYLE_RULES
 
 
 # ===== 肌悩みトピック辞書 =====
@@ -477,6 +478,51 @@ def _extract_reference_style(scripts: list[ReferenceScript]) -> dict:
         "failure_count": len(failed),
         "success_patterns": success_patterns,
         "failure_patterns": failure_patterns,
+    }
+
+
+def get_builtin_reference_style() -> dict:
+    """ビルトインの参考台本データからスタイル情報を取得する."""
+    success_patterns = []
+    for s in SUCCESS_SCRIPTS[:5]:
+        hook = ""
+        if s.get("transcript"):
+            hook = s["transcript"][:30]
+        elif s.get("title"):
+            hook = s["title"][:30]
+        success_patterns.append({
+            "views": s.get("views", 0),
+            "note": s.get("analysis", "")[:200],
+            "hook": hook,
+            "voice": s.get("voice", ""),
+        })
+
+    failure_patterns = []
+    for s in FAILURE_SCRIPTS[:5]:
+        hook = ""
+        if s.get("transcript"):
+            hook = s["transcript"][:30]
+        failure_patterns.append({
+            "views": s.get("views", 0),
+            "note": s.get("analysis", "")[:200],
+            "hook": hook,
+        })
+
+    # 声サンプル
+    voice_samples = [s["voice"] for s in SUCCESS_SCRIPTS if s.get("voice")]
+
+    return {
+        "avg_length": 300,
+        "intro_samples": [],
+        "body_samples": [],
+        "outro_samples": [],
+        "voice_samples": voice_samples[:5],
+        "script_count": len(SUCCESS_SCRIPTS) + len(FAILURE_SCRIPTS),
+        "success_count": len(SUCCESS_SCRIPTS),
+        "failure_count": len(FAILURE_SCRIPTS),
+        "success_patterns": success_patterns,
+        "failure_patterns": failure_patterns,
+        "style_rules": STYLE_RULES,
     }
 
 
