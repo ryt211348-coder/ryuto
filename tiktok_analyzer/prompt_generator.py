@@ -160,6 +160,36 @@ CHARACTER_VISUALS = {
         "role_default": "説明役",
         "reality_anchor": "Real kitchen/bathroom sink, real cleaning supplies, wet surface",
     },
+    "角質": {
+        "base": "An anthropomorphic dead skin cell / keratin character — a flat flaky greyish-white layered figure with a tough stubborn face. Stacked like bricks inside a pore. Rough dry texture, crumbly edges.",
+        "environment": "Inside a real pore on human nose/face skin. Stacked layers of dead cells filling the pore. Sebum mixed in between layers. Macro view of skin surface visible above.",
+        "role_default": "悪役",
+        "reality_anchor": "Real facial skin pore interior, layered dead skin cells visible, realistic skin texture around pore",
+    },
+    "いちご鼻": {
+        "base": "An anthropomorphic strawberry-nose character — a human nose tip covered in visible dark dots (oxidized sebum plugs in pores), with a taunting villainous face on the nose surface. The dark dots are prominent and gross. The nose itself has a reddish strawberry-like appearance.",
+        "environment": "Real human face close-up, centered on the nose. Surrounding cheek skin visible. Mirror reflection or bathroom lighting. Each pore has a dark plug visible.",
+        "role_default": "悪役",
+        "reality_anchor": "Real human face/nose close-up, visible clogged pores, bathroom mirror setting",
+    },
+    "クレンジング": {
+        "base": "An anthropomorphic cleansing product character — a sleek bottle-shaped female figure with a determined fierce face. Clear/golden oil body that looks powerful. Hands ready to fight. Emulsified milky droplets swirling around her like a battle aura.",
+        "environment": "Bathroom counter or sink. Real human hand nearby holding/reaching for the character. Water droplets. Warm soft lighting. Makeup residue and sebum visualized as a dark fortress being dissolved.",
+        "role_default": "ヒーロー",
+        "reality_anchor": "Real bathroom counter, human hand nearby, water droplets, real skincare bottles in background",
+    },
+    "洗顔料": {
+        "base": "An anthropomorphic face wash character — a tube-shaped muscular male figure with a tough no-nonsense face. Rich foamy lather surrounding him like armor. Charcoal/enzyme particles visible in the foam like tiny soldiers. Standing heroically on a real bathroom shelf.",
+        "environment": "Real bathroom. Thick foam clouds around the character. Remnants of dissolved dirt and oil being swept away. Bright clean lighting.",
+        "role_default": "ヒーロー",
+        "reality_anchor": "Real bathroom shelf, foamy lather, real soap dish or sink visible, human hands in background",
+    },
+    "美容成分": {
+        "base": "An anthropomorphic serum/active ingredient squad — a group of tiny glowing colorful droplet soldiers in formation. The leader is a golden glowing droplet with a commanding general's face. Behind him are 5-6 smaller droplets in different colors (green, orange, white, yellow) each representing different ingredients. Military formation pose.",
+        "environment": "On real human skin surface after cleansing — clean, clear pores visible. The squad is marching into the open pores like an army entering a cleared battlefield. Dramatic golden backlight.",
+        "role_default": "ヒーロー",
+        "reality_anchor": "Real cleansed human skin surface, open empty pores, post-wash clean skin texture",
+    },
 }
 
 # 感情に応じた表情・演出の修飾
@@ -191,23 +221,27 @@ def detect_emotion(dialogue: str) -> str:
         return "恐怖"
     if any(w in dialogue for w in ["ハハハ", "ヒヒヒ", "フフフ", "ガハハ", "愚か"]):
         return "嘲笑"
-    if any(w in dialogue for w in ["聞け", "引っ込めろ", "怒", "！！", "一生", "なれない"]):
+    if any(w in dialogue for w in ["聞け", "引っ込めろ", "怒", "！！", "なれない"]):
         return "怒り"
-    if any(w in dialogue for w in ["絶望", "お手上げ", "一生消えない"]):
+    if any(w in dialogue for w in ["絶望", "お手上げ", "一生消えない", "一生ない", "放っておいても"]):
         return "威圧"
     if any(w in dialogue for w in ["身動き", "とれない", "助けて", "溺れ", "苦し"]):
         return "苦しみ"
-    if any(w in dialogue for w in ["根こそぎ", "引き剥が", "鎧", "守る", "踏み潰", "切る"]):
+    if any(w in dialogue for w in ["根こそぎ", "引き剥が", "鎧", "守る", "踏み潰", "切る",
+                                    "崩す", "溶かせ", "流してやる", "攻め込め", "送り込め",
+                                    "俺たちの番"]):
         return "ヒーロー"
     if any(w in dialogue for w in ["うんざり", "待たされ", "いつも最後"]):
         return "怒り"
-    if any(w in dialogue for w in ["頼む", "守れば", "サラサラ", "行くぞ"]):
+    if any(w in dialogue for w in ["お願い", "させないで", "2度と", "頼む", "続けてくれ"]):
+        return "訴え"
+    if any(w in dialogue for w in ["守れば", "サラサラ", "行くぞ"]):
         return "決意"
     if any(w in dialogue for w in ["しなさい", "ちゃんと", "でしょ？", "温めなさい"]):
         return "訴え"
-    if any(w in dialogue for w in ["知ってた？", "実は", "正体"]):
+    if any(w in dialogue for w in ["知ってた？", "実は", "正体", "分かってんのか"]):
         return "得意"
-    if any(w in dialogue for w in ["だぞ", "だから", "するんだ", "使っとけ"]):
+    if any(w in dialogue for w in ["選べよ", "だぞ", "だから", "するんだ", "使っとけ"]):
         return "説明"
     return "説明"
 
@@ -232,8 +266,11 @@ def detect_role(dialogue: str, speaker: str, visual: dict | None) -> str:
 
 def detect_voice(dialogue: str, speaker: str) -> str:
     """キャラに適した声の雰囲気メモを生成."""
-    if any(w in dialogue for w in ["あたし", "〜わよ", "〜の！", "なさい"]):
-        return "女性・おばさん系・命令口調"
+    if any(w in dialogue for w in ["あたし", "〜わよ", "〜の！", "なさい",
+                                    "わよ！", "のよ！", "するわ", "崩すわ"]):
+        return "女性・芯の通った声・命令口調"
+    if any(w in dialogue for w in ["私にしか", "私で"]) and any(w in dialogue for w in ["の！", "わよ", "わ！"]):
+        return "女性・芯の通った声・困っている感じ"
     if any(w in dialogue for w in ["俺様", "貴様", "愚か", "ハハハ"]):
         return "男性・20代・威圧的な怒鳴り声"
     if any(w in dialogue for w in ["僕", "だよ", "ちゃう"]):
