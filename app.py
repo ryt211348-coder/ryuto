@@ -20,10 +20,16 @@ from tiktok_analyzer.analyzer import (
 )
 from tiktok_analyzer.planner import (
     parse_csv,
-    analyze_scripts,
+    analyze_researched_videos,
     generate_plans,
     format_plans_for_display,
-    get_analysis_summary,
+    get_research_summary,
+)
+from tiktok_analyzer.researcher import (
+    search_tiktok_videos,
+    get_video_transcript,
+    get_account_info,
+    format_account_for_display,
 )
 
 app = Flask(__name__)
@@ -251,34 +257,130 @@ def planner():
     return render_template("planner.html")
 
 
-@app.route("/api/planner/generate", methods=["POST"])
-def planner_generate():
+# 企画メーカー用ジョブ管理
+planner_jobs = {}
+
+
+def run_research(job_id: str, keyword: str, min_views: int,
+                 hook_period_months: int, search_period_months: int,
+                 max_plans: int, csv_content: str):
+    """バックグラウンドでTikTokリサーチ→企画生成を実行する."""
+    job = planner_jobs[job_id]
+
+    try:
+        # Step 1: TikTok検索
+        job["status"] = "searching"
+        job["message"] = f"TikTokで「{keyword}」を検索中..."
+        videos = search_tiktok_videos(
+            keyword, min_views=min_views,
+            period_months=search_period_months, max_results=30,
+        )
+
+        if not videos:
+            job["status"] = "error"
+            job["message"] = "動画が見つかりませんでした。キーワードを変えて試してください。"
+            return
+
+        job["message"] = f"{len(videos)}本の動画を取得"
+
+        # Step 2: 文字起こし取得
+        job["status"] = "transcribing"
+        job["progress"] = 0
+        job["total"] = len(videos)
+        job["message"] = f"文字起こし取得中 (0/{len(videos)})..."
+
+        for i, video in enumerate(videos):
+            if not video.transcript:
+                transcript = get_video_transcript(video.url)
+                video.transcript = transcript
+            job["progress"] = i + 1
+            job["message"] = f"文字起こし取得中 ({i + 1}/{len(videos)})..."
+
+        transcribed = sum(1 for v in videos if v.transcript)
+        job["message"] = f"文字起こし完了: {transcribed}/{len(videos)}本"
+
+        # Step 3: 分析
+        job["status"] = "analyzing"
+        job["message"] = "フック・コンテンツを分析中..."
+        analysis = analyze_researched_videos(videos, hook_period_months=hook_period_months)
+
+        # Step 4: 企画生成
+        job["status"] = "generating"
+        job["message"] = "企画台本を生成中..."
+
+        # CSV参考台本のパース（オプション）
+        reference_scripts = None
+        if csv_content and csv_content.strip():
+            reference_scripts = parse_csv(csv_content)
+
+        plans = generate_plans(analysis, reference_scripts=reference_scripts, max_plans=max_plans)
+        plans_display = format_plans_for_display(plans)
+        summary = get_research_summary(analysis)
+
+        job["status"] = "completed"
+        job["message"] = "企画生成完了！"
+        job["result"] = {
+            "plans": plans_display,
+            "summary": summary,
+        }
+
+    except Exception as e:
+        job["status"] = "error"
+        job["message"] = f"エラーが発生しました: {str(e)}"
+
+
+@app.route("/api/planner/research", methods=["POST"])
+def planner_research():
     data = request.get_json()
-    csv_content = data.get("csv_content", "")
+    keyword = data.get("keyword", "").strip()
+    if not keyword:
+        return jsonify({"error": "検索キーワードを入力してください"}), 400
+
     min_views = int(data.get("min_views", 500_000))
-    recent_months = int(data.get("recent_months", 3))
+    hook_period_months = int(data.get("hook_period_months", 3))
+    search_period_months = int(data.get("search_period_months", 6))
     max_plans = int(data.get("max_plans", 6))
+    csv_content = data.get("csv_content", "")
 
-    if not csv_content.strip():
-        return jsonify({"error": "CSVデータが空です"}), 400
+    job_id = str(uuid.uuid4())[:8]
+    planner_jobs[job_id] = {
+        "status": "queued",
+        "message": "リサーチを開始しています...",
+        "progress": 0,
+        "total": 0,
+    }
 
-    # CSV解析
-    scripts = parse_csv(csv_content)
-    if not scripts:
-        return jsonify({"error": "CSVから台本データを読み取れませんでした。カラム名を確認してください。"}), 400
+    thread = threading.Thread(
+        target=run_research,
+        args=(job_id, keyword, min_views, hook_period_months,
+              search_period_months, max_plans, csv_content),
+        daemon=True,
+    )
+    thread.start()
 
-    # 分析
-    analysis = analyze_scripts(scripts, min_views=min_views, recent_months=recent_months)
+    return jsonify({"job_id": job_id})
 
-    # 企画生成
-    plans = generate_plans(analysis, max_plans=max_plans)
-    plans_display = format_plans_for_display(plans)
-    summary = get_analysis_summary(analysis)
 
-    return jsonify({
-        "plans": plans_display,
-        "summary": summary,
-    })
+@app.route("/api/planner/status/<job_id>")
+def planner_status(job_id):
+    job = planner_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    return jsonify(job)
+
+
+@app.route("/api/planner/account", methods=["POST"])
+def planner_account():
+    data = request.get_json()
+    account_url = data.get("account_url", "").strip()
+    if not account_url:
+        return jsonify({"error": "アカウントURLが必要です"}), 400
+
+    account = get_account_info(account_url)
+    if not account:
+        return jsonify({"error": "アカウント情報を取得できませんでした"}), 404
+
+    return jsonify({"account": format_account_for_display(account)})
 
 
 if __name__ == "__main__":

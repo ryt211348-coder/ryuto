@@ -1,4 +1,4 @@
-"""TikTok スキンケア企画メーカー - CSV参考台本から企画を自動生成する."""
+"""TikTok スキンケア企画メーカー - リサーチ結果＋参考台本で企画を自動生成する."""
 
 import csv
 import io
@@ -7,6 +7,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
+
+from .researcher import TikTokVideo, search_tiktok_videos, get_video_transcript
 
 
 # ===== 肌悩みトピック辞書 =====
@@ -38,38 +40,47 @@ HOOK_TYPES = {
 
 @dataclass
 class ReferenceScript:
-    """参考台本データ."""
+    """CSV参考台本データ（スタイル参考用）."""
     url: str = ""
     transcript: str = ""
     views: int = 0
     date: str = ""
     title: str = ""
     duration: int = 0
-    # 解析結果
-    hook_text: str = ""          # 冒頭～30文字
-    hook_type: str = ""          # フックの分類
-    topics: list = field(default_factory=list)  # 該当する肌悩みトピック
-    is_recent: bool = False      # 直近3ヶ月以内か
-    full_structure: dict = field(default_factory=dict)  # 台本構造
+    hook_text: str = ""
+    topics: list = field(default_factory=list)
+    structure: dict = field(default_factory=dict)
+
+
+@dataclass
+class AnalyzedVideo:
+    """リサーチ結果の分析済み動画."""
+    video: TikTokVideo = field(default_factory=TikTokVideo)
+    hook_text: str = ""
+    hook_type: str = ""
+    topics: list = field(default_factory=list)
+    structure: dict = field(default_factory=dict)
 
 
 @dataclass
 class ScriptPlan:
     """生成された企画台本."""
-    hook_text: str = ""          # 冒頭訴求テキスト
-    hook_source: dict = field(default_factory=dict)  # フック元ネタ情報
-    topic: str = ""              # メインのスキンケアトピック
-    content_summary: str = ""    # 中身の要約
-    content_sources: list = field(default_factory=list)  # コンテンツ元ネタ
-    full_script: str = ""        # 台本全体
-    structure: dict = field(default_factory=dict)  # 構成
+    hook_text: str = ""
+    hook_source: dict = field(default_factory=dict)
+    topic: str = ""
+    content_summary: str = ""
+    content_sources: list = field(default_factory=list)
+    reference_style: dict = field(default_factory=dict)
+    full_script: str = ""
+    structure: dict = field(default_factory=dict)
 
 
-def parse_csv(file_content: str, encoding: str = "utf-8") -> list[ReferenceScript]:
+# ===== CSV参考台本パース =====
+
+def parse_csv(file_content: str) -> list[ReferenceScript]:
     """CSVファイルを解析してReferenceScriptのリストを返す."""
     scripts = []
 
-    # BOM除去
     if file_content.startswith("\ufeff"):
         file_content = file_content[1:]
 
@@ -77,39 +88,29 @@ def parse_csv(file_content: str, encoding: str = "utf-8") -> list[ReferenceScrip
     if not reader.fieldnames:
         return scripts
 
-    # カラム名の柔軟なマッピング
     col_map = _detect_columns(reader.fieldnames)
 
     for row in reader:
         script = ReferenceScript()
 
-        # URL
         if col_map.get("url"):
             script.url = row.get(col_map["url"], "").strip()
-
-        # 文字起こし/台本
         if col_map.get("transcript"):
             script.transcript = row.get(col_map["transcript"], "").strip()
-
-        # 再生数
         if col_map.get("views"):
-            raw = row.get(col_map["views"], "0").strip()
-            script.views = _parse_number(raw)
-
-        # 日付
+            script.views = _parse_number(row.get(col_map["views"], "0"))
         if col_map.get("date"):
             script.date = row.get(col_map["date"], "").strip()
-
-        # タイトル
         if col_map.get("title"):
             script.title = row.get(col_map["title"], "").strip()
-
-        # 動画長
         if col_map.get("duration"):
-            raw = row.get(col_map["duration"], "0").strip()
-            script.duration = _parse_number(raw)
+            script.duration = _parse_number(row.get(col_map["duration"], "0"))
 
         if script.transcript or script.title:
+            text = script.transcript or script.title
+            script.hook_text = text[:30].strip()
+            script.topics = _detect_topics(text)
+            script.structure = _analyze_structure(text)
             scripts.append(script)
 
     return scripts
@@ -144,111 +145,87 @@ def _detect_columns(fieldnames: list[str]) -> dict:
 
 
 def _parse_number(raw: str) -> int:
-    """文字列から数値を抽出する（カンマ・万・億対応）."""
     if not raw:
         return 0
     raw = raw.replace(",", "").replace("，", "").strip()
-
-    # 万・億の処理
     m = re.match(r"([\d.]+)\s*億", raw)
     if m:
         return int(float(m.group(1)) * 100_000_000)
     m = re.match(r"([\d.]+)\s*万", raw)
     if m:
         return int(float(m.group(1)) * 10_000)
-
-    # 数字のみ抽出
     m = re.match(r"[\d.]+", raw)
     if m:
         return int(float(m.group(0)))
     return 0
 
 
-def _parse_date(date_str: str) -> Optional[datetime]:
-    """日付文字列をdatetimeに変換する."""
-    if not date_str:
-        return None
+# ===== リサーチ動画の分析 =====
 
-    # Unix timestamp
-    if date_str.isdigit() and len(date_str) >= 10:
-        try:
-            return datetime.fromtimestamp(int(date_str))
-        except (ValueError, OSError):
-            pass
+def analyze_researched_videos(videos: list[TikTokVideo],
+                              hook_period_months: int = 3) -> dict:
+    """リサーチで取得した動画を分析する."""
+    cutoff = datetime.now() - timedelta(days=hook_period_months * 30)
+    analyzed = []
 
-    # 各種日付フォーマット
-    formats = [
-        "%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d",
-        "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",
-        "%Y%m%d", "%m/%d/%Y", "%d/%m/%Y",
-    ]
-    for fmt in formats:
-        try:
-            return datetime.strptime(date_str.strip()[:19], fmt)
-        except ValueError:
-            continue
-    return None
+    for video in videos:
+        text = video.transcript or video.description or video.title or ""
+        av = AnalyzedVideo(video=video)
 
+        # 冒頭フック（最初の30文字）
+        av.hook_text = text[:30].strip()
+        av.hook_type = _classify_hook(av.hook_text)
 
-def analyze_scripts(scripts: list[ReferenceScript], min_views: int = 500_000,
-                    recent_months: int = 3) -> dict:
-    """参考台本を分析し、フックとコンテンツに分類する."""
-    now = datetime.now()
-    cutoff_date = now - timedelta(days=recent_months * 30)
+        # トピック検出
+        av.topics = _detect_topics(text)
 
-    for script in scripts:
-        text = script.transcript or script.title or ""
+        # 構造分析
+        av.structure = _analyze_structure(text)
 
-        # 冒頭フック抽出（最初の30文字）
-        script.hook_text = text[:30].strip()
+        analyzed.append(av)
 
-        # フックタイプ分類
-        script.hook_type = _classify_hook(script.hook_text)
+    # フック候補: 直近N ヶ月のみ
+    hook_candidates = []
+    content_candidates = []
 
-        # 肌悩みトピック抽出
-        script.topics = _detect_topics(text)
+    for av in analyzed:
+        is_recent = False
+        v = av.video
+        if v.upload_timestamp:
+            try:
+                vdate = datetime.fromtimestamp(v.upload_timestamp)
+                is_recent = vdate >= cutoff
+            except (ValueError, OSError):
+                pass
+        elif v.upload_date:
+            parsed = _parse_date_str(v.upload_date)
+            if parsed:
+                is_recent = parsed >= cutoff
 
-        # 日付判定
-        parsed_date = _parse_date(script.date)
-        if parsed_date:
-            script.is_recent = parsed_date >= cutoff_date
-        else:
-            script.is_recent = False
+        if is_recent and av.hook_text:
+            hook_candidates.append(av)
 
-        # 台本構造分析
-        script.full_structure = _analyze_structure(text)
+        # コンテンツ候補: トピックがあれば期間不問
+        if av.topics:
+            content_candidates.append(av)
 
-    # フィルタリング
-    viral_scripts = [s for s in scripts if s.views >= min_views]
+    hook_candidates.sort(key=lambda a: a.video.views, reverse=True)
+    content_candidates.sort(key=lambda a: a.video.views, reverse=True)
 
-    # フック候補: 直近3ヶ月 + 50万再生以上
-    hook_candidates = [
-        s for s in viral_scripts
-        if s.is_recent and s.hook_text
-    ]
-    hook_candidates.sort(key=lambda s: s.views, reverse=True)
-
-    # コンテンツ候補: 50万再生以上（期間不問）、肌悩みトピックあり
-    content_candidates = [
-        s for s in viral_scripts
-        if s.topics and s.transcript and len(s.transcript) > 50
-    ]
-    content_candidates.sort(key=lambda s: s.views, reverse=True)
-
-    # トピック別に集約
+    # トピック別集約
     topics_summary = {}
-    for s in content_candidates:
-        for topic in s.topics:
+    for av in content_candidates:
+        for topic in av.topics:
             if topic not in topics_summary:
                 topics_summary[topic] = []
-            topics_summary[topic].append(s)
+            topics_summary[topic].append(av)
 
     # フックタイプ集計
-    hook_type_counts = Counter(s.hook_type for s in hook_candidates if s.hook_type)
+    hook_type_counts = Counter(a.hook_type for a in hook_candidates if a.hook_type)
 
     return {
-        "total_scripts": len(scripts),
-        "viral_count": len(viral_scripts),
+        "total_videos": len(videos),
+        "analyzed": analyzed,
         "hook_candidates": hook_candidates,
         "content_candidates": content_candidates,
         "topics_summary": topics_summary,
@@ -256,8 +233,204 @@ def analyze_scripts(scripts: list[ReferenceScript], min_views: int = 500_000,
     }
 
 
+def _parse_date_str(date_str: str) -> Optional[datetime]:
+    if not date_str:
+        return None
+    if date_str.isdigit() and len(date_str) >= 10:
+        try:
+            return datetime.fromtimestamp(int(date_str))
+        except (ValueError, OSError):
+            pass
+    for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%Y%m%d", "%Y-%m-%dT%H:%M:%S"]:
+        try:
+            return datetime.strptime(date_str[:19], fmt)
+        except ValueError:
+            continue
+    return None
+
+
+# ===== 企画台本生成 =====
+
+def generate_plans(analysis: dict, reference_scripts: list[ReferenceScript] = None,
+                   max_plans: int = 6) -> list[ScriptPlan]:
+    """フック×コンテンツ×参考台本で企画台本を生成する."""
+    hook_candidates = analysis.get("hook_candidates", [])
+    content_candidates = analysis.get("content_candidates", [])
+    topics_summary = analysis.get("topics_summary", {})
+
+    if not hook_candidates and not content_candidates:
+        return []
+
+    # 参考台本のスタイルを抽出
+    ref_style = _extract_reference_style(reference_scripts or [])
+
+    plans = []
+    used_hooks = set()
+    used_content_ids = set()
+
+    # 1. フック×マッチするコンテンツ
+    for hook_av in hook_candidates:
+        if len(plans) >= max_plans:
+            break
+        if hook_av.hook_text in used_hooks:
+            continue
+
+        best_content = _find_matching_content_av(
+            hook_av, content_candidates, used_content_ids
+        )
+        if not best_content:
+            for c in content_candidates:
+                cid = c.video.video_id or c.video.url
+                if cid not in used_content_ids:
+                    best_content = c
+                    break
+        if not best_content:
+            continue
+
+        plan = _build_plan_from_research(hook_av, best_content, ref_style)
+        plans.append(plan)
+        used_hooks.add(hook_av.hook_text)
+        cid = best_content.video.video_id or best_content.video.url
+        used_content_ids.add(cid)
+
+    # 2. クロス生成でパターンを増やす
+    if len(plans) < max_plans:
+        for topic, avs in topics_summary.items():
+            if len(plans) >= max_plans:
+                break
+            for hook_av in hook_candidates:
+                if len(plans) >= max_plans:
+                    break
+                if hook_av.hook_text in used_hooks:
+                    continue
+                for content_av in avs:
+                    cid = content_av.video.video_id or content_av.video.url
+                    if cid in used_content_ids:
+                        continue
+                    plan = _build_plan_from_research(hook_av, content_av, ref_style)
+                    plans.append(plan)
+                    used_hooks.add(hook_av.hook_text)
+                    used_content_ids.add(cid)
+                    break
+
+    return plans
+
+
+def _extract_reference_style(scripts: list[ReferenceScript]) -> dict:
+    """参考台本群からスタイル情報を抽出する."""
+    if not scripts:
+        return {}
+
+    # 平均的な構造を把握
+    intro_samples = []
+    body_samples = []
+    outro_samples = []
+    total_lengths = []
+
+    for s in scripts:
+        st = s.structure
+        if st:
+            if st.get("intro"):
+                intro_samples.append(st["intro"])
+            if st.get("body"):
+                body_samples.append(st["body"])
+            if st.get("outro"):
+                outro_samples.append(st["outro"])
+            if st.get("total_length"):
+                total_lengths.append(st["total_length"])
+
+    avg_length = int(sum(total_lengths) / len(total_lengths)) if total_lengths else 0
+
+    return {
+        "avg_length": avg_length,
+        "intro_samples": intro_samples[:3],
+        "body_samples": body_samples[:3],
+        "outro_samples": outro_samples[:3],
+        "script_count": len(scripts),
+    }
+
+
+def _find_matching_content_av(hook_av: AnalyzedVideo,
+                              content_candidates: list[AnalyzedVideo],
+                              used_ids: set) -> Optional[AnalyzedVideo]:
+    """フックに関連するコンテンツを探す."""
+    hook_topics = set(hook_av.topics)
+
+    if hook_topics:
+        for c in content_candidates:
+            cid = c.video.video_id or c.video.url
+            if cid in used_ids:
+                continue
+            if set(c.topics) & hook_topics:
+                return c
+
+    for c in content_candidates:
+        cid = c.video.video_id or c.video.url
+        hid = hook_av.video.video_id or hook_av.video.url
+        if cid in used_ids or cid == hid:
+            continue
+        if c.topics:
+            return c
+
+    return None
+
+
+def _build_plan_from_research(hook_av: AnalyzedVideo,
+                              content_av: AnalyzedVideo,
+                              ref_style: dict) -> ScriptPlan:
+    """リサーチ動画からの企画台本組み立て."""
+    plan = ScriptPlan()
+    hv = hook_av.video
+    cv = content_av.video
+
+    # フック
+    plan.hook_text = hook_av.hook_text
+    plan.hook_source = {
+        "url": hv.url,
+        "views": hv.views,
+        "date": hv.upload_date,
+        "hook_type": hook_av.hook_type,
+        "full_hook": (hv.transcript or hv.description or hv.title)[:80],
+        "account_name": hv.account_name,
+        "account_url": hv.account_url,
+    }
+
+    # トピック
+    plan.topic = content_av.topics[0] if content_av.topics else "スキンケア全般"
+
+    # コンテンツ
+    content_text = cv.transcript or cv.description or cv.title or ""
+    plan.content_summary = _summarize_content(content_text)
+    plan.content_sources = [{
+        "url": cv.url,
+        "views": cv.views,
+        "date": cv.upload_date,
+        "title": cv.title or cv.description[:50] if cv.description else "",
+        "topics": content_av.topics,
+        "account_name": cv.account_name,
+        "account_url": cv.account_url,
+    }]
+
+    # 参考台本スタイル
+    plan.reference_style = ref_style
+
+    # 台本構造
+    plan.structure = {
+        "hook": plan.hook_text,
+        "bridge": _generate_bridge(plan.hook_text, plan.topic),
+        "body": plan.content_summary,
+        "cta": _generate_cta(plan.topic),
+    }
+
+    # 全体台本
+    plan.full_script = _compose_script(plan, ref_style)
+
+    return plan
+
+
+# ===== 台本生成ヘルパー =====
+
 def _classify_hook(text: str) -> str:
-    """フックテキストをタイプ分類する."""
     if not text:
         return "その他"
     for hook_type, patterns in HOOK_TYPES.items():
@@ -268,7 +441,6 @@ def _classify_hook(text: str) -> str:
 
 
 def _detect_topics(text: str) -> list[str]:
-    """テキストから肌悩みトピックを検出する."""
     found = []
     for topic, keywords in SKIN_TOPICS.items():
         for kw in keywords:
@@ -279,180 +451,29 @@ def _detect_topics(text: str) -> list[str]:
 
 
 def _analyze_structure(text: str) -> dict:
-    """台本の構造を分析する."""
     if not text or len(text) < 10:
         return {}
-
     total = len(text)
-    # 3分割: 導入・本題・締め
     third = max(total // 3, 1)
-    intro = text[:third]
-    body = text[third:third * 2]
-    outro = text[third * 2:]
-
     return {
-        "intro": intro[:100],
-        "body": body[:150],
-        "outro": outro[:100],
+        "intro": text[:third][:100],
+        "body": text[third:third * 2][:150],
+        "outro": text[third * 2:][:100],
         "total_length": total,
     }
 
 
-def generate_plans(analysis: dict, max_plans: int = 6) -> list[ScriptPlan]:
-    """フックとコンテンツを組み合わせて企画台本を生成する."""
-    hook_candidates = analysis.get("hook_candidates", [])
-    content_candidates = analysis.get("content_candidates", [])
-    topics_summary = analysis.get("topics_summary", {})
-
-    if not hook_candidates or not content_candidates:
-        return []
-
-    plans = []
-    used_hooks = set()
-    used_content_ids = set()
-
-    # 各フック候補に対して、マッチするコンテンツを探す
-    for hook_script in hook_candidates:
-        if len(plans) >= max_plans:
-            break
-        if hook_script.hook_text in used_hooks:
-            continue
-
-        # フックのトピックに関連するコンテンツを探す
-        best_content = _find_matching_content(
-            hook_script, content_candidates, used_content_ids
-        )
-
-        if not best_content:
-            # トピック不一致でも、汎用的なフックなら使える
-            for c in content_candidates:
-                content_id = c.url or c.transcript[:20]
-                if content_id not in used_content_ids:
-                    best_content = c
-                    break
-
-        if not best_content:
-            continue
-
-        plan = _build_plan(hook_script, best_content)
-        plans.append(plan)
-        used_hooks.add(hook_script.hook_text)
-        content_id = best_content.url or best_content.transcript[:20]
-        used_content_ids.add(content_id)
-
-    # まだ足りない場合：トピック別にクロス生成
-    if len(plans) < max_plans:
-        for topic, scripts in topics_summary.items():
-            if len(plans) >= max_plans:
-                break
-            for hook_script in hook_candidates:
-                if len(plans) >= max_plans:
-                    break
-                if hook_script.hook_text in used_hooks:
-                    continue
-                for content_script in scripts:
-                    content_id = content_script.url or content_script.transcript[:20]
-                    if content_id in used_content_ids:
-                        continue
-                    plan = _build_plan(hook_script, content_script)
-                    plans.append(plan)
-                    used_hooks.add(hook_script.hook_text)
-                    used_content_ids.add(content_id)
-                    break
-
-    return plans
-
-
-def _find_matching_content(hook_script: ReferenceScript,
-                           content_candidates: list[ReferenceScript],
-                           used_ids: set) -> Optional[ReferenceScript]:
-    """フックに関連するコンテンツを探す."""
-    hook_topics = set(hook_script.topics)
-
-    # 1. 同じトピックのコンテンツを優先
-    if hook_topics:
-        for c in content_candidates:
-            content_id = c.url or c.transcript[:20]
-            if content_id in used_ids:
-                continue
-            if set(c.topics) & hook_topics:
-                return c
-
-    # 2. フックと異なる動画で、トピックありのコンテンツ
-    for c in content_candidates:
-        content_id = c.url or c.transcript[:20]
-        hook_id = hook_script.url or hook_script.transcript[:20]
-        if content_id in used_ids or content_id == hook_id:
-            continue
-        if c.topics:
-            return c
-
-    return None
-
-
-def _build_plan(hook_script: ReferenceScript,
-                content_script: ReferenceScript) -> ScriptPlan:
-    """フックとコンテンツから企画台本を組み立てる."""
-    plan = ScriptPlan()
-
-    # フック情報
-    plan.hook_text = hook_script.hook_text
-    plan.hook_source = {
-        "url": hook_script.url,
-        "views": hook_script.views,
-        "date": hook_script.date,
-        "hook_type": hook_script.hook_type,
-        "full_hook": hook_script.transcript[:80] if hook_script.transcript else "",
-    }
-
-    # トピック
-    plan.topic = content_script.topics[0] if content_script.topics else "スキンケア全般"
-
-    # コンテンツ要約
-    content_text = content_script.transcript or content_script.title or ""
-    plan.content_summary = _summarize_content(content_text)
-
-    # コンテンツ元ネタ
-    plan.content_sources = [{
-        "url": content_script.url,
-        "views": content_script.views,
-        "date": content_script.date,
-        "title": content_script.title,
-        "topics": content_script.topics,
-    }]
-
-    # 台本構造
-    plan.structure = {
-        "hook": plan.hook_text,
-        "bridge": _generate_bridge(plan.hook_text, plan.topic),
-        "body": plan.content_summary,
-        "cta": _generate_cta(plan.topic),
-    }
-
-    # 全体台本生成
-    plan.full_script = _compose_script(plan)
-
-    return plan
-
-
 def _summarize_content(text: str) -> str:
-    """コンテンツテキストからハウツー部分を要約する."""
     if not text:
         return ""
-
-    # 冒頭をスキップして本題部分を抽出
     total = len(text)
     if total <= 100:
         return text
-
-    # 導入（1/4）をスキップし、本題（2/4）を取得
     quarter = total // 4
-    body = text[quarter:quarter * 3]
-    return body[:300]
+    return text[quarter:quarter * 3][:300]
 
 
 def _generate_bridge(hook_text: str, topic: str) -> str:
-    """フックとコンテンツをつなぐブリッジ文を生成する."""
     bridges = {
         "ニキビ": "そのニキビ、実は原因が違うかもしれません。",
         "毛穴": "毛穴が目立つのには理由があるんです。",
@@ -469,20 +490,16 @@ def _generate_bridge(hook_text: str, topic: str) -> str:
 
 
 def _generate_cta(topic: str) -> str:
-    """締めのCTA文を生成する."""
     ctas = [
         "他にも知りたい方はフォローしてね！",
         "保存して見返してね！",
         "もっと詳しく知りたい人はコメントで教えて！",
         "参考になったらいいねしてね！",
     ]
-    # トピックに応じてCTAを選択
-    idx = hash(topic) % len(ctas)
-    return ctas[idx]
+    return ctas[hash(topic) % len(ctas)]
 
 
-def _compose_script(plan: ScriptPlan) -> str:
-    """企画台本の全文を組み立てる."""
+def _compose_script(plan: ScriptPlan, ref_style: dict = None) -> str:
     parts = []
 
     # 冒頭（0-5秒）
@@ -498,6 +515,11 @@ def _compose_script(plan: ScriptPlan) -> str:
     if body:
         parts.append(f"\n【本題 10秒-】\n{body}")
 
+    # 参考台本スタイルの注記
+    if ref_style and ref_style.get("avg_length"):
+        parts.append(f"\n【参考】台本目安文字数: 約{ref_style['avg_length']}文字 "
+                     f"({ref_style.get('script_count', 0)}本の参考台本より)")
+
     # 締め
     cta = plan.structure.get("cta", "")
     if cta:
@@ -506,8 +528,9 @@ def _compose_script(plan: ScriptPlan) -> str:
     return "\n".join(parts)
 
 
+# ===== フロント表示用整形 =====
+
 def format_plans_for_display(plans: list[ScriptPlan]) -> list[dict]:
-    """企画台本をフロント表示用に整形する."""
     result = []
     for i, plan in enumerate(plans, 1):
         result.append({
@@ -519,42 +542,66 @@ def format_plans_for_display(plans: list[ScriptPlan]) -> list[dict]:
                 "views": plan.hook_source.get("views", 0),
                 "date": plan.hook_source.get("date", ""),
                 "full_hook": plan.hook_source.get("full_hook", ""),
+                "account_name": plan.hook_source.get("account_name", ""),
+                "account_url": plan.hook_source.get("account_url", ""),
             },
             "topic": plan.topic,
             "content_summary": plan.content_summary[:200],
             "content_sources": plan.content_sources,
+            "reference_style": plan.reference_style,
             "structure": plan.structure,
             "full_script": plan.full_script,
         })
     return result
 
 
-def get_analysis_summary(analysis: dict) -> dict:
-    """分析結果のサマリーを返す."""
+def get_research_summary(analysis: dict) -> dict:
     hook_candidates = analysis.get("hook_candidates", [])
     content_candidates = analysis.get("content_candidates", [])
     topics_summary = analysis.get("topics_summary", {})
 
-    # トピック別件数
-    topic_counts = {t: len(scripts) for t, scripts in topics_summary.items()}
+    topic_counts = {t: len(avs) for t, avs in topics_summary.items()}
 
-    # 上位フック
     top_hooks = []
-    for s in hook_candidates[:10]:
+    for a in hook_candidates[:10]:
         top_hooks.append({
-            "text": s.hook_text,
-            "type": s.hook_type,
-            "views": s.views,
-            "url": s.url,
-            "date": s.date,
+            "text": a.hook_text,
+            "type": a.hook_type,
+            "views": a.video.views,
+            "url": a.video.url,
+            "date": a.video.upload_date,
+            "account_name": a.video.account_name,
+            "account_url": a.video.account_url,
         })
 
+    # リサーチ動画一覧
+    all_videos = []
+    for a in analysis.get("analyzed", []):
+        v = a.video
+        all_videos.append({
+            "video_id": v.video_id,
+            "url": v.url,
+            "title": v.title,
+            "views": v.views,
+            "likes": v.likes,
+            "duration": v.duration,
+            "upload_date": v.upload_date,
+            "account_name": v.account_name,
+            "account_url": v.account_url,
+            "transcript": v.transcript[:100] if v.transcript else "",
+            "has_transcript": bool(v.transcript),
+            "hook_text": a.hook_text,
+            "hook_type": a.hook_type,
+            "topics": a.topics,
+        })
+    all_videos.sort(key=lambda x: x["views"], reverse=True)
+
     return {
-        "total_scripts": analysis.get("total_scripts", 0),
-        "viral_count": analysis.get("viral_count", 0),
+        "total_videos": analysis.get("total_videos", 0),
         "hook_count": len(hook_candidates),
         "content_count": len(content_candidates),
         "topic_counts": topic_counts,
         "hook_type_counts": analysis.get("hook_type_counts", {}),
         "top_hooks": top_hooks,
+        "all_videos": all_videos[:30],
     }

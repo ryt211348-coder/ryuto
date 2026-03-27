@@ -18,23 +18,85 @@
         <!-- ヘッダー -->
         <header class="header">
             <h1>スキンケア企画メーカー</h1>
-            <p class="subtitle">参考台本CSVをアップロード → 冒頭訴求×ハウツーを自動マッチング → 企画台本を複数パターン生成</p>
+            <p class="subtitle">キーワードでTikTokをリサーチ → バズ動画からフック×ハウツーを自動マッチング → 企画台本を複数パターン生成</p>
         </header>
 
-        <!-- Step 1: CSV アップロード -->
-        <section class="input-section" id="uploadSection">
+        <!-- Step 1: 入力 -->
+        <section class="input-section" id="inputSection">
             <div class="form-card">
-                <h2 class="section-title">1. 参考台本CSVをアップロード</h2>
-                <p class="section-desc">
-                    CSVには「文字起こし（台本）」「再生数」「投稿日」のカラムが含まれていると最適です。<br>
-                    カラム名は自動検出されます。
-                </p>
+                <!-- キーワード入力 -->
+                <h2 class="section-title">1. リサーチキーワード</h2>
+                <p class="section-desc">TikTokで検索するキーワードを入力してください。肌悩みやスキンケアに関するワードが効果的です。</p>
+
+                <div class="form-group">
+                    <label for="searchKeyword">検索キーワード</label>
+                    <input type="text" id="searchKeyword" placeholder="例: ニキビ ケア、毛穴 黒ずみ、スキンケア ルーティン" autocomplete="off">
+                </div>
+
+                <div class="keyword-suggestions">
+                    <span class="suggestion-label">おすすめ:</span>
+                    <button class="keyword-chip" onclick="setKeyword('ニキビ 原因 対策')">ニキビ</button>
+                    <button class="keyword-chip" onclick="setKeyword('毛穴 黒ずみ ケア')">毛穴</button>
+                    <button class="keyword-chip" onclick="setKeyword('スキンケア ルーティン 2024')">ルーティン</button>
+                    <button class="keyword-chip" onclick="setKeyword('乾燥肌 保湿 おすすめ')">乾燥肌</button>
+                    <button class="keyword-chip" onclick="setKeyword('美白 透明感 スキンケア')">美白</button>
+                    <button class="keyword-chip" onclick="setKeyword('敏感肌 赤み 鎮静')">敏感肌</button>
+                    <button class="keyword-chip" onclick="setKeyword('シミ くすみ 対策')">シミ・くすみ</button>
+                    <button class="keyword-chip" onclick="setKeyword('韓国 スキンケア おすすめ')">韓国コスメ</button>
+                </div>
+
+                <!-- 設定 -->
+                <h2 class="section-title" style="margin-top:2rem">2. リサーチ条件</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="minViews">最低再生数</label>
+                        <select id="minViews">
+                            <option value="100000">10万再生</option>
+                            <option value="300000">30万再生</option>
+                            <option value="500000" selected>50万再生</option>
+                            <option value="1000000">100万再生</option>
+                            <option value="5000000">500万再生</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="hookPeriod">フック参照期間</label>
+                        <select id="hookPeriod">
+                            <option value="1">直近1ヶ月</option>
+                            <option value="3" selected>直近3ヶ月</option>
+                            <option value="6">直近6ヶ月</option>
+                            <option value="12">直近1年</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="searchPeriod">リサーチ全体期間</label>
+                        <select id="searchPeriod">
+                            <option value="3">直近3ヶ月</option>
+                            <option value="6" selected>直近6ヶ月</option>
+                            <option value="12">直近1年</option>
+                            <option value="24">直近2年</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="maxPlans">生成パターン数</label>
+                        <select id="maxPlans">
+                            <option value="3">3パターン</option>
+                            <option value="6" selected>6パターン</option>
+                            <option value="10">10パターン</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- CSV参考台本（オプション） -->
+                <h2 class="section-title" style="margin-top:2rem">3. 参考台本CSV（オプション）</h2>
+                <p class="section-desc">自分の台本CSVをアップロードすると、そのスタイルを参考にした企画を生成します。</p>
 
                 <div class="upload-area" id="uploadArea">
                     <input type="file" id="csvFile" accept=".csv,.tsv,.txt" hidden>
                     <div class="upload-icon">📄</div>
-                    <p class="upload-text">CSVファイルをドラッグ＆ドロップ<br>またはクリックして選択</p>
-                    <p class="upload-hint">対応: .csv / .tsv / .txt</p>
+                    <p class="upload-text">CSVをドラッグ＆ドロップ or クリック</p>
+                    <p class="upload-hint">構成・口調のスタイル参考として使います</p>
                 </div>
 
                 <div class="file-info hidden" id="fileInfo">
@@ -42,46 +104,41 @@
                     <button class="btn-text" onclick="clearFile()">削除</button>
                 </div>
 
-                <div class="form-row" style="margin-top:1.5rem">
-                    <div class="form-group">
-                        <label for="minViewsPlanner">最低再生数</label>
-                        <select id="minViewsPlanner">
-                            <option value="100000">10万再生</option>
-                            <option value="300000">30万再生</option>
-                            <option value="500000" selected>50万再生</option>
-                            <option value="1000000">100万再生</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="recentMonths">フック参照期間</label>
-                        <select id="recentMonths">
-                            <option value="1">直近1ヶ月</option>
-                            <option value="3" selected>直近3ヶ月</option>
-                            <option value="6">直近6ヶ月</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="maxPlans">生成パターン数</label>
-                    <select id="maxPlans">
-                        <option value="3">3パターン</option>
-                        <option value="6" selected>6パターン</option>
-                        <option value="10">10パターン</option>
-                    </select>
-                </div>
-
-                <button class="btn-primary" id="generateBtn" onclick="generatePlans()" disabled>
-                    企画を生成する
+                <button class="btn-primary" id="startBtn" onclick="startResearch()" style="margin-top:1.5rem">
+                    リサーチ開始
                 </button>
             </div>
         </section>
 
-        <!-- ローディング -->
+        <!-- プログレス -->
         <section class="loading-section hidden" id="loadingSection">
             <div class="progress-card">
-                <div class="spinner"></div>
-                <p class="progress-message">CSVを解析中...</p>
+                <div class="progress-steps">
+                    <div class="step" id="rs1" data-status="waiting">
+                        <div class="step-icon">1</div>
+                        <div class="step-label">TikTok検索</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="rs2" data-status="waiting">
+                        <div class="step-icon">2</div>
+                        <div class="step-label">文字起こし</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="rs3" data-status="waiting">
+                        <div class="step-icon">3</div>
+                        <div class="step-label">分析</div>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="rs4" data-status="waiting">
+                        <div class="step-icon">4</div>
+                        <div class="step-label">企画生成</div>
+                    </div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="researchProgressBar"></div>
+                </div>
+                <p class="progress-message" id="researchMessage">準備中...</p>
+                <button class="btn-secondary" onclick="location.reload()" style="margin-top:1rem">キャンセル</button>
             </div>
         </section>
 
@@ -96,11 +153,12 @@
         <!-- 結果 -->
         <section class="result-section hidden" id="resultSection">
             <!-- サマリー -->
-            <div class="summary-card" id="summaryCard"></div>
+            <div id="summaryCard"></div>
 
             <!-- タブ -->
             <div class="tabs">
                 <button class="tab active" onclick="switchPlannerTab('plans')">企画台本</button>
+                <button class="tab" onclick="switchPlannerTab('videos')">リサーチ動画</button>
                 <button class="tab" onclick="switchPlannerTab('hooks')">フック一覧</button>
                 <button class="tab" onclick="switchPlannerTab('topics')">トピック分析</button>
             </div>
@@ -108,6 +166,11 @@
             <!-- 企画台本タブ -->
             <div class="tab-content active" id="ptab-plans">
                 <div id="plansList"></div>
+            </div>
+
+            <!-- リサーチ動画タブ -->
+            <div class="tab-content" id="ptab-videos">
+                <div id="researchedVideos"></div>
             </div>
 
             <!-- フック一覧タブ -->
@@ -120,8 +183,19 @@
                 <div id="topicsAnalysis"></div>
             </div>
 
-            <button class="btn-secondary" onclick="resetPlanner()" style="margin-top:2rem">新しいCSVで再生成</button>
+            <button class="btn-secondary" onclick="resetPlanner()" style="margin-top:2rem">新しいリサーチを開始</button>
         </section>
+
+        <!-- アカウント情報モーダル -->
+        <div class="modal-overlay hidden" id="accountModal" onclick="closeAccountModal(event)">
+            <div class="modal-card" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeAccountModal()">&times;</button>
+                <div id="accountContent">
+                    <div class="spinner" style="margin:2rem auto"></div>
+                    <p style="text-align:center;color:var(--text-dim)">読み込み中...</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="/static/planner.js"></script>
