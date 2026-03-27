@@ -253,12 +253,29 @@ function renderScenes(){
   const rc={"悪役":"#ff2d55","黒幕":"#a78bfa","弱者":"#fbbf24","ヒーロー":"#34d399","説明役":"#00f0ff","締め":"#ff6b8a"};
   currentScenes.forEach((s,i)=>{
     const cl=rc[s.role]||"#888",d=document.createElement("div");d.className="scene-card";
-    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span><span class="done-mark hidden" id="done${i}">✓</span></div><div style="display:flex;gap:.5rem;align-items:center"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyOne(${i})" id="copyBtn${i}" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();toggleDone(${i})" id="doneBtn${i}">完了</button><span class="expand-icon">▼</span></div></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="modify-section"><div class="section-label">プロンプト修正（日本語で入力 → AIが英語プロンプトに変換）</div><div style="display:flex;gap:.5rem;margin-top:.4rem"><input class="modify-input" id="modifyInput${i}" placeholder="修正したい内容を入力..." onkeydown="if(event.key==='Enter')applyModify(${i})"><button class="btn btn-outline btn-sm" onclick="applyModify(${i})" style="white-space:nowrap;background:rgba(255,45,85,.1);color:var(--accent);border-color:rgba(255,45,85,.3)">反映</button><button class="btn btn-outline btn-sm" onclick="resetPrompt(${i})" style="white-space:nowrap">初期に戻す</button></div></div><div class="prompt-hdr"><h4>画像生成プロンプト（編集可能）</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button></div><textarea class="prompt-edit" id="prompt${i}" rows="10" oninput="currentScenes[${i}].prompt=this.value">${esc(s.prompt)}</textarea><div class="img-upload-area"><div class="section-label" style="margin-top:1rem">生成した画像を保存</div><div class="img-drop" id="imgDrop${i}" onclick="document.getElementById('imgFile${i}').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');handleImgDrop(${i},event)"><div id="imgPreview${i}">${s.imageUrl?`<img src="${s.imageUrl}">`:'クリックまたはドラッグ＆ドロップで画像を追加'}</div></div><input type="file" id="imgFile${i}" accept="image/*" style="display:none" onchange="handleImgSelect(${i},this)"></div></div>`;
+    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span><span class="done-mark hidden" id="done${i}">✓</span></div><div style="display:flex;gap:.5rem;align-items:center"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyOne(${i})" id="copyBtn${i}" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();toggleDone(${i})" id="doneBtn${i}">完了</button><span class="expand-icon">▼</span></div></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="modify-section"><div class="section-label">プロンプト修正（日本語で入力 → AIが英語プロンプトに変換）</div><div style="display:flex;gap:.5rem;margin-top:.4rem;flex-wrap:wrap"><input class="modify-input" id="modifyInput${i}" placeholder="例: もっと怒った表情にして、背景を暗く" onkeydown="if(event.key==='Enter')applyModify(${i})"><button class="btn btn-outline btn-sm" onclick="applyModify(${i})" style="white-space:nowrap;background:rgba(255,45,85,.1);color:var(--accent);border-color:rgba(255,45,85,.3)">AIで反映</button><button class="btn btn-outline btn-sm" onclick="resetPrompt(${i})" style="white-space:nowrap">初期に戻す</button></div><div style="margin-top:.5rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap"><span style="font-size:.75rem;color:var(--dim)">うまくいかなかった画像:</span><button class="btn btn-outline btn-sm" onclick="document.getElementById('refImg${i}').click()" style="font-size:.7rem">添付</button><button class="btn btn-outline btn-sm hidden" id="refClear${i}" onclick="clearRef(${i})" style="font-size:.7rem">削除</button><input type="file" id="refImg${i}" accept="image/*" style="display:none" onchange="loadRef(${i},this)"></div><div id="refPreview${i}" style="margin-top:.3rem"></div></div><div class="prompt-hdr"><h4>画像生成プロンプト（編集可能）</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button></div><textarea class="prompt-edit" id="prompt${i}" rows="10" oninput="currentScenes[${i}].prompt=this.value">${esc(s.prompt)}</textarea><div class="img-upload-area"><div class="section-label" style="margin-top:1rem">生成した画像を保存</div><div class="img-drop" id="imgDrop${i}" onclick="document.getElementById('imgFile${i}').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');handleImgDrop(${i},event)"><div id="imgPreview${i}">${s.imageUrl?`<img src="${s.imageUrl}">`:'クリックまたはドラッグ＆ドロップで画像を追加'}</div></div><input type="file" id="imgFile${i}" accept="image/*" style="display:none" onchange="handleImgSelect(${i},this)"></div></div>`;
     c.appendChild(d);
   });
 }
 let doneSet=new Set();
+let refImages={};// 参考画像（うまくいかなかった画像）を保持
 function toggle(i){document.getElementById("sb"+i).classList.toggle("open");document.getElementById("sb"+i).closest(".scene-card").classList.toggle("open")}
+function loadRef(i,input){
+  if(!input.files||!input.files[0])return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    refImages[i]=e.target.result;
+    document.getElementById("refPreview"+i).innerHTML=`<img src="${e.target.result}" style="max-width:150px;max-height:150px;border-radius:6px;border:1px solid var(--border)">`;
+    document.getElementById("refClear"+i).classList.remove("hidden");
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+function clearRef(i){
+  delete refImages[i];
+  document.getElementById("refPreview"+i).innerHTML="";
+  document.getElementById("refClear"+i).classList.add("hidden");
+  document.getElementById("refImg"+i).value="";
+}
 async function applyModify(i){
   const input=document.getElementById("modifyInput"+i);
   const instruction=input.value.trim();
@@ -277,15 +294,24 @@ async function applyModify(i){
     return;
   }
 
-  // APIキーあり → Gemini APIでプロンプトをAI修正
+  // APIキーあり → Gemini APIでプロンプトをAI修正（画像付き対応）
   const btn=document.querySelector(`#sb${i} .modify-section button`);
   btn.textContent="AI変換中...";btn.disabled=true;
   try{
-    const sysPrompt=`You are an expert image generation prompt engineer. The user has an existing image generation prompt and wants to modify it. Apply the user's modification instructions (given in Japanese) to the existing prompt. Return ONLY the modified English prompt, nothing else. Keep the same structure and style. Incorporate the modification naturally into the prompt.`;
+    const hasRefImg=!!refImages[i];
+    const sysPrompt=hasRefImg
+      ?`You are an expert image generation prompt engineer. The user has an existing prompt and a reference image that didn't turn out well. Analyze the reference image to understand what went wrong, then apply the user's modification instructions (in Japanese) to fix the prompt. Return ONLY the modified English prompt, nothing else.`
+      :`You are an expert image generation prompt engineer. The user has an existing image generation prompt and wants to modify it. Apply the user's modification instructions (given in Japanese) to the existing prompt. Return ONLY the modified English prompt, nothing else. Keep the same structure and style. Incorporate the modification naturally into the prompt.`;
     const userMsg=`Current prompt:\n${currentPrompt}\n\nModification request (in Japanese):\n${instruction}\n\nReturn the full modified prompt in English:`;
+    const parts=[{text:sysPrompt+"\n\n"+userMsg}];
+    if(hasRefImg){
+      const base64=refImages[i].split(",")[1];
+      const mime=refImages[i].split(";")[0].split(":")[1];
+      parts.unshift({inlineData:{mimeType:mime,data:base64}});
+    }
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,{
       method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({contents:[{parts:[{text:sysPrompt+"\n\n"+userMsg}]}]})
+      body:JSON.stringify({contents:[{parts}]})
     });
     const d=await r.json();
     if(d.error){alert("APIエラー: "+d.error.message);return}
