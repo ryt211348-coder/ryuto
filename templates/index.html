@@ -101,26 +101,37 @@
 
             <!-- タブ -->
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('patterns')">共通項分析</button>
-                <button class="tab" onclick="switchTab('hooks')">フック例</button>
-                <button class="tab" onclick="switchTab('phrases')">頻出フレーズ</button>
+                <button class="tab active" onclick="switchTab('formats')">企画フォーマット</button>
+                <button class="tab" onclick="switchTab('appeals')">訴求・感情</button>
+                <button class="tab" onclick="switchTab('hooks')">フック・構成</button>
+                <button class="tab" onclick="switchTab('products')">商品・フレーズ</button>
                 <button class="tab" onclick="switchTab('videos')">動画一覧・台本</button>
             </div>
 
-            <!-- 共通項分析タブ -->
-            <div class="tab-content active" id="tab-patterns">
-                <div class="patterns-grid" id="patternsGrid"></div>
+            <!-- 企画フォーマットタブ -->
+            <div class="tab-content active" id="tab-formats">
+                <div id="formatsChart"></div>
+                <div id="topInsights"></div>
                 <div class="duration-chart" id="durationChart"></div>
             </div>
 
-            <!-- フック例タブ -->
+            <!-- 訴求・感情タブ -->
+            <div class="tab-content" id="tab-appeals">
+                <div id="appealsChart"></div>
+                <div id="emotionsChart"></div>
+            </div>
+
+            <!-- フック・構成タブ -->
             <div class="tab-content" id="tab-hooks">
+                <div id="hookRates"></div>
+                <div id="structureChart"></div>
                 <div id="hooksList"></div>
             </div>
 
-            <!-- 頻出フレーズタブ -->
-            <div class="tab-content" id="tab-phrases">
-                <div id="phrasesList"></div>
+            <!-- 商品・フレーズタブ -->
+            <div class="tab-content" id="tab-products">
+                <div id="productsList"></div>
+                <div id="phrasesList" style="margin-top:1.5rem"></div>
             </div>
 
             <!-- 動画一覧タブ -->

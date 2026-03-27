@@ -1,4 +1,4 @@
-"""バイラル動画の台本から共通項を分析する."""
+"""バイラル動画の台本から企画転用可能な共通項を分析する."""
 
 import re
 from collections import Counter
@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 
 from .extractor import VideoInfo
 
@@ -20,96 +18,141 @@ class AnalysisResult:
     avg_duration: float = 0.0
     avg_views: float = 0.0
     avg_likes: float = 0.0
-
-    # 構造パターン
-    hook_patterns: list[dict] = field(default_factory=list)
-    ending_patterns: list[dict] = field(default_factory=list)
-
-    # コンテンツパターン
-    common_phrases: list[tuple[str, int]] = field(default_factory=list)
-    common_topics: list[tuple[str, int]] = field(default_factory=list)
-
-    # 形式パターン
-    duration_distribution: dict[str, int] = field(default_factory=dict)
     avg_script_length: float = 0.0
-    question_usage_rate: float = 0.0
-    cta_usage_rate: float = 0.0
 
-    # 感情・トーン
-    urgency_words_rate: float = 0.0
-    negative_hook_rate: float = 0.0
-    number_usage_rate: float = 0.0
+    # 動画長分布
+    duration_distribution: dict = field(default_factory=dict)
 
+    # === 企画分析 ===
+    content_formats: list = field(default_factory=list)       # 企画フォーマット分類
+    topic_categories: list = field(default_factory=list)      # 扱っているテーマ/商品カテゴリ
+    product_mentions: list = field(default_factory=list)      # 言及されている商品・ブランド
 
-# 日本語のバイラルパターン用キーワード
-HOOK_KEYWORDS = [
-    "知ってた", "知ってますか", "実は", "衝撃", "ヤバい", "やばい",
-    "マジで", "まじで", "びっくり", "驚き", "秘密", "裏技",
-    "知らないと損", "損してる", "危険", "注意", "絶対", "必ず",
-    "最強", "神", "プロ", "99%", "誰も知らない", "禁断",
-    "閲覧注意", "これ見て", "聞いて", "待って", "えっ",
-]
+    # === 台本構成分析 ===
+    hook_patterns: list = field(default_factory=list)         # フック（冒頭）
+    structure_patterns: list = field(default_factory=list)    # 台本の構成パターン
+    ending_patterns: list = field(default_factory=list)       # エンディング
 
-CTA_KEYWORDS = [
-    "フォロー", "いいね", "コメント", "シェア", "保存",
-    "プロフィール", "リンク", "詳しく", "続き", "パート2",
-    "part2", "次回", "また", "お楽しみに",
-]
+    # === 訴求軸分析 ===
+    appeal_types: list = field(default_factory=list)          # 訴求の種類（悩み解決/比較/ランキング等）
+    emotional_triggers: list = field(default_factory=list)    # 感情トリガー
 
-URGENCY_KEYWORDS = [
-    "今すぐ", "急いで", "早く", "限定", "期間", "最後",
-    "ラスト", "終了", "なくなる", "売り切れ", "残り",
-]
+    # === 使用率 ===
+    format_rates: dict = field(default_factory=dict)
+    hook_technique_rates: dict = field(default_factory=dict)
+    appeal_rates: dict = field(default_factory=dict)
 
-NEGATIVE_HOOK_KEYWORDS = [
-    "やめて", "ダメ", "危険", "注意", "失敗", "後悔",
-    "損", "最悪", "絶対にやるな", "知らないと",
-]
+    # === 頻出フレーズ ===
+    common_phrases: list = field(default_factory=list)
+
+    # === 再生数との相関 ===
+    top_performing_insights: list = field(default_factory=list)
 
 
-def analyze_hook(transcript: str) -> dict:
-    """冒頭部分（フック）のパターンを分析する."""
-    # 最初の30文字をフックとして分析
-    hook = transcript[:80] if len(transcript) > 80 else transcript
-    hook_lower = hook.lower()
+# ===== 企画フォーマット =====
+FORMAT_PATTERNS = {
+    "ランキング・〇選": [r"\d+選", r"ランキング", r"TOP\s?\d+", r"トップ\d+", r"ベスト\d+", r"おすすめ\d+"],
+    "比較・対決": ["比較", "vs", "VS", "対決", "違い", "どっち", "どちら"],
+    "ビフォーアフター": ["ビフォーアフター", "before", "after", "変化", "使う前", "使った後", "1ヶ月後", "1週間後"],
+    "How-to・やり方": ["やり方", "方法", "手順", "ステップ", "コツ", "テクニック", "裏技", "ハウツー", "how to"],
+    "レビュー・紹介": ["レビュー", "紹介", "買ってみた", "試してみた", "使ってみた", "開封", "正直", "本音"],
+    "暴露・裏側": ["暴露", "裏側", "真実", "本当は", "業界", "闇", "秘密", "内緒"],
+    "ルーティン": ["ルーティン", "ルーティーン", "routine", "モーニング", "ナイト", "1日"],
+    "Q&A・質問回答": ["質問", "Q&A", "回答", "聞かれ", "よく聞く", "教えて"],
+    "ストーリー・体験談": ["体験", "経験", "ストーリー", "実話", "あの時", "過去に"],
+    "まとめ・解説": ["まとめ", "解説", "徹底", "完全版", "全て", "すべて"],
+}
 
-    patterns = {
-        "text": hook,
-        "has_question": "?" in hook or "？" in hook,
-        "has_number": bool(re.search(r"\d+", hook)),
-        "has_hook_keyword": any(kw in hook for kw in HOOK_KEYWORDS),
-        "has_negative_hook": any(kw in hook for kw in NEGATIVE_HOOK_KEYWORDS),
-        "matched_keywords": [kw for kw in HOOK_KEYWORDS if kw in hook],
+# ===== 訴求パターン =====
+APPEAL_PATTERNS = {
+    "悩み解決型": ["悩み", "困って", "解決", "改善", "なくす", "消す", "治す", "直す", "対策", "防ぐ"],
+    "損失回避型": ["知らないと損", "損してる", "もったいない", "損する", "やめて", "NG", "ダメ", "絶対やるな"],
+    "権威・プロ型": ["プロ", "専門", "美容師", "皮膚科", "医師", "薬剤師", "現役", "元", "歴\d+年"],
+    "コスパ・お得型": ["コスパ", "安い", "プチプラ", "お得", "節約", "半額", "セール", "円"],
+    "驚き・衝撃型": ["衝撃", "ヤバい", "やばい", "驚き", "マジで", "まじで", "信じられない", "えっ"],
+    "限定・希少型": ["限定", "今だけ", "期間", "なくなる", "売り切れ", "残り", "新発売", "新作"],
+    "共感・あるある型": ["あるある", "わかる", "共感", "同じ", "みんな", "あなたも"],
+    "数字・具体型": [r"\d+%", r"\d+倍", r"\d+日", r"\d+ヶ月", r"\d+万", r"\d+円"],
+}
+
+# ===== 感情トリガー =====
+EMOTION_PATTERNS = {
+    "好奇心": ["実は", "知ってた", "意外", "まさか", "秘密", "裏", "隠された"],
+    "不安・恐怖": ["危険", "注意", "怖い", "リスク", "副作用", "失敗", "後悔"],
+    "期待・希望": ["変わる", "人生", "最高", "神", "最強", "革命", "感動"],
+    "怒り・不満": ["許せない", "ひどい", "最悪", "詐欺", "嘘", "騙され"],
+    "安心・信頼": ["安心", "安全", "信頼", "実績", "証明", "エビデンス"],
+}
+
+# ===== 台本構成パターン =====
+STRUCTURE_PATTERNS = {
+    "問題提起→解決": ["でも大丈夫", "そこで", "解決策", "答えは", "実は簡単"],
+    "結論ファースト": [],  # 冒頭に結論がある場合（別途判定）
+    "リスト型": [r"一つ目", r"二つ目", r"1つ目", r"2つ目", r"まず", r"次に", r"最後に", r"ポイント\d"],
+    "ストーリー型": ["ある日", "最初は", "きっかけ", "そしたら", "結果的に"],
+    "Before→After型": ["前は", "以前は", "今は", "今では", "変わった", "使い始めて"],
+}
+
+
+def _match_patterns(text, pattern_dict):
+    """テキストに対してパターン辞書をマッチングする."""
+    matched = {}
+    for category, patterns in pattern_dict.items():
+        count = 0
+        for p in patterns:
+            if re.search(p, text):
+                count += 1
+        if count > 0:
+            matched[category] = count
+    return matched
+
+
+def _extract_products(text):
+    """テキストから商品名・ブランド名を抽出する."""
+    products = []
+    # 「」で囲まれた固有名詞
+    quoted = re.findall(r"[「『](.*?)[」』]", text)
+    products.extend(quoted)
+    # #ハッシュタグ
+    hashtags = re.findall(r"#(\w+)", text)
+    products.extend(hashtags)
+    return products
+
+
+def _analyze_script_structure(transcript):
+    """台本の構造を分析する."""
+    total_len = len(transcript)
+    if total_len == 0:
+        return {}
+
+    # 3分割して分析
+    third = total_len // 3
+    intro = transcript[:third]
+    body = transcript[third:third*2]
+    outro = transcript[third*2:]
+
+    structure = {
+        "intro_text": intro[:100],
+        "body_text": body[:100],
+        "outro_text": outro[:100],
+        "total_length": total_len,
     }
-    return patterns
+
+    # 構成パターンの判定
+    matched = _match_patterns(transcript, STRUCTURE_PATTERNS)
+    structure["patterns"] = list(matched.keys())
+
+    # リスト型の検出（数字列挙）
+    list_markers = len(re.findall(r"[一二三四五六七八九十]つ目|[\d１２３４５６７８９]つ目|\d+\.|第\d", transcript))
+    if list_markers >= 2:
+        if "リスト型" not in structure["patterns"]:
+            structure["patterns"].append("リスト型")
+    structure["list_count"] = list_markers
+
+    return structure
 
 
-def analyze_ending(transcript: str) -> dict:
-    """終盤部分（CTA）のパターンを分析する."""
-    ending = transcript[-80:] if len(transcript) > 80 else transcript
-
-    patterns = {
-        "text": ending,
-        "has_cta": any(kw in ending for kw in CTA_KEYWORDS),
-        "has_question": "?" in ending or "？" in ending,
-        "matched_cta": [kw for kw in CTA_KEYWORDS if kw in ending],
-    }
-    return patterns
-
-
-def extract_phrases(transcript: str, min_len: int = 3, max_len: int = 15) -> "list[str]":
-    """台本からフレーズを抽出する."""
-    # 句読点やスペースで分割
-    parts = re.split(r"[。、！？!?\s\n,.]", transcript)
-    phrases = []
-    for part in parts:
-        part = part.strip()
-        if min_len <= len(part) <= max_len:
-            phrases.append(part)
-    return phrases
-
-
-def categorize_duration(seconds: int) -> str:
+def categorize_duration(seconds):
     """動画の長さをカテゴリに分類."""
     if seconds <= 15:
         return "~15秒"
@@ -123,10 +166,7 @@ def categorize_duration(seconds: int) -> str:
         return "3分以上"
 
 
-def analyze_viral_patterns(
-    videos: list[VideoInfo],
-    transcripts: dict[str, str],
-) -> AnalysisResult:
+def analyze_viral_patterns(videos, transcripts):
     """バイラル動画の共通パターンを総合分析する."""
     console.print("\n[bold cyan]バイラルパターン分析中...[/bold cyan]\n")
 
@@ -145,223 +185,170 @@ def analyze_viral_patterns(
     duration_counts = Counter(categorize_duration(v.duration) for v in videos)
     result.duration_distribution = dict(duration_counts.most_common())
 
-    # 台本分析
+    # 各動画を分析
+    format_counter = Counter()
+    appeal_counter = Counter()
+    emotion_counter = Counter()
+    structure_counter = Counter()
+    all_products = []
     all_phrases = []
-    question_count = 0
-    cta_count = 0
-    urgency_count = 0
-    negative_hook_count = 0
-    number_in_hook_count = 0
     script_lengths = []
+    video_analyses = []
 
     for video in videos:
         transcript = transcripts.get(video.video_id, "")
-        if not transcript:
+        full_text = transcript + " " + video.description
+        if not full_text.strip():
             continue
 
         script_lengths.append(len(transcript))
 
-        # フック分析
-        hook_info = analyze_hook(transcript)
-        result.hook_patterns.append({
-            "video_id": video.video_id,
-            "views": video.view_count,
-            **hook_info,
-        })
+        analysis = {"video_id": video.video_id, "views": video.view_count}
 
-        if hook_info["has_question"]:
-            question_count += 1
-        if hook_info["has_negative_hook"]:
-            negative_hook_count += 1
-        if hook_info["has_number"]:
-            number_in_hook_count += 1
+        # 企画フォーマット
+        formats = _match_patterns(full_text, FORMAT_PATTERNS)
+        for fmt in formats:
+            format_counter[fmt] += 1
+        analysis["formats"] = list(formats.keys())
 
-        # エンディング分析
-        ending_info = analyze_ending(transcript)
-        result.ending_patterns.append({
-            "video_id": video.video_id,
-            "views": video.view_count,
-            **ending_info,
-        })
+        # 訴求パターン
+        appeals = _match_patterns(full_text, APPEAL_PATTERNS)
+        for ap in appeals:
+            appeal_counter[ap] += 1
+        analysis["appeals"] = list(appeals.keys())
 
-        if ending_info["has_cta"]:
-            cta_count += 1
+        # 感情トリガー
+        emotions = _match_patterns(full_text, EMOTION_PATTERNS)
+        for em in emotions:
+            emotion_counter[em] += 1
+        analysis["emotions"] = list(emotions.keys())
 
-        # 緊急性キーワード
-        if any(kw in transcript for kw in URGENCY_KEYWORDS):
-            urgency_count += 1
+        # フック（冒頭80文字）
+        hook = transcript[:80] if len(transcript) > 80 else transcript
+        analysis["hook_text"] = hook
+        analysis["hook_has_question"] = bool(re.search(r"[?？]", hook))
+        analysis["hook_has_number"] = bool(re.search(r"\d+", hook))
+        analysis["hook_has_negative"] = any(kw in hook for kw in ["やめて", "ダメ", "危険", "注意", "損", "NG"])
+        analysis["hook_has_curiosity"] = any(kw in hook for kw in ["実は", "知ってた", "意外", "秘密", "衝撃"])
+
+        # エンディング（末尾80文字）
+        ending = transcript[-80:] if len(transcript) > 80 else transcript
+        analysis["ending_text"] = ending
+        analysis["ending_has_cta"] = any(kw in ending for kw in ["フォロー", "いいね", "コメント", "保存", "シェア"])
+        analysis["ending_has_next"] = any(kw in ending for kw in ["続き", "次回", "パート2", "part2"])
+
+        # 台本構造
+        structure = _analyze_script_structure(transcript)
+        for sp in structure.get("patterns", []):
+            structure_counter[sp] += 1
+        analysis["structure"] = structure
+
+        # 商品・ブランド抽出
+        products = _extract_products(full_text)
+        all_products.extend(products)
+        analysis["products"] = products
 
         # フレーズ抽出
-        all_phrases.extend(extract_phrases(transcript))
+        parts = re.split(r"[。、！？!?\s\n,.]", transcript)
+        for part in parts:
+            part = part.strip()
+            if 3 <= len(part) <= 20:
+                all_phrases.append(part)
+
+        video_analyses.append(analysis)
+        result.hook_patterns.append(analysis)
 
     transcribed_count = len(script_lengths)
     if transcribed_count > 0:
         result.avg_script_length = sum(script_lengths) / transcribed_count
-        result.question_usage_rate = question_count / transcribed_count
-        result.cta_usage_rate = cta_count / transcribed_count
-        result.urgency_words_rate = urgency_count / transcribed_count
-        result.negative_hook_rate = negative_hook_count / transcribed_count
-        result.number_usage_rate = number_in_hook_count / transcribed_count
 
-    # 頻出フレーズ
+    # === 企画フォーマット集計 ===
+    result.content_formats = format_counter.most_common(15)
+    if transcribed_count > 0:
+        result.format_rates = {k: v / transcribed_count for k, v in format_counter.items()}
+
+    # === 訴求パターン集計 ===
+    result.appeal_types = appeal_counter.most_common(15)
+    if transcribed_count > 0:
+        result.appeal_rates = {k: v / transcribed_count for k, v in appeal_counter.items()}
+
+    # === 感情トリガー集計 ===
+    result.emotional_triggers = emotion_counter.most_common(10)
+
+    # === 台本構成集計 ===
+    result.structure_patterns = structure_counter.most_common(10)
+
+    # === フック手法の使用率 ===
+    if transcribed_count > 0:
+        q_count = sum(1 for a in video_analyses if a.get("hook_has_question"))
+        n_count = sum(1 for a in video_analyses if a.get("hook_has_number"))
+        neg_count = sum(1 for a in video_analyses if a.get("hook_has_negative"))
+        cur_count = sum(1 for a in video_analyses if a.get("hook_has_curiosity"))
+        cta_count = sum(1 for a in video_analyses if a.get("ending_has_cta"))
+        result.hook_technique_rates = {
+            "疑問文フック": q_count / transcribed_count,
+            "数字フック": n_count / transcribed_count,
+            "ネガティブフック": neg_count / transcribed_count,
+            "好奇心フック": cur_count / transcribed_count,
+            "CTA（行動喚起）": cta_count / transcribed_count,
+        }
+
+    # === 商品・ブランド集計 ===
+    product_counter = Counter(all_products)
+    result.product_mentions = product_counter.most_common(30)
+
+    # === 頻出フレーズ ===
     phrase_counter = Counter(all_phrases)
-    result.common_phrases = phrase_counter.most_common(30)
+    result.common_phrases = [(p, c) for p, c in phrase_counter.most_common(30) if c >= 2]
+
+    # === 再生数トップの特徴抽出 ===
+    sorted_analyses = sorted(video_analyses, key=lambda x: x["views"], reverse=True)
+    top_5 = sorted_analyses[:5]
+    if top_5:
+        top_formats = Counter()
+        top_appeals = Counter()
+        for a in top_5:
+            for f in a.get("formats", []):
+                top_formats[f] += 1
+            for ap in a.get("appeals", []):
+                top_appeals[ap] += 1
+        result.top_performing_insights = [
+            {"label": "上位5本で最も多い企画", "items": top_formats.most_common(3)},
+            {"label": "上位5本で最も多い訴求", "items": top_appeals.most_common(3)},
+        ]
 
     return result
 
 
-def print_analysis(result: AnalysisResult) -> None:
-    """分析結果をコンソールに出力する."""
-    console.print(Panel("[bold]バイラル動画分析レポート[/bold]", style="cyan"))
-
-    # 基本統計
-    table = Table(title="基本統計")
-    table.add_column("指標", style="cyan")
-    table.add_column("値", style="green")
-    table.add_row("分析動画数", f"{result.total_videos} 本")
-    table.add_row("平均再生数", f"{result.avg_views:,.0f}")
-    table.add_row("平均いいね数", f"{result.avg_likes:,.0f}")
-    table.add_row("平均動画長", f"{result.avg_duration:.0f} 秒")
-    table.add_row("平均台本文字数", f"{result.avg_script_length:.0f} 文字")
-    console.print(table)
-
-    # 動画長分布
-    if result.duration_distribution:
-        table = Table(title="動画長の分布")
-        table.add_column("カテゴリ", style="cyan")
-        table.add_column("本数", style="green")
-        for cat, count in result.duration_distribution.items():
-            bar = "█" * count
-            table.add_row(cat, f"{count} {bar}")
-        console.print(table)
-
-    # パターン使用率
-    table = Table(title="台本パターン使用率")
-    table.add_column("パターン", style="cyan")
-    table.add_column("使用率", style="green")
-    table.add_column("効果", style="yellow")
-    table.add_row("冒頭で疑問文", f"{result.question_usage_rate:.0%}", "視聴者の注意を引く")
-    table.add_row("ネガティブフック", f"{result.negative_hook_rate:.0%}", "不安・好奇心を刺激")
-    table.add_row("冒頭に数字", f"{result.number_usage_rate:.0%}", "具体性で信頼感UP")
-    table.add_row("CTA（行動喚起）", f"{result.cta_usage_rate:.0%}", "フォロー・いいね誘導")
-    table.add_row("緊急性キーワード", f"{result.urgency_words_rate:.0%}", "即時行動を促す")
-    console.print(table)
-
-    # フック例
-    if result.hook_patterns:
-        console.print("\n[bold]冒頭フック例（再生数上位）:[/bold]")
-        sorted_hooks = sorted(result.hook_patterns, key=lambda x: x["views"], reverse=True)
-        for hook in sorted_hooks[:5]:
-            kws = ", ".join(hook.get("matched_keywords", []))
-            console.print(
-                f"  [cyan]{hook['views']:>12,}再生[/cyan] | "
-                f"「{hook['text'][:60]}」"
-                f"{f' [yellow]({kws})[/yellow]' if kws else ''}"
-            )
-
-    # 頻出フレーズ
-    if result.common_phrases:
-        console.print("\n[bold]頻出フレーズ（2回以上出現）:[/bold]")
-        for phrase, count in result.common_phrases:
-            if count >= 2:
-                console.print(f"  {count:3d}回 | {phrase}")
+def print_analysis(result):
+    """分析結果をコンソールに出力する（簡易版）."""
+    console.print(f"  分析動画数: {result.total_videos}")
+    console.print(f"  平均再生数: {result.avg_views:,.0f}")
+    console.print(f"  企画フォーマット: {len(result.content_formats)} 種類")
+    console.print(f"  訴求パターン: {len(result.appeal_types)} 種類")
 
 
-def generate_report(
-    videos: list[VideoInfo],
-    transcripts: dict[str, str],
-    result: AnalysisResult,
-    output_path: Path,
-) -> None:
+def generate_report(videos, transcripts, result, output_path):
     """分析レポートをMarkdownファイルとして出力する."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     lines = [
         "# TikTok バイラル動画分析レポート\n",
-        f"## 概要\n",
-        f"- **分析動画数**: {result.total_videos} 本（100万再生以上）",
-        f"- **平均再生数**: {result.avg_views:,.0f}",
-        f"- **平均いいね数**: {result.avg_likes:,.0f}",
-        f"- **平均動画長**: {result.avg_duration:.0f} 秒",
-        f"- **平均台本文字数**: {result.avg_script_length:.0f} 文字\n",
-        "---\n",
-        "## 動画長の分布\n",
-        "| カテゴリ | 本数 |",
-        "|---------|------|",
+        f"分析動画数: {result.total_videos}本\n",
     ]
-    for cat, count in result.duration_distribution.items():
-        lines.append(f"| {cat} | {count} |")
 
-    lines.extend([
-        "\n---\n",
-        "## 台本パターン分析\n",
-        "### 使用率\n",
-        "| パターン | 使用率 | 効果 |",
-        "|---------|--------|------|",
-        f"| 冒頭で疑問文 | {result.question_usage_rate:.0%} | 視聴者の注意を引く |",
-        f"| ネガティブフック | {result.negative_hook_rate:.0%} | 不安・好奇心を刺激 |",
-        f"| 冒頭に数字 | {result.number_usage_rate:.0%} | 具体性で信頼感UP |",
-        f"| CTA（行動喚起） | {result.cta_usage_rate:.0%} | フォロー・いいね誘導 |",
-        f"| 緊急性キーワード | {result.urgency_words_rate:.0%} | 即時行動を促す |",
-    ])
+    # 企画フォーマット
+    if result.content_formats:
+        lines.append("## 企画フォーマット\n")
+        for fmt, count in result.content_formats:
+            lines.append(f"- {fmt}: {count}本")
 
-    # フック例
-    if result.hook_patterns:
-        lines.extend(["\n---\n", "## 冒頭フック例（再生数上位）\n"])
-        sorted_hooks = sorted(result.hook_patterns, key=lambda x: x["views"], reverse=True)
-        for i, hook in enumerate(sorted_hooks[:10], 1):
-            kws = ", ".join(hook.get("matched_keywords", []))
-            lines.append(
-                f"{i}. **{hook['views']:,}再生** - 「{hook['text'][:80]}」"
-                f"{f' → キーワード: {kws}' if kws else ''}"
-            )
+    # 訴求パターン
+    if result.appeal_types:
+        lines.append("\n## 訴求パターン\n")
+        for ap, count in result.appeal_types:
+            lines.append(f"- {ap}: {count}本")
 
-    # エンディングパターン
-    if result.ending_patterns:
-        lines.extend(["\n---\n", "## エンディング・CTAパターン\n"])
-        cta_hooks = [e for e in result.ending_patterns if e.get("has_cta")]
-        if cta_hooks:
-            for e in sorted(cta_hooks, key=lambda x: x["views"], reverse=True)[:10]:
-                ctas = ", ".join(e.get("matched_cta", []))
-                lines.append(f"- **{e['views']:,}再生** - CTA: {ctas}")
-
-    # 頻出フレーズ
-    if result.common_phrases:
-        lines.extend(["\n---\n", "## 頻出フレーズ\n"])
-        lines.append("| フレーズ | 出現回数 |")
-        lines.append("|---------|---------|")
-        for phrase, count in result.common_phrases:
-            if count >= 2:
-                lines.append(f"| {phrase} | {count} |")
-
-    # 全動画の台本
-    lines.extend(["\n---\n", "## 全動画台本一覧\n"])
-    for video in sorted(videos, key=lambda v: v.view_count, reverse=True):
-        transcript = transcripts.get(video.video_id, "（文字起こしなし）")
-        lines.extend([
-            f"### {video.view_count:,}再生 | {video.duration}秒 | {video.title[:50]}\n",
-            f"**URL**: {video.url}\n",
-            f"```",
-            transcript,
-            f"```\n",
-        ])
-
-    # 共通項まとめ
-    lines.extend([
-        "\n---\n",
-        "## バイラル共通項まとめ\n",
-        "### 1. フック（冒頭）の特徴",
-        f"- 疑問文で始める動画: **{result.question_usage_rate:.0%}**",
-        f"- ネガティブフックを使う動画: **{result.negative_hook_rate:.0%}**",
-        f"- 具体的な数字を冒頭に入れる動画: **{result.number_usage_rate:.0%}**",
-        "",
-        "### 2. 構成の特徴",
-        f"- 最も多い動画長: **{max(result.duration_distribution, key=result.duration_distribution.get) if result.duration_distribution else 'N/A'}**",
-        f"- 平均台本文字数: **{result.avg_script_length:.0f}文字**",
-        "",
-        "### 3. CTA（行動喚起）",
-        f"- CTA使用率: **{result.cta_usage_rate:.0%}**",
-        f"- 緊急性キーワード使用率: **{result.urgency_words_rate:.0%}**",
-    ])
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")
     console.print(f"\n  [green]レポート保存: {output_path}[/green]")

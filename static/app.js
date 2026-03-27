@@ -118,9 +118,13 @@ function showResults(result) {
     document.getElementById('resultSection').classList.remove('hidden');
 
     renderStats(result.stats);
-    renderPatterns(result.patterns);
+    renderFormats(result.content_formats, result.top_insights);
     renderDurationChart(result.duration_dist);
+    renderAppeals(result.appeal_types, result.emotional_triggers);
+    renderHookRates(result.hook_technique_rates);
+    renderStructure(result.structure_patterns);
     renderHooks(result.hooks);
+    renderProducts(result.product_mentions);
     renderPhrases(result.phrases);
     renderVideos(result.videos);
 }
@@ -143,26 +147,81 @@ function renderStats(stats) {
     ).join('');
 }
 
-function renderPatterns(patterns) {
-    const grid = document.getElementById('patternsGrid');
-    const items = [
-        { name: '冒頭で疑問文', value: patterns.question_rate, color: 'var(--yellow)', desc: '視聴者の注意を引く' },
-        { name: 'ネガティブフック', value: patterns.negative_hook_rate, color: 'var(--accent)', desc: '不安・好奇心を刺激' },
-        { name: '冒頭に数字', value: patterns.number_rate, color: 'var(--cyan)', desc: '具体性で信頼感UP' },
-        { name: 'CTA（行動喚起）', value: patterns.cta_rate, color: 'var(--green)', desc: 'フォロー・いいね誘導' },
-        { name: '緊急性キーワード', value: patterns.urgency_rate, color: 'var(--purple)', desc: '即時行動を促す' },
-    ];
-
-    grid.innerHTML = items.map(item =>
-        `<div class="pattern-card">
-            <div class="pattern-name">${item.name}</div>
-            <div class="pattern-bar-bg">
-                <div class="pattern-bar-fill" style="width:${item.value * 100}%;background:${item.color}"></div>
+function renderBarChart(containerId, title, items, colorStart, colorEnd) {
+    const container = document.getElementById(containerId);
+    if (!items || !items.length) { container.innerHTML = ''; return; }
+    const max = Math.max(...items.map(i => i.count), 1);
+    let html = `<div class="card"><h3 style="font-size:.95rem;color:var(--text);margin-bottom:1rem">${title}</h3>`;
+    items.forEach((item, idx) => {
+        const pct = (item.count / max) * 100;
+        html += `<div class="duration-row">
+            <span class="duration-label" style="width:140px;text-align:left">${item.name}</span>
+            <div class="duration-bar-bg">
+                <div class="duration-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${colorStart},${colorEnd})">${item.count}本</div>
             </div>
-            <div class="pattern-value" style="color:${item.color}">${Math.round(item.value * 100)}%</div>
-            <div class="pattern-desc">${item.desc}</div>
-        </div>`
-    ).join('');
+        </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderFormats(formats, insights) {
+    renderBarChart('formatsChart', '企画フォーマット（どんな形式の動画が伸びているか）', formats, 'var(--accent)', 'var(--purple)');
+
+    const container = document.getElementById('topInsights');
+    if (!insights || !insights.length) { container.innerHTML = ''; return; }
+    let html = '<div class="card" style="margin-top:1rem"><h3 style="font-size:.95rem;color:var(--text);margin-bottom:.75rem">再生数TOP5の動画に共通する特徴</h3>';
+    insights.forEach(insight => {
+        html += `<p style="color:var(--cyan);font-weight:600;margin-bottom:.3rem">${insight.label}</p>`;
+        if (insight.items && insight.items.length) {
+            insight.items.forEach(([name, count]) => {
+                html += `<span class="badge badge-keyword" style="margin-right:.4rem;margin-bottom:.3rem;display:inline-block;padding:.2rem .6rem">${name} (${count}本)</span>`;
+            });
+        }
+        html += '<br style="margin-bottom:.5rem">';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderAppeals(appeals, emotions) {
+    renderBarChart('appealsChart', '訴求パターン（どんな切り口で視聴者を惹きつけているか）', appeals, 'var(--cyan)', 'var(--green)');
+    renderBarChart('emotionsChart', '感情トリガー（どの感情に訴えかけているか）', emotions, 'var(--yellow)', 'var(--accent)');
+}
+
+function renderHookRates(rates) {
+    const container = document.getElementById('hookRates');
+    if (!rates || !Object.keys(rates).length) { container.innerHTML = ''; return; }
+    const colors = ['var(--yellow)', 'var(--cyan)', 'var(--accent)', 'var(--purple)', 'var(--green)'];
+    let html = '<div class="card"><h3 style="font-size:.95rem;color:var(--text);margin-bottom:1rem">フック手法の使用率</h3><div class="patterns-grid">';
+    Object.entries(rates).forEach(([name, value], i) => {
+        const color = colors[i % colors.length];
+        html += `<div class="pattern-card">
+            <div class="pattern-name">${name}</div>
+            <div class="pattern-bar-bg"><div class="pattern-bar-fill" style="width:${value*100}%;background:${color}"></div></div>
+            <div class="pattern-value" style="color:${color}">${Math.round(value*100)}%</div>
+        </div>`;
+    });
+    html += '</div></div>';
+    container.innerHTML = html;
+}
+
+function renderStructure(patterns) {
+    renderBarChart('structureChart', '台本構成パターン', patterns, 'var(--purple)', 'var(--cyan)');
+}
+
+function renderProducts(products) {
+    const container = document.getElementById('productsList');
+    if (!products || !products.length) {
+        container.innerHTML = '<p style="color:var(--dim)">商品・ブランド・ハッシュタグの言及なし</p>';
+        return;
+    }
+    let html = '<div class="card"><h3 style="font-size:.95rem;color:var(--text);margin-bottom:1rem">よく登場する商品・ブランド・タグ</h3>';
+    products.forEach(p => {
+        html += `<span style="display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:.3rem .8rem;margin:.2rem .3rem;font-size:.85rem">${escapeHtml(p.name)} <span style="color:var(--cyan);font-weight:600">${p.count}</span></span>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 function renderDurationChart(dist) {
@@ -194,13 +253,13 @@ function renderHooks(hooks) {
         return;
     }
 
-    container.innerHTML = hooks.map(h => {
+    container.innerHTML = '<h3 style="font-size:.95rem;color:var(--text);margin-bottom:1rem">冒頭フック例（再生数上位）</h3>' + hooks.map(h => {
         let badges = '';
         if (h.has_question) badges += '<span class="badge badge-question">疑問文</span>';
         if (h.has_negative) badges += '<span class="badge badge-negative">ネガティブ</span>';
-        h.keywords.forEach(kw => {
-            badges += `<span class="badge badge-keyword">${kw}</span>`;
-        });
+        if (h.has_curiosity) badges += '<span class="badge badge-keyword">好奇心</span>';
+        (h.formats || []).forEach(f => { badges += `<span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${f}</span>`; });
+        (h.appeals || []).forEach(a => { badges += `<span class="badge" style="background:rgba(52,211,153,.15);color:var(--green)">${a}</span>`; });
 
         return `
             <div class="hook-card">

@@ -120,10 +120,13 @@ def build_result(videos, transcripts, analysis):
         for h in sorted(analysis.hook_patterns, key=lambda x: x["views"], reverse=True)[:10]:
             hook_examples.append({
                 "views": h["views"],
-                "text": h["text"],
-                "keywords": h.get("matched_keywords", []),
-                "has_question": h.get("has_question", False),
-                "has_negative": h.get("has_negative_hook", False),
+                "text": h.get("hook_text", ""),
+                "formats": h.get("formats", []),
+                "appeals": h.get("appeals", []),
+                "emotions": h.get("emotions", []),
+                "has_question": h.get("hook_has_question", False),
+                "has_negative": h.get("hook_has_negative", False),
+                "has_curiosity": h.get("hook_has_curiosity", False),
             })
 
     phrases = [{"phrase": p, "count": c} for p, c in analysis.common_phrases if c >= 2]
@@ -136,13 +139,13 @@ def build_result(videos, transcripts, analysis):
             "avg_duration": analysis.avg_duration,
             "avg_script_length": analysis.avg_script_length,
         },
-        "patterns": {
-            "question_rate": analysis.question_usage_rate,
-            "negative_hook_rate": analysis.negative_hook_rate,
-            "number_rate": analysis.number_usage_rate,
-            "cta_rate": analysis.cta_usage_rate,
-            "urgency_rate": analysis.urgency_words_rate,
-        },
+        "content_formats": [{"name": n, "count": c} for n, c in analysis.content_formats],
+        "appeal_types": [{"name": n, "count": c} for n, c in analysis.appeal_types],
+        "emotional_triggers": [{"name": n, "count": c} for n, c in analysis.emotional_triggers],
+        "structure_patterns": [{"name": n, "count": c} for n, c in analysis.structure_patterns],
+        "hook_technique_rates": analysis.hook_technique_rates,
+        "product_mentions": [{"name": n, "count": c} for n, c in analysis.product_mentions[:20]],
+        "top_insights": analysis.top_performing_insights,
         "duration_dist": analysis.duration_distribution,
         "hooks": hook_examples,
         "phrases": phrases,
