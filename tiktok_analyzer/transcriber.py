@@ -30,24 +30,59 @@ def _try_scrapecreators(video_url, lang="ja"):
         )
         if resp.status_code == 200:
             data = resp.json()
-            # レスポンスからテキストを抽出
             if isinstance(data, dict):
+                # "transcript" フィールドがVTT形式の文字列の場合
+                raw = data.get("transcript", "")
+                if isinstance(raw, str) and raw.strip():
+                    if "WEBVTT" in raw or "-->" in raw:
+                        return _parse_vtt_text(raw)
+                    return raw.strip()
                 # transcript配列の場合
-                transcript_list = data.get("transcript") or data.get("data") or data.get("subtitles")
-                if isinstance(transcript_list, list):
-                    texts = [item.get("text", "") for item in transcript_list if isinstance(item, dict)]
+                if isinstance(raw, list):
+                    texts = [item.get("text", "") for item in raw if isinstance(item, dict)]
                     text = " ".join(texts).strip()
                     if text:
                         return text
-                # 直接テキストの場合
-                text = data.get("text", "") or data.get("content", "")
-                if text:
-                    return text.strip()
-            elif isinstance(data, str) and data.strip():
-                return data.strip()
+                # その他のフィールド
+                for key in ["text", "content", "data", "subtitles"]:
+                    val = data.get(key, "")
+                    if isinstance(val, str) and val.strip():
+                        if "WEBVTT" in val or "-->" in val:
+                            return _parse_vtt_text(val)
+                        return val.strip()
+                    if isinstance(val, list):
+                        texts = [item.get("text", "") for item in val if isinstance(item, dict)]
+                        text = " ".join(texts).strip()
+                        if text:
+                            return text
+        else:
+            console.print(f"    [dim]ScrapeCreators: HTTP {resp.status_code}[/dim]")
     except Exception as e:
         console.print(f"    [dim]ScrapeCreators: {e}[/dim]")
     return None
+
+
+def _parse_vtt_text(vtt_content):
+    """VTT形式のテキストからセリフだけを抽出する."""
+    lines = vtt_content.split("\n")
+    text_lines = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("WEBVTT"):
+            continue
+        if "-->" in line:
+            continue
+        if re.match(r"^\d+$", line):
+            continue
+        if line.startswith("Kind:") or line.startswith("Language:") or line.startswith("NOTE"):
+            continue
+        # HTMLタグ除去
+        line = re.sub(r"<[^>]+>", "", line)
+        if line and line not in text_lines:
+            text_lines.append(line)
+    return " ".join(text_lines).strip() if text_lines else None
 
 
 def _try_supadata(video_url, lang="ja"):
