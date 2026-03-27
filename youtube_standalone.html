@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube チャンネル分析 - ショート / 長尺 別</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+            background: #0f0f0f;
+            color: #f1f1f1;
+            min-height: 100vh;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+        .header {
+            text-align: center;
+            padding: 30px 0 20px;
+        }
+        .header h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #ff0000, #ff4444);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header p { color: #aaa; margin-top: 6px; font-size: 0.9rem; }
+
+        .input-section {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .input-group { margin-bottom: 14px; }
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #f1f1f1;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-group input:focus { border-color: #ff4444; }
+        .input-group input::placeholder { color: #666; }
+
+        .api-key-note {
+            font-size: 0.78rem;
+            color: #777;
+            margin-top: 4px;
+        }
+        .api-key-note a { color: #ff6666; text-decoration: none; }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 32px;
+            background: #ff0000;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+        .btn:hover { background: #cc0000; }
+        .btn:disabled { background: #555; cursor: not-allowed; }
+
+        .progress-section {
+            display: none;
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+        }
+        .progress-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff4444);
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .progress-text { font-size: 0.9rem; color: #ccc; }
+
+        .results { display: none; }
+
+        .channel-header {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .channel-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        .channel-info h2 { font-size: 1.4rem; }
+        .channel-meta {
+            color: #aaa;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+        .channel-meta span { margin-right: 16px; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+        .stat-card .value {
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+        .stat-card .sub {
+            font-size: 0.75rem;
+            color: #777;
+            margin-top: 4px;
+        }
+        .shorts-color { color: #ff4444; }
+        .long-color { color: #4488ff; }
+        .total-color { color: #44cc88; }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 24px 0 12px;
+            padding-left: 4px;
+        }
+
+        .monthly-table-wrapper {
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+        th {
+            background: #222;
+            padding: 12px 14px;
+            text-align: right;
+            font-weight: 600;
+            color: #ccc;
+            white-space: nowrap;
+        }
+        th:first-child { text-align: left; }
+        td {
+            padding: 10px 14px;
+            text-align: right;
+            border-top: 1px solid #2a2a2a;
+            white-space: nowrap;
+        }
+        td:first-child { text-align: left; color: #ccc; }
+        tr:hover td { background: #1f1f1f; }
+
+        .error-msg {
+            background: #3a1a1a;
+            border: 1px solid #ff4444;
+            border-radius: 8px;
+            padding: 16px;
+            color: #ff6666;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-short { background: rgba(255,68,68,0.2); color: #ff4444; }
+        .badge-long { background: rgba(68,136,255,0.2); color: #4488ff; }
+
+        .saved-key-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .saved-key-info .tag {
+            background: #2a3a2a;
+            color: #4a4;
+            font-size: 0.78rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .clear-key {
+            background: none;
+            border: none;
+            color: #777;
+            font-size: 0.78rem;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .clear-key:hover { color: #aaa; }
+
+        @media (max-width: 600px) {
+            .channel-header { flex-direction: column; text-align: center; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>YouTube チャンネル分析</h1>
+        <p>ショート動画 / 長尺動画 別の再生回数・投稿数を分析</p>
+    </div>
+
+    <div class="input-section">
+        <div class="input-group" id="apiKeyGroup">
+            <label>YouTube Data API キー</label>
+            <div id="savedKeyInfo" class="saved-key-info" style="display:none;">
+                <span class="tag">保存済み</span>
+                <span id="savedKeyPreview" style="color:#aaa;font-size:0.85rem;"></span>
+                <button class="clear-key" onclick="clearApiKey()">クリア</button>
+            </div>
+            <input type="password" id="apiKey" placeholder="AIzaSy...">
+            <div class="api-key-note">
+                Google Cloud Console で YouTube Data API v3 を有効にして取得してください
+            </div>
+        </div>
+        <div class="input-group">
+            <label>チャンネルURL または @ハンドル</label>
+            <input type="text" id="channelUrl" placeholder="https://www.youtube.com/@channelname">
+        </div>
+        <button class="btn" id="analyzeBtn" onclick="startAnalysis()">分析開始</button>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="progress-section" id="progressSection">
+        <div class="progress-text" id="progressText">準備中...</div>
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+    </div>
+
+    <div class="results" id="results"></div>
+</div>
+
+<script>
+const STORAGE_KEY = 'yt_analyzer_api_key';
+
+// ページ読み込み時にAPIキーを復元
+window.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+        document.getElementById('apiKey').value = saved;
+        document.getElementById('apiKey').style.display = 'none';
+        document.getElementById('savedKeyInfo').style.display = 'flex';
+        document.getElementById('savedKeyPreview').textContent = saved.substring(0, 10) + '...';
+    }
+});
+
+function clearApiKey() {
+    localStorage.removeItem(STORAGE_KEY);
+    document.getElementById('apiKey').value = '';
+    document.getElementById('apiKey').style.display = '';
+    document.getElementById('savedKeyInfo').style.display = 'none';
+}
+
+function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+
+function hideError() {
+    document.getElementById('errorMsg').style.display = 'none';
+}
+
+function setProgress(text, pct) {
+    document.getElementById('progressText').textContent = text;
+    document.getElementById('progressBar').style.width = pct + '%';
+}
+
+function fmt(n) {
+    if (n === undefined || n === null) return '0';
+    return Number(n).toLocaleString('ja-JP');
+}
+
+// YouTube Data API 呼び出し
+async function ytApi(endpoint, params, apiKey) {
+    const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
+    params.key = apiKey;
+    for (const [k, v] of Object.entries(params)) {
+        url.searchParams.set(k, v);
+    }
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const msg = err?.error?.message || res.statusText;
+        throw new Error(`API Error (${res.status}): ${msg}`);
+    }
+    return res.json();
+}
+
+// チャンネルIDを解決
+async function resolveChannelId(input, apiKey) {
+    input = input.trim();
+
+    // @handle形式
+    let handle = null;
+    const handleMatch = input.match(/@([\w.-]+)/);
+    if (handleMatch) {
+        handle = handleMatch[1];
+    }
+
+    // /channel/UCxxxx 形式
+    const channelIdMatch = input.match(/\/channel\/(UC[\w-]+)/);
+    if (channelIdMatch) {
+        return channelIdMatch[1];
+    }
+
+    // forHandle で検索
+    if (handle) {
+        try {
+            const data = await ytApi('channels', {
+                part: 'id',
+                forHandle: handle,
+            }, apiKey);
+            if (data.items && data.items.length > 0) {
+                return data.items[0].id;
+            }
+        } catch (e) {
+            // fallback to search
+        }
+    }
+
+    // search で探す
+    const query = handle || input;
+    const searchData = await ytApi('search', {
+        part: 'snippet',
+        type: 'channel',
+        q: query,
+        maxResults: 1,
+    }, apiKey);
+    if (searchData.items && searchData.items.length > 0) {
+        return searchData.items[0].snippet.channelId;
+    }
+
+    throw new Error('チャンネルが見つかりませんでした');
+}
+
+// ISO 8601 duration をパース（秒数に変換）
+function parseDuration(iso) {
+    const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!m) return 0;
+    return (parseInt(m[1] || 0) * 3600) + (parseInt(m[2] || 0) * 60) + parseInt(m[3] || 0);
+}
+
+// 全動画を取得
+async function fetchAllVideos(channelId, apiKey, onProgress) {
+    // まずアップロードプレイリストIDを取得
+    const chData = await ytApi('channels', {
+        part: 'contentDetails,snippet,statistics',
+        id: channelId,
+    }, apiKey);
+
+    if (!chData.items || chData.items.length === 0) {
+        throw new Error('チャンネル情報が取得できません');
+    }
+
+    const channel = chData.items[0];
+    const uploadsPlaylistId = channel.contentDetails.relatedPlaylists.uploads;
+    const channelInfo = {
+        title: channel.snippet.title,
+        thumbnail: channel.snippet.thumbnails.default.url,
+        subscribers: parseInt(channel.statistics.subscriberCount || 0),
+        totalViews: parseInt(channel.statistics.viewCount || 0),
+        videoCount: parseInt(channel.statistics.videoCount || 0),
+    };
+
+    onProgress(`動画リストを取得中... (0/${channelInfo.videoCount})`, 10);
+
+    // プレイリストアイテムを全件取得
+    let videoIds = [];
+    let nextPageToken = '';
+    let fetched = 0;
+
+    while (true) {
+        const params = {
+            part: 'contentDetails',
+            playlistId: uploadsPlaylistId,
+            maxResults: 50,
+        };
+        if (nextPageToken) params.pageToken = nextPageToken;
+
+        const plData = await ytApi('playlistItems', params, apiKey);
+        const ids = plData.items.map(item => item.contentDetails.videoId);
+        videoIds = videoIds.concat(ids);
+        fetched += ids.length;
+
+        onProgress(`動画リストを取得中... (${fetched}/${channelInfo.videoCount})`, 10 + (fetched / channelInfo.videoCount) * 30);
+
+        nextPageToken = plData.nextPageToken;
+        if (!nextPageToken) break;
+    }
+
+    // 動画の詳細情報を50件ずつ取得
+    onProgress(`動画の詳細情報を取得中... (0/${videoIds.length})`, 40);
+    let videos = [];
+
+    for (let i = 0; i < videoIds.length; i += 50) {
+        const batch = videoIds.slice(i, i + 50);
+        const vData = await ytApi('videos', {
+            part: 'snippet,contentDetails,statistics',
+            id: batch.join(','),
+        }, apiKey);
+
+        for (const item of vData.items) {
+            const duration = parseDuration(item.contentDetails.duration);
+            videos.push({
+                id: item.id,
+                title: item.snippet.title,
+                publishedAt: item.snippet.publishedAt,
+                duration: duration,
+                views: parseInt(item.statistics.viewCount || 0),
+                likes: parseInt(item.statistics.likeCount || 0),
+                comments: parseInt(item.statistics.commentCount || 0),
+                isShort: duration <= 60,
+            });
+        }
+
+        const done = Math.min(i + 50, videoIds.length);
+        onProgress(`動画の詳細情報を取得中... (${done}/${videoIds.length})`, 40 + (done / videoIds.length) * 50);
+    }
+
+    return { channelInfo, videos };
+}
+
+// 月別に集計
+function aggregateMonthly(videos) {
+    const months = {};
+
+    for (const v of videos) {
+        const d = new Date(v.publishedAt);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+        if (!months[key]) {
+            months[key] = {
+                month: key,
+                shortsViews: 0, shortsCount: 0,
+                longViews: 0, longCount: 0,
+                totalViews: 0, totalCount: 0,
+            };
+        }
+
+        const m = months[key];
+        m.totalViews += v.views;
+        m.totalCount += 1;
+
+        if (v.isShort) {
+            m.shortsViews += v.views;
+            m.shortsCount += 1;
+        } else {
+            m.longViews += v.views;
+            m.longCount += 1;
+        }
+    }
+
+    return Object.values(months).sort((a, b) => b.month.localeCompare(a.month));
+}
+
+// 結果を表示
+function renderResults(channelInfo, videos, monthly) {
+    const shorts = videos.filter(v => v.isShort);
+    const longs = videos.filter(v => !v.isShort);
+    const totalShortViews = shorts.reduce((s, v) => s + v.views, 0);
+    const totalLongViews = longs.reduce((s, v) => s + v.views, 0);
+
+    // 初投稿日
+    const sorted = [...videos].sort((a, b) => new Date(a.publishedAt) - new Date(b.publishedAt));
+    const firstVideo = sorted.length > 0 ? sorted[0] : null;
+    const firstDate = firstVideo ? new Date(firstVideo.publishedAt).toLocaleDateString('ja-JP') : '-';
+
+    // 直近30日の集計
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const recent = videos.filter(v => new Date(v.publishedAt) >= thirtyDaysAgo);
+    const recentShorts = recent.filter(v => v.isShort);
+    const recentLongs = recent.filter(v => !v.isShort);
+    const recentShortViews = recentShorts.reduce((s, v) => s + v.views, 0);
+    const recentLongViews = recentLongs.reduce((s, v) => s + v.views, 0);
+
+    const el = document.getElementById('results');
+    el.innerHTML = `
+        <div class="channel-header">
+            <img class="channel-avatar" src="${channelInfo.thumbnail}" alt="">
+            <div class="channel-info">
+                <h2>${esc(channelInfo.title)}</h2>
+                <div class="channel-meta">
+                    <span>登録者 ${fmt(channelInfo.subscribers)} 人</span>
+                    <span>総再生回数 ${fmt(channelInfo.totalViews)}</span>
+                    <span>初投稿日 ${firstDate}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">全期間サマリー</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">総動画数</div>
+                <div class="value total-color">${fmt(videos.length)}</div>
+                <div class="sub">ショート ${fmt(shorts.length)} / 長尺 ${fmt(longs.length)}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">ショート総再生回数</div>
+                <div class="value shorts-color">${fmt(totalShortViews)}</div>
+                <div class="sub">${shorts.length} 本</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">長尺 総再生回数</div>
+                <div class="value long-color">${fmt(totalLongViews)}</div>
+                <div class="sub">${longs.length} 本</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">総再生回数</div>
+                <div class="value total-color">${fmt(totalShortViews + totalLongViews)}</div>
+            </div>
+        </div>
+
+        <div class="section-title">直近30日</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">投稿数</div>
+                <div class="value total-color">${fmt(recent.length)}</div>
+                <div class="sub">ショート ${fmt(recentShorts.length)} / 長尺 ${fmt(recentLongs.length)}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">ショート再生回数</div>
+                <div class="value shorts-color">${fmt(recentShortViews)}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">長尺 再生回数</div>
+                <div class="value long-color">${fmt(recentLongViews)}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">合計再生回数</div>
+                <div class="value total-color">${fmt(recentShortViews + recentLongViews)}</div>
+            </div>
+        </div>
+
+        <div class="section-title">月別データ</div>
+        <div class="monthly-table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>月</th>
+                        <th>ショート再生</th>
+                        <th>ショート本数</th>
+                        <th>長尺再生</th>
+                        <th>長尺本数</th>
+                        <th>合計再生</th>
+                        <th>合計本数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${monthly.map(m => `
+                    <tr>
+                        <td>${m.month}</td>
+                        <td class="shorts-color">${fmt(m.shortsViews)}</td>
+                        <td class="shorts-color">${fmt(m.shortsCount)}</td>
+                        <td class="long-color">${fmt(m.longViews)}</td>
+                        <td class="long-color">${fmt(m.longCount)}</td>
+                        <td>${fmt(m.totalViews)}</td>
+                        <td>${fmt(m.totalCount)}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    el.style.display = 'block';
+}
+
+function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+async function startAnalysis() {
+    hideError();
+    const apiKey = document.getElementById('apiKey').value.trim();
+    const channelUrl = document.getElementById('channelUrl').value.trim();
+
+    if (!apiKey) { showError('APIキーを入力してください'); return; }
+    if (!channelUrl) { showError('チャンネルURLを入力してください'); return; }
+
+    // APIキーを保存
+    localStorage.setItem(STORAGE_KEY, apiKey);
+
+    const btn = document.getElementById('analyzeBtn');
+    const prog = document.getElementById('progressSection');
+    btn.disabled = true;
+    prog.style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+
+    try {
+        setProgress('チャンネルを検索中...', 5);
+        const channelId = await resolveChannelId(channelUrl, apiKey);
+
+        const { channelInfo, videos } = await fetchAllVideos(channelId, apiKey, setProgress);
+
+        setProgress('集計中...', 95);
+        const monthly = aggregateMonthly(videos);
+
+        setProgress('完了!', 100);
+        renderResults(channelInfo, videos, monthly);
+
+        // 保存済み表示を更新
+        document.getElementById('apiKey').style.display = 'none';
+        document.getElementById('savedKeyInfo').style.display = 'flex';
+        document.getElementById('savedKeyPreview').textContent = apiKey.substring(0, 10) + '...';
+
+    } catch (e) {
+        showError(e.message);
+    } finally {
+        btn.disabled = false;
+        prog.style.display = 'none';
+    }
+}
+
+// Enter キーで分析開始
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !document.getElementById('analyzeBtn').disabled) {
+        startAnalysis();
+    }
+});
+</script>
+</body>
+</html>
