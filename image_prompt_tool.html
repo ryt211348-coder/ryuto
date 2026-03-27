@@ -71,6 +71,8 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
     <label for="apiKey">Gemini APIキー</label>
     <input type="password" id="apiKey" placeholder="AIza...（画像生成に必要）">
     <p class="hint">Google AI Studio で取得できます。プロンプト生成だけなら不要です。</p>
+    <button class="btn btn-outline btn-sm" onclick="listModels()" style="margin-top:.5rem">使えるモデルを確認</button>
+    <pre id="modelList" style="font-size:.75rem;color:var(--cyan);max-height:200px;overflow-y:auto;margin-top:.5rem;display:none"></pre>
   </div>
   <div style="margin-bottom:1rem">
     <label for="scriptInput">台本テキスト</label>
@@ -282,6 +284,19 @@ function showGallery(){
   imageResults.forEach(r=>{const d=document.createElement("div");d.className="gallery-card";d.innerHTML=r.ok?`<img src="${r.url}"><div class="gallery-label"><span class="scene-num">#${r.n}</span>${esc(r.speaker)}</div>`:`<div class="gallery-err">${esc(r.err)}</div><div class="gallery-label">#${r.n} ${esc(r.speaker)}</div>`;grid.appendChild(d)});
 }
 function exportCSVWithImages(){let c="シーン番号,話者,役割,感情,声,画像\n";imageResults.forEach(r=>{const s=currentScenes.find(x=>x.n===r.n);if(s)c+=[r.n,q(s.speaker),q(s.role),q(s.emotion),q(s.voice),q(r.ok?"成功":"エラー")].join(",")+"\n"});dl(c,"scenes_with_images.csv","text/csv")}
+
+async function listModels(){
+  const key=document.getElementById("apiKey").value.trim();
+  if(!key){alert("APIキーを入力してください");return}
+  const el=document.getElementById("modelList");el.style.display="block";el.textContent="読み込み中...";
+  try{
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    const d=await r.json();
+    if(d.error){el.textContent="エラー: "+d.error.message;return}
+    const names=(d.models||[]).map(m=>m.name+" | "+((m.supportedGenerationMethods||[]).join(", "))).join("\n");
+    el.textContent=names||"モデルが見つかりません";
+  }catch(e){el.textContent="エラー: "+e.message}
+}
 
 function loadSample(){document.getElementById("scriptInput").value=`（皮脂）
 いちご鼻から卒業したいなら絶対に聞け！
