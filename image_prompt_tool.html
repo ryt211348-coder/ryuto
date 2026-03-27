@@ -82,8 +82,8 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
 <div class="card" id="inputSection">
   <div style="margin-bottom:1rem">
     <label for="apiKey">Gemini APIキー（プロンプト修正に使用）</label>
-    <input type="password" id="apiKey" placeholder="AIza...（プロンプトのAI修正に必要）">
-    <p class="hint">修正内容をAIで自然なプロンプトに変換します。なくてもプロンプト生成は可能です。</p>
+    <div style="display:flex;gap:.5rem"><input type="password" id="apiKey" placeholder="AIza...（プロンプトのAI修正に必要）"><button class="btn btn-outline btn-sm" onclick="saveApiKey()" style="white-space:nowrap">保存</button></div>
+    <p class="hint">「保存」を押すとブラウザに記憶されます。次回以降は自動入力されます。</p>
   </div>
   <div style="margin-bottom:1rem">
     <label for="scriptInput">台本テキスト</label>
@@ -122,6 +122,10 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
 </div>
 
 <script>
+// === APIキー保存 ===
+(function(){const k=localStorage.getItem("gemini_api_key");if(k)document.getElementById("apiKey").value=k})();
+function saveApiKey(){const k=document.getElementById("apiKey").value.trim();if(!k){alert("APIキーを入力してください");return}localStorage.setItem("gemini_api_key",k);alert("APIキーを保存しました")}
+
 // === キャラクター設定 ===
 const CHARS = {
 "髪の毛":{base:"A single anthropomorphic hair strand character standing upright on a real human scalp. Dark brown, textured realistic hair fiber. Tiny compared to surrounding hair strands that tower like a forest.",env:"Real human scalp surface with visible pores. Other hair strands tower around it. Partial human finger visible for scale.",role:"説明役",anchor:"Human scalp, real hair strands as forest, partial finger for scale"},
