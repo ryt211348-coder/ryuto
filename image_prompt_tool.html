@@ -57,6 +57,9 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 
 .gallery-card img{width:100%;aspect-ratio:9/16;object-fit:cover;display:block}
 .gallery-label{padding:.5rem .75rem;font-size:.8rem;color:var(--dim);display:flex;align-items:center;gap:.5rem}
 .gallery-err{width:100%;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;background:var(--bg);color:#ff6b6b;font-size:.8rem;padding:1rem;text-align:center}
+.modify-section{margin:1rem 0;padding:.75rem;background:rgba(255,45,85,.05);border:1px solid rgba(255,45,85,.15);border-radius:8px}
+.modify-input{flex:1;padding:.5rem .75rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem}
+.modify-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,45,85,.2)}
 .img-drop{background:var(--bg);border:2px dashed var(--border);border-radius:8px;padding:1.5rem;text-align:center;cursor:pointer;color:var(--dim);font-size:.85rem;margin-top:.5rem;transition:border-color .2s}
 .img-drop:hover,.img-drop.drag-over{border-color:var(--cyan);color:var(--cyan)}
 .img-drop img{max-width:100%;max-height:300px;border-radius:8px}
@@ -242,12 +245,31 @@ function renderScenes(){
   const rc={"悪役":"#ff2d55","黒幕":"#a78bfa","弱者":"#fbbf24","ヒーロー":"#34d399","説明役":"#00f0ff","締め":"#ff6b8a"};
   currentScenes.forEach((s,i)=>{
     const cl=rc[s.role]||"#888",d=document.createElement("div");d.className="scene-card";
-    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span><span class="done-mark hidden" id="done${i}">✓</span></div><div style="display:flex;gap:.5rem;align-items:center"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyOne(${i})" id="copyBtn${i}" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();toggleDone(${i})" id="doneBtn${i}">完了</button><span class="expand-icon">▼</span></div></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="prompt-hdr"><h4>画像生成プロンプト（編集可能）</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button></div><textarea class="prompt-edit" id="prompt${i}" rows="10" oninput="currentScenes[${i}].prompt=this.value">${esc(s.prompt)}</textarea><div class="img-upload-area"><div class="section-label" style="margin-top:1rem">生成した画像を保存</div><div class="img-drop" id="imgDrop${i}" onclick="document.getElementById('imgFile${i}').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');handleImgDrop(${i},event)"><div id="imgPreview${i}">${s.imageUrl?`<img src="${s.imageUrl}">`:'クリックまたはドラッグ＆ドロップで画像を追加'}</div></div><input type="file" id="imgFile${i}" accept="image/*" style="display:none" onchange="handleImgSelect(${i},this)"></div></div>`;
+    d.innerHTML=`<div class="scene-header" onclick="toggle(${i})"><div class="scene-info"><span class="scene-num">#${s.n}</span><span class="scene-speaker">${esc(s.speaker)}</span><span class="badge" style="background:${cl}22;color:${cl}">${esc(s.role)}</span><span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">${esc(s.emotion)}</span><span class="done-mark hidden" id="done${i}">✓</span></div><div style="display:flex;gap:.5rem;align-items:center"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();copyOne(${i})" id="copyBtn${i}" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();toggleDone(${i})" id="doneBtn${i}">完了</button><span class="expand-icon">▼</span></div></div><div class="scene-body" id="sb${i}"><div class="meta-grid"><div><div class="meta-label">役割</div><div class="meta-val" style="color:${cl}">${esc(s.role)}</div></div><div><div class="meta-label">感情</div><div class="meta-val">${esc(s.emotion)}</div></div><div><div class="meta-label">声の雰囲気</div><div class="meta-val">${esc(s.voice)}</div></div><div><div class="meta-label">現実接続</div><div class="meta-val">${esc(s.anchor)}</div></div></div><div class="section-label">セリフ</div><div class="dialogue-box">${esc(s.dialogue)}</div><div class="modify-section"><div class="section-label">修正指示（例: もっと怒った顔にして、背景を暗くして）</div><div style="display:flex;gap:.5rem;margin-top:.4rem"><input class="modify-input" id="modifyInput${i}" placeholder="修正したい内容を入力..." onkeydown="if(event.key==='Enter')applyModify(${i})"><button class="btn btn-outline btn-sm" onclick="applyModify(${i})" style="white-space:nowrap;background:rgba(255,45,85,.1);color:var(--accent);border-color:rgba(255,45,85,.3)">反映</button><button class="btn btn-outline btn-sm" onclick="resetPrompt(${i})" style="white-space:nowrap">初期に戻す</button></div></div><div class="prompt-hdr"><h4>画像生成プロンプト（編集可能）</h4><button class="btn btn-outline btn-sm" onclick="copyOne(${i})" style="background:rgba(0,240,255,.1);color:var(--cyan);border-color:rgba(0,240,255,.3)">コピー</button></div><textarea class="prompt-edit" id="prompt${i}" rows="10" oninput="currentScenes[${i}].prompt=this.value">${esc(s.prompt)}</textarea><div class="img-upload-area"><div class="section-label" style="margin-top:1rem">生成した画像を保存</div><div class="img-drop" id="imgDrop${i}" onclick="document.getElementById('imgFile${i}').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');handleImgDrop(${i},event)"><div id="imgPreview${i}">${s.imageUrl?`<img src="${s.imageUrl}">`:'クリックまたはドラッグ＆ドロップで画像を追加'}</div></div><input type="file" id="imgFile${i}" accept="image/*" style="display:none" onchange="handleImgSelect(${i},this)"></div></div>`;
     c.appendChild(d);
   });
 }
 let doneSet=new Set();
 function toggle(i){document.getElementById("sb"+i).classList.toggle("open");document.getElementById("sb"+i).closest(".scene-card").classList.toggle("open")}
+function applyModify(i){
+  const input=document.getElementById("modifyInput"+i);
+  const instruction=input.value.trim();
+  if(!instruction){alert("修正内容を入力してください");return}
+  const ta=document.getElementById("prompt"+i);
+  // 既存の修正指示を削除してから新しいものを追加
+  let prompt=ta.value.replace(/\n\[Additional instructions\].*$/s,"");
+  prompt+="\n\n[Additional instructions] "+instruction;
+  ta.value=prompt;
+  currentScenes[i].prompt=prompt;
+  input.value="";
+  input.placeholder="反映しました！続けて追加もできます";
+  setTimeout(()=>{input.placeholder="修正したい内容を入力..."},2000);
+}
+function resetPrompt(i){
+  const original=buildPrompt(currentScenes[i]);
+  document.getElementById("prompt"+i).value=original;
+  currentScenes[i].prompt=original;
+}
 function copyOne(i){navigator.clipboard.writeText(currentScenes[i].prompt);const b=document.getElementById("copyBtn"+i);if(b){b.textContent="コピー済み!";setTimeout(()=>b.textContent="コピー",1500)}}
 function toggleDone(i){
   if(doneSet.has(i)){
