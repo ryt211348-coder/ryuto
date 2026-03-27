@@ -8,16 +8,21 @@ from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify, Response
 
-from tiktok_analyzer.extractor import (
-    extract_account_videos,
-    filter_viral_videos,
-    save_videos_metadata,
-)
-from tiktok_analyzer.transcriber import transcribe_videos
-from tiktok_analyzer.analyzer import (
-    analyze_viral_patterns,
-    generate_report,
-)
+try:
+    from tiktok_analyzer.extractor import (
+        extract_account_videos,
+        filter_viral_videos,
+        save_videos_metadata,
+    )
+    from tiktok_analyzer.transcriber import transcribe_videos
+    from tiktok_analyzer.analyzer import (
+        analyze_viral_patterns,
+        generate_report,
+    )
+    TIKTOK_AVAILABLE = True
+except ImportError:
+    TIKTOK_AVAILABLE = False
+
 from youtube_analyzer.analyzer import analyze_channel
 
 app = Flask(__name__)
