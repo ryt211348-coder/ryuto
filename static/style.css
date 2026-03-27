@@ -37,6 +37,32 @@ body {
     padding: 2rem 1.5rem;
 }
 
+/* ===== Navigation ===== */
+.nav-bar {
+    display: flex;
+    gap: 0;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.nav-bar a {
+    padding: 0.75rem 1.5rem;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.9rem;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.nav-bar a:hover {
+    color: var(--text);
+}
+
+.nav-bar a.active {
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+}
+
 /* ===== Header ===== */
 .header {
     text-align: center;

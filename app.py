@@ -18,6 +18,11 @@ from tiktok_analyzer.analyzer import (
     analyze_viral_patterns,
     generate_report,
 )
+from tiktok_analyzer.prompt_generator import (
+    generate_all_prompts,
+    scenes_to_csv,
+    scenes_to_json,
+)
 
 app = Flask(__name__)
 
@@ -203,6 +208,60 @@ def job_status(job_id):
     if not job:
         return jsonify({"error": "ジョブが見つかりません"}), 404
     return jsonify(job)
+
+
+@app.route("/image-prompts")
+def image_prompts_page():
+    return render_template("image_prompts.html")
+
+
+@app.route("/api/generate-prompts", methods=["POST"])
+def generate_prompts():
+    """台本テキストから画像生成プロンプトを一括生成."""
+    data = request.get_json()
+    script_text = data.get("script", "").strip()
+
+    if not script_text:
+        return jsonify({"error": "台本テキストを入力してください"}), 400
+
+    scenes = generate_all_prompts(script_text)
+
+    if not scenes:
+        return jsonify({"error": "シーンが検出できませんでした。（話者名）の形式で台本を入力してください。"}), 400
+
+    return jsonify({
+        "scenes": [
+            {
+                "scene_number": s.scene_number,
+                "speaker": s.speaker,
+                "dialogue": s.dialogue,
+                "emotion": s.emotion,
+                "camera_note": s.camera_note,
+                "image_prompt": s.image_prompt,
+            }
+            for s in scenes
+        ],
+        "total": len(scenes),
+    })
+
+
+@app.route("/api/export-csv", methods=["POST"])
+def export_csv():
+    """シーンデータをCSVとしてエクスポート."""
+    data = request.get_json()
+    script_text = data.get("script", "").strip()
+
+    if not script_text:
+        return jsonify({"error": "台本テキストを入力してください"}), 400
+
+    scenes = generate_all_prompts(script_text)
+    csv_content = scenes_to_csv(scenes)
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=image_prompts.csv"},
+    )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI画像プロンプト生成ツール</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/prompt_generator.css">
+</head>
+<body>
+    <div class="container">
+        <!-- ナビ -->
+        <nav class="nav-bar">
+            <a href="/">バイラル分析</a>
+            <a href="/image-prompts" class="active">画像プロンプト生成</a>
+        </nav>
+
+        <!-- ヘッダー -->
+        <header class="header">
+            <h1>AI画像プロンプト生成</h1>
+            <p class="subtitle">台本を入力 &rarr; シーン分割 &rarr; Gemini用プロンプト一括生成 &rarr; CSV出力</p>
+        </header>
+
+        <!-- 入力エリア -->
+        <section class="input-section" id="inputSection">
+            <div class="form-card">
+                <div class="form-group">
+                    <label for="scriptInput">台本テキスト</label>
+                    <textarea
+                        id="scriptInput"
+                        rows="16"
+                        placeholder="（髪の毛）
+俺は髪の毛！
+お前の洗い方じゃ
+一生サラサラになれないんだ！
+
+（皮脂）
+俺は皮脂だ
+毛穴ちゃんの中に
+どっかり居座ってるから..."
+                    ></textarea>
+                    <p class="form-hint">（話者名）の形式でシーンを区切ってください</p>
+                </div>
+                <div class="btn-row">
+                    <button class="btn-primary" id="generateBtn" onclick="generatePrompts()">
+                        プロンプトを一括生成
+                    </button>
+                    <button class="btn-secondary" id="sampleBtn" onclick="loadSample()">
+                        サンプル台本を読み込む
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 結果エリア -->
+        <section class="result-section hidden" id="resultSection">
+            <!-- 統計 -->
+            <div class="result-header">
+                <div class="result-stats">
+                    <span id="sceneCount" class="stat-badge">0 シーン</span>
+                </div>
+                <div class="result-actions">
+                    <button class="btn-action" onclick="copyAllPrompts()">全プロンプトをコピー</button>
+                    <button class="btn-action" onclick="exportCSV()">CSV出力</button>
+                    <button class="btn-secondary" onclick="resetForm()">新しい台本</button>
+                </div>
+            </div>
+
+            <!-- シーンカード一覧 -->
+            <div id="scenesList"></div>
+        </section>
+    </div>
+
+    <script>
+    const SAMPLE_SCRIPT = `（髪の毛）
+俺は髪の毛！
+お前の洗い方じゃ
+一生サラサラになれないんだ！
+
+（皮脂）
+俺は皮脂だ
+毛穴ちゃんの中に
+どっかり居座ってるから
+いきなりシャンプーつけたって
+表面を滑るだけだぞ
+ヒヒヒ…！
+
+（毛穴）
+あたしは毛穴よ！
+もう皮脂に
+びっしり居座られて
+身動きとれないの…！
+38℃の湯船に10分浸かって
+あたしをちゃんと温めなさい！
+バターは温めると溶けるでしょ？
+それと一緒なの！
+
+（髪の毛）
+その後はお湯で1分間
+予洗いしろ！
+浮いた汚れの7割は
+これで流せるんだ！
+
+（皮脂）
+や…やめてくれぇぇ…！
+
+（シルクシャンプー）
+俺はシルクシャンプー
+毛穴に居座る皮脂を
+根こそぎ引き剥がしてやる！
+シルクタンパクが髪を包んで
+摩擦から守る鎧になるんだ！
+
+（後頭部）
+俺は後頭部だ
+みんな前から洗い始めるだろ？
+耳の後ろや襟足は
+いつも最後まで待たされて
+うんざりしてるんだ！
+入念に洗えよ！
+
+（髪の毛・締め）
+この手順を守れば
+俺はサラサラになるんだからな
+頼むぜ！`;
+
+    let currentScenes = [];
+
+    function loadSample() {
+        document.getElementById('scriptInput').value = SAMPLE_SCRIPT;
+    }
+
+    async function generatePrompts() {
+        const script = document.getElementById('scriptInput').value.trim();
+        if (!script) {
+            alert('台本テキストを入力してください');
+            return;
+        }
+
+        const btn = document.getElementById('generateBtn');
+        btn.disabled = true;
+        btn.textContent = '生成中...';
+
+        try {
+            const res = await fetch('/api/generate-prompts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ script }),
+            });
+
+            const data = await res.json();
+
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+
+            currentScenes = data.scenes;
+            renderScenes(data.scenes);
+
+            document.getElementById('sceneCount').textContent = `${data.total} シーン`;
+            document.getElementById('resultSection').classList.remove('hidden');
+
+        } catch (err) {
+            alert('エラーが発生しました: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'プロンプトを一括生成';
+        }
+    }
+
+    function renderScenes(scenes) {
+        const container = document.getElementById('scenesList');
+        container.innerHTML = '';
+
+        scenes.forEach((scene, idx) => {
+            const card = document.createElement('div');
+            card.className = 'scene-card';
+            card.innerHTML = `
+                <div class="scene-header" onclick="toggleScene(${idx})">
+                    <div class="scene-info">
+                        <span class="scene-number">#${scene.scene_number}</span>
+                        <span class="scene-speaker">${escapeHtml(scene.speaker)}</span>
+                        <span class="scene-emotion badge-emotion">${escapeHtml(scene.emotion)}</span>
+                    </div>
+                    <span class="expand-icon">&#9660;</span>
+                </div>
+                <div class="scene-body" id="sceneBody${idx}">
+                    <div class="scene-dialogue">
+                        <h4>セリフ</h4>
+                        <p>${escapeHtml(scene.dialogue)}</p>
+                    </div>
+                    <div class="scene-prompt">
+                        <div class="prompt-header">
+                            <h4>画像生成プロンプト (Gemini用)</h4>
+                            <button class="btn-copy" onclick="copyPrompt(${idx})">コピー</button>
+                        </div>
+                        <pre class="prompt-text">${escapeHtml(scene.image_prompt)}</pre>
+                    </div>
+                    <div class="scene-meta">
+                        <span><strong>カメラ:</strong> ${escapeHtml(scene.camera_note)}</span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function toggleScene(idx) {
+        const body = document.getElementById(`sceneBody${idx}`);
+        const card = body.closest('.scene-card');
+        body.classList.toggle('open');
+        card.classList.toggle('open');
+    }
+
+    function copyPrompt(idx) {
+        const prompt = currentScenes[idx].image_prompt;
+        navigator.clipboard.writeText(prompt).then(() => {
+            const btns = document.querySelectorAll('.btn-copy');
+            btns[idx].textContent = 'コピー済み!';
+            setTimeout(() => { btns[idx].textContent = 'コピー'; }, 1500);
+        });
+    }
+
+    function copyAllPrompts() {
+        const allText = currentScenes.map((s, i) =>
+            `=== シーン${s.scene_number}: ${s.speaker} ===\n${s.image_prompt}`
+        ).join('\n\n---\n\n');
+
+        navigator.clipboard.writeText(allText).then(() => {
+            alert('全プロンプトをクリップボードにコピーしました');
+        });
+    }
+
+    async function exportCSV() {
+        const script = document.getElementById('scriptInput').value.trim();
+        try {
+            const res = await fetch('/api/export-csv', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ script }),
+            });
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'image_prompts.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('CSV出力エラー: ' + err.message);
+        }
+    }
+
+    function resetForm() {
+        document.getElementById('resultSection').classList.add('hidden');
+        document.getElementById('scriptInput').value = '';
+        currentScenes = [];
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+    </script>
+</body>
+</html>
