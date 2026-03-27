@@ -1,37 +1,12 @@
-let csvFileData = null;
 let currentJobId = null;
 let pollTimer = null;
 let selectedKeywords = new Set();
-
-// ===== ファイルアップロード =====
-const uploadArea = document.getElementById('uploadArea');
-const csvInput = document.getElementById('csvFile');
-uploadArea.addEventListener('click', () => csvInput.click());
-uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
-uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
-uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('drag-over'); if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
-csvInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
-
-function handleFile(file) {
-    if (!file.name.match(/\.(csv|tsv|txt)$/i)) { alert('CSV/TSV/TXTファイルを選択してください'); return; }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        csvFileData = e.target.result;
-        document.getElementById('fileInfo').classList.remove('hidden');
-        document.getElementById('fileName').textContent = `${file.name} (${fmtSize(file.size)})`;
-        uploadArea.classList.add('hidden');
-    };
-    reader.readAsText(file, 'UTF-8');
-}
-function clearFile() { csvFileData = null; csvInput.value = ''; document.getElementById('fileInfo').classList.add('hidden'); uploadArea.classList.remove('hidden'); }
-function fmtSize(b) { if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; }
 
 // ===== Step 1: トレンドキーワード自動発見 =====
 function startDiscovery() {
     const params = {
         min_views: parseInt(document.getElementById('minViews').value),
         search_period_months: parseInt(document.getElementById('searchPeriod').value),
-        csv_content: csvFileData || "",
     };
 
     document.getElementById('inputSection').classList.add('hidden');
@@ -116,7 +91,6 @@ function startResearchWithKeywords() {
         hook_period_months: parseInt(document.getElementById('hookPeriod').value),
         search_period_months: parseInt(document.getElementById('searchPeriod').value),
         max_plans: parseInt(document.getElementById('maxPlans').value),
-        csv_content: csvFileData || "",
     };
 
     document.getElementById('keywordSection').classList.add('hidden');
