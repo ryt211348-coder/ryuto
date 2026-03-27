@@ -322,19 +322,24 @@ def analyze_viral_patterns(videos, transcripts):
     # === 台本構成集計 ===
     result.structure_patterns = structure_counter.most_common(10)
 
-    # === フック手法の使用率 ===
+    # === フック手法の使用率（排他分類・合計100%） ===
     if transcribed_count > 0:
-        q_count = sum(1 for a in video_analyses if a.get("hook_has_question"))
-        n_count = sum(1 for a in video_analyses if a.get("hook_has_number"))
-        neg_count = sum(1 for a in video_analyses if a.get("hook_has_negative"))
-        cur_count = sum(1 for a in video_analyses if a.get("hook_has_curiosity"))
-        cta_count = sum(1 for a in video_analyses if a.get("ending_has_cta"))
+        hook_type_counter = Counter()
+        for a in video_analyses:
+            # 優先順位で1つだけ分類
+            if a.get("hook_has_negative"):
+                hook_type_counter["ネガティブフック"] += 1
+            elif a.get("hook_has_curiosity"):
+                hook_type_counter["好奇心フック"] += 1
+            elif a.get("hook_has_question"):
+                hook_type_counter["疑問文フック"] += 1
+            elif a.get("hook_has_number"):
+                hook_type_counter["数字フック"] += 1
+            else:
+                hook_type_counter["ストレート型"] += 1
+
         result.hook_technique_rates = {
-            "疑問文フック": q_count / transcribed_count,
-            "数字フック": n_count / transcribed_count,
-            "ネガティブフック": neg_count / transcribed_count,
-            "好奇心フック": cur_count / transcribed_count,
-            "CTA（行動喚起）": cta_count / transcribed_count,
+            k: v / transcribed_count for k, v in hook_type_counter.most_common()
         }
 
     # === 商品・ブランド集計 ===
