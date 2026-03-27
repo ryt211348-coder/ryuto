@@ -1,0 +1,435 @@
+/* ===== Navigation ===== */
+.nav-bar {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.nav-link {
+    padding: 0.75rem 1.5rem;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.nav-link:hover {
+    color: var(--text);
+}
+
+.nav-link.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* ===== Section Titles ===== */
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+
+.section-desc {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+
+.section-subtitle {
+    font-size: 0.95rem;
+    color: var(--text);
+    margin-bottom: 1rem;
+}
+
+/* ===== Upload Area ===== */
+.upload-area {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.upload-area:hover,
+.upload-area.drag-over {
+    border-color: var(--accent);
+    background: rgba(255, 45, 85, 0.05);
+}
+
+.upload-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.upload-text {
+    color: var(--text);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+}
+
+.upload-hint {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+}
+
+/* ===== File Info ===== */
+.file-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 240, 255, 0.05);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: var(--radius-sm);
+    margin-top: 1rem;
+}
+
+.file-name {
+    color: var(--cyan);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.btn-text:hover {
+    text-decoration: underline;
+}
+
+/* ===== Loading ===== */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== Plan Cards ===== */
+.plan-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.plan-card:hover {
+    border-color: rgba(0, 240, 255, 0.3);
+}
+
+.plan-card.open {
+    border-color: var(--cyan);
+}
+
+.plan-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.plan-header:hover {
+    background: var(--bg-card-hover);
+}
+
+.plan-number {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #ff6b8a);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.plan-title-area {
+    flex: 1;
+    min-width: 0;
+}
+
+.plan-hook-preview {
+    font-size: 0.95rem;
+    color: var(--text);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.3rem;
+}
+
+.plan-meta {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.plan-body {
+    display: none;
+    padding: 0 1.25rem 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.plan-body.open {
+    display: block;
+}
+
+/* ===== Source Blocks ===== */
+.source-block {
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-top: 1rem;
+    border-left: 3px solid var(--purple);
+}
+
+.source-block h4 {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.source-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.source-views {
+    color: var(--cyan);
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.source-date {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+
+.source-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.source-link:hover {
+    text-decoration: underline;
+}
+
+.source-transcript {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-top: 0.3rem;
+}
+
+.source-topics {
+    display: flex;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+    flex-wrap: wrap;
+}
+
+/* ===== Script Blocks ===== */
+.script-block {
+    margin-top: 1.25rem;
+}
+
+.script-block h4 {
+    font-size: 0.95rem;
+    color: var(--text);
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+}
+
+.script-structure {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.script-section {
+    padding: 0.75rem 1rem;
+    border-left: 3px solid var(--border);
+    position: relative;
+}
+
+.script-section.script-hook {
+    border-left-color: var(--yellow);
+    background: rgba(251, 191, 36, 0.05);
+}
+
+.script-section.script-bridge {
+    border-left-color: var(--cyan);
+    background: rgba(0, 240, 255, 0.03);
+}
+
+.script-section.script-body {
+    border-left-color: var(--green);
+    background: rgba(52, 211, 153, 0.03);
+}
+
+.script-section.script-cta {
+    border-left-color: var(--accent);
+    background: rgba(255, 45, 85, 0.03);
+}
+
+.script-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.3rem;
+}
+
+.script-hook .script-label { color: var(--yellow); }
+.script-bridge .script-label { color: var(--cyan); }
+.script-body .script-label { color: var(--green); }
+.script-cta .script-label { color: var(--accent); }
+
+.script-text {
+    font-size: 0.9rem;
+    color: var(--text);
+    line-height: 1.6;
+}
+
+/* ===== Full Script ===== */
+.script-full {
+    margin-top: 1.25rem;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.script-full-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.script-full-header h4 {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin: 0;
+}
+
+.btn-copy {
+    padding: 0.3rem 0.8rem;
+    background: rgba(0, 240, 255, 0.1);
+    color: var(--cyan);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-copy:hover {
+    background: rgba(0, 240, 255, 0.2);
+}
+
+.script-full-text {
+    padding: 1rem;
+    font-size: 0.85rem;
+    color: var(--text);
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: inherit;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* ===== Badges ===== */
+.badge-topic {
+    background: rgba(0, 240, 255, 0.1);
+    color: var(--cyan);
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.badge-hook-type {
+    background: rgba(167, 139, 250, 0.15);
+    color: var(--purple);
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+/* ===== Empty State ===== */
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--text-dim);
+}
+
+.empty-state p {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* ===== Card ===== */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 640px) {
+    .plan-header {
+        padding: 1rem;
+    }
+
+    .plan-hook-preview {
+        font-size: 0.85rem;
+    }
+
+    .source-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.3rem;
+    }
+
+    .script-text {
+        font-size: 0.85rem;
+    }
+}

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok スキンケア企画メーカー</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/planner.css">
+</head>
+<body>
+    <div class="container">
+        <!-- ナビ -->
+        <nav class="nav-bar">
+            <a href="/" class="nav-link">分析ツール</a>
+            <a href="/planner" class="nav-link active">企画メーカー</a>
+        </nav>
+
+        <!-- ヘッダー -->
+        <header class="header">
+            <h1>スキンケア企画メーカー</h1>
+            <p class="subtitle">参考台本CSVをアップロード → 冒頭訴求×ハウツーを自動マッチング → 企画台本を複数パターン生成</p>
+        </header>
+
+        <!-- Step 1: CSV アップロード -->
+        <section class="input-section" id="uploadSection">
+            <div class="form-card">
+                <h2 class="section-title">1. 参考台本CSVをアップロード</h2>
+                <p class="section-desc">
+                    CSVには「文字起こし（台本）」「再生数」「投稿日」のカラムが含まれていると最適です。<br>
+                    カラム名は自動検出されます。
+                </p>
+
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="csvFile" accept=".csv,.tsv,.txt" hidden>
+                    <div class="upload-icon">📄</div>
+                    <p class="upload-text">CSVファイルをドラッグ＆ドロップ<br>またはクリックして選択</p>
+                    <p class="upload-hint">対応: .csv / .tsv / .txt</p>
+                </div>
+
+                <div class="file-info hidden" id="fileInfo">
+                    <span class="file-name" id="fileName"></span>
+                    <button class="btn-text" onclick="clearFile()">削除</button>
+                </div>
+
+                <div class="form-row" style="margin-top:1.5rem">
+                    <div class="form-group">
+                        <label for="minViewsPlanner">最低再生数</label>
+                        <select id="minViewsPlanner">
+                            <option value="100000">10万再生</option>
+                            <option value="300000">30万再生</option>
+                            <option value="500000" selected>50万再生</option>
+                            <option value="1000000">100万再生</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="recentMonths">フック参照期間</label>
+                        <select id="recentMonths">
+                            <option value="1">直近1ヶ月</option>
+                            <option value="3" selected>直近3ヶ月</option>
+                            <option value="6">直近6ヶ月</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="maxPlans">生成パターン数</label>
+                    <select id="maxPlans">
+                        <option value="3">3パターン</option>
+                        <option value="6" selected>6パターン</option>
+                        <option value="10">10パターン</option>
+                    </select>
+                </div>
+
+                <button class="btn-primary" id="generateBtn" onclick="generatePlans()" disabled>
+                    企画を生成する
+                </button>
+            </div>
+        </section>
+
+        <!-- ローディング -->
+        <section class="loading-section hidden" id="loadingSection">
+            <div class="progress-card">
+                <div class="spinner"></div>
+                <p class="progress-message">CSVを解析中...</p>
+            </div>
+        </section>
+
+        <!-- エラー -->
+        <section class="error-section hidden" id="errorSection">
+            <div class="error-card">
+                <p id="plannerError"></p>
+                <button class="btn-secondary" onclick="resetPlanner()">やり直す</button>
+            </div>
+        </section>
+
+        <!-- 結果 -->
+        <section class="result-section hidden" id="resultSection">
+            <!-- サマリー -->
+            <div class="summary-card" id="summaryCard"></div>
+
+            <!-- タブ -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchPlannerTab('plans')">企画台本</button>
+                <button class="tab" onclick="switchPlannerTab('hooks')">フック一覧</button>
+                <button class="tab" onclick="switchPlannerTab('topics')">トピック分析</button>
+            </div>
+
+            <!-- 企画台本タブ -->
+            <div class="tab-content active" id="ptab-plans">
+                <div id="plansList"></div>
+            </div>
+
+            <!-- フック一覧タブ -->
+            <div class="tab-content" id="ptab-hooks">
+                <div id="hooksCandidates"></div>
+            </div>
+
+            <!-- トピック分析タブ -->
+            <div class="tab-content" id="ptab-topics">
+                <div id="topicsAnalysis"></div>
+            </div>
+
+            <button class="btn-secondary" onclick="resetPlanner()" style="margin-top:2rem">新しいCSVで再生成</button>
+        </section>
+    </div>
+
+    <script src="/static/planner.js"></script>
+</body>
+</html>

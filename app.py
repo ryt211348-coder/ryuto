@@ -18,6 +18,13 @@ from tiktok_analyzer.analyzer import (
     analyze_viral_patterns,
     generate_report,
 )
+from tiktok_analyzer.planner import (
+    parse_csv,
+    analyze_scripts,
+    generate_plans,
+    format_plans_for_display,
+    get_analysis_summary,
+)
 
 app = Flask(__name__)
 
@@ -237,6 +244,41 @@ def set_config():
         return jsonify({"error": "APIキーを入力してください"}), 400
     save_api_key(key)
     return jsonify({"success": True, "message": "APIキーを保存しました"})
+
+
+@app.route("/planner")
+def planner():
+    return render_template("planner.html")
+
+
+@app.route("/api/planner/generate", methods=["POST"])
+def planner_generate():
+    data = request.get_json()
+    csv_content = data.get("csv_content", "")
+    min_views = int(data.get("min_views", 500_000))
+    recent_months = int(data.get("recent_months", 3))
+    max_plans = int(data.get("max_plans", 6))
+
+    if not csv_content.strip():
+        return jsonify({"error": "CSVデータが空です"}), 400
+
+    # CSV解析
+    scripts = parse_csv(csv_content)
+    if not scripts:
+        return jsonify({"error": "CSVから台本データを読み取れませんでした。カラム名を確認してください。"}), 400
+
+    # 分析
+    analysis = analyze_scripts(scripts, min_views=min_views, recent_months=recent_months)
+
+    # 企画生成
+    plans = generate_plans(analysis, max_plans=max_plans)
+    plans_display = format_plans_for_display(plans)
+    summary = get_analysis_summary(analysis)
+
+    return jsonify({
+        "plans": plans_display,
+        "summary": summary,
+    })
 
 
 if __name__ == "__main__":
