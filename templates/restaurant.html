@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レストラン比較ツール - 食べログ・ホットペッパー・Google 総合比較</title>
+    <link rel="stylesheet" href="/static/restaurant.css">
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="header">
+        <div class="header-inner">
+            <h1 class="logo">BestBite</h1>
+            <p class="tagline">食べログ・ホットペッパー・Google 口コミを総合比較</p>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="main">
+        <!-- 検索パネル -->
+        <section class="search-panel">
+            <h2 class="search-title">レストランを探す</h2>
+            <div class="search-grid">
+                <!-- エリア -->
+                <div class="form-group">
+                    <label for="area">エリア</label>
+                    <select id="area">
+                        <option value="">すべてのエリア</option>
+                    </select>
+                </div>
+                <!-- ジャンル -->
+                <div class="form-group">
+                    <label for="genre">料理ジャンル</label>
+                    <select id="genre">
+                        <option value="">すべてのジャンル</option>
+                    </select>
+                </div>
+                <!-- 雰囲気 -->
+                <div class="form-group">
+                    <label for="atmosphere">雰囲気</label>
+                    <select id="atmosphere">
+                        <option value="">こだわりなし</option>
+                    </select>
+                </div>
+                <!-- 人数 -->
+                <div class="form-group">
+                    <label for="party_size">人数</label>
+                    <select id="party_size">
+                        <option value="0">指定なし</option>
+                        <option value="2">2人</option>
+                        <option value="4">4人</option>
+                        <option value="6">6人</option>
+                        <option value="8">8人</option>
+                        <option value="10">10人</option>
+                        <option value="20">20人以上</option>
+                        <option value="50">50人以上</option>
+                    </select>
+                </div>
+                <!-- 予算 -->
+                <div class="form-group">
+                    <label for="budget_min">予算（下限）</label>
+                    <select id="budget_min">
+                        <option value="0">指定なし</option>
+                        <option value="1000">¥1,000〜</option>
+                        <option value="3000">¥3,000〜</option>
+                        <option value="5000">¥5,000〜</option>
+                        <option value="8000">¥8,000〜</option>
+                        <option value="10000">¥10,000〜</option>
+                        <option value="15000">¥15,000〜</option>
+                        <option value="20000">¥20,000〜</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="budget_max">予算（上限）</label>
+                    <select id="budget_max">
+                        <option value="0">指定なし</option>
+                        <option value="3000">〜¥3,000</option>
+                        <option value="5000">〜¥5,000</option>
+                        <option value="8000">〜¥8,000</option>
+                        <option value="10000">〜¥10,000</option>
+                        <option value="15000">〜¥15,000</option>
+                        <option value="20000">〜¥20,000</option>
+                        <option value="30000">〜¥30,000</option>
+                        <option value="50000">〜¥50,000</option>
+                    </select>
+                </div>
+                <!-- 予約状況 -->
+                <div class="form-group">
+                    <label for="reservation">予約状況</label>
+                    <select id="reservation">
+                        <option value="">すべて</option>
+                        <option value="available">予約可能</option>
+                        <option value="few">残りわずか</option>
+                    </select>
+                </div>
+                <!-- 個室 -->
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="private_room">
+                        個室あり
+                    </label>
+                </div>
+            </div>
+            <!-- ソート & 検索ボタン -->
+            <div class="search-actions">
+                <div class="sort-group">
+                    <label for="sort_by">並び替え:</label>
+                    <select id="sort_by">
+                        <option value="score">総合スコア順（おすすめ）</option>
+                        <option value="review_count">口コミ件数順</option>
+                        <option value="price_low">価格が安い順</option>
+                        <option value="price_high">価格が高い順</option>
+                    </select>
+                </div>
+                <button id="search-btn" class="btn-search" onclick="searchRestaurants()">検索する</button>
+            </div>
+        </section>
+
+        <!-- スコア説明 -->
+        <section class="score-explanation">
+            <details>
+                <summary>総合スコアの算出方法</summary>
+                <p>
+                    各サイト（食べログ・ホットペッパー・Google）の評価を<strong>ベイズ平均</strong>で信頼性スコアに変換し、
+                    サイトごとの重み付け（食べログ40%、Google 35%、ホットペッパー25%）で統合しています。
+                    口コミが少ない店舗は全体平均に近づくため、<strong>口コミ件数が多く評価も高い店舗</strong>が上位に表示されます。
+                </p>
+            </details>
+        </section>
+
+        <!-- 結果カウント -->
+        <div id="result-count" class="result-count" style="display:none;"></div>
+
+        <!-- 結果表示 -->
+        <div id="results" class="results-grid"></div>
+
+        <!-- 詳細モーダル -->
+        <div id="modal" class="modal" style="display:none;">
+            <div class="modal-overlay" onclick="closeModal()"></div>
+            <div class="modal-content">
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <div id="modal-body"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- フッター -->
+    <footer class="footer">
+        <p>BestBite - レストラン総合比較ツール | デモ版</p>
+    </footer>
+
+    <script src="/static/restaurant.js"></script>
+</body>
+</html>
