@@ -44,7 +44,7 @@ def _try_ytdlp_subs(video_url, output_dir):
         sys.executable, "-m", "yt_dlp",
         "--write-auto-subs",
         "--write-subs",
-        "--sub-langs", "ja,en,all",
+        "--sub-langs", "ja,jpn,ja-JP",
         "--sub-format", "vtt/srt/best",
         "--skip-download",
         "-o", str(base) + ".%(ext)s",
@@ -58,19 +58,35 @@ def _try_ytdlp_subs(video_url, output_dir):
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return None
 
-    # 生成された字幕ファイルを探す
+    # 生成された字幕ファイルを探す（日本語優先）
+    all_files = []
     for ext in ["vtt", "srt"]:
-        for f in output_dir.glob(f"temp_sub*.{ext}"):
-            text = _parse_subtitle_file(f)
-            # 一時ファイル削除
-            try:
-                f.unlink()
-            except OSError:
-                pass
-            if text and len(text.strip()) > 5:
-                return text.strip()
+        all_files.extend(output_dir.glob(f"temp_sub*.{ext}"))
 
+    best_text = None
+    for f in all_files:
+        text = _parse_subtitle_file(f)
+        try:
+            f.unlink()
+        except OSError:
+            pass
+        if text and len(text.strip()) > 5:
+            if _is_japanese(text):
+                return text.strip()
+            # 日本語でない場合は一旦保持（日本語が見つからなければ使わない）
+            if best_text is None:
+                best_text = text.strip()
+
+    # 日本語字幕が見つからなかった場合はNoneを返す（Whisperにフォールバック）
     return None
+
+
+def _is_japanese(text):
+    """テキストに日本語（ひらがな・カタカナ・漢字）が含まれるか判定."""
+    japanese_chars = sum(1 for c in text if '\u3040' <= c <= '\u309f'   # ひらがな
+                        or '\u30a0' <= c <= '\u30ff'   # カタカナ
+                        or '\u4e00' <= c <= '\u9fff')   # 漢字
+    return japanese_chars > len(text) * 0.1
 
 
 def _parse_subtitle_file(filepath):
