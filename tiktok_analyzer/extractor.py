@@ -1,5 +1,6 @@
 """TikTokアカウントから動画メタデータを抽出し、再生数でフィルタリングする."""
 
+import asyncio
 import json
 import subprocess
 import sys
@@ -8,7 +9,6 @@ from pathlib import Path
 from typing import Optional
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 console = Console()
 
@@ -27,67 +27,134 @@ class VideoInfo:
     description: str
 
 
-def extract_account_videos(account_url: str) -> "list[VideoInfo]":
-    """yt-dlpでTikTokアカウントの全動画メタデータを取得する."""
-    console.print(f"\n[bold cyan]アカウントから動画情報を取得中...[/bold cyan]")
-    console.print(f"  URL: {account_url}\n")
+async def _fetch_with_tiktokapi(username):
+    """TikTokApi (Playwright) を使って動画データを取得する."""
+    from TikTokApi import TikTokApi
 
+    videos_data = []
+    async with TikTokApi() as api:
+        await api.create_sessions(num_sessions=1, sleep_after=3)
+        user = api.user(username)
+        async for video in user.videos(count=100):
+            vd = video.as_dict
+            stats = vd.get("stats", {})
+            desc = vd.get("desc", "")
+            vid_id = vd.get("id", "")
+            duration = vd.get("video", {}).get("duration", 0)
+            create_time = vd.get("createTime", "")
+
+            videos_data.append({
+                "id": vid_id,
+                "desc": desc,
+                "views": stats.get("playCount", 0),
+                "likes": stats.get("diggCount", 0),
+                "comments": stats.get("commentCount", 0),
+                "shares": stats.get("shareCount", 0),
+                "duration": duration,
+                "createTime": create_time,
+            })
+    return videos_data
+
+
+def _fetch_with_ytdlp(account_url):
+    """yt-dlp を使って動画データを取得する（フォールバック）."""
     cmd = [
         sys.executable, "-m", "yt_dlp",
-        "--dump-json",
-        "--flat-playlist",
-        "--no-download",
-        "--no-warnings",
+        "--dump-json", "--flat-playlist",
+        "--no-download", "--no-warnings",
         account_url,
     ]
-
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-    except subprocess.TimeoutExpired:
-        console.print("[red]タイムアウト: 動画情報の取得に時間がかかりすぎました[/red]")
-        return []
-    except FileNotFoundError:
-        console.print("[red]エラー: yt-dlpがインストールされていません。pip install yt-dlp を実行してください[/red]")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
         return []
 
     if result.returncode != 0 and not result.stdout:
-        console.print(f"[red]エラー: 動画情報の取得に失敗しました[/red]")
-        if result.stderr:
-            console.print(f"[dim]{result.stderr[:500]}[/dim]")
         return []
 
-    videos = []
+    videos_data = []
     for line in result.stdout.strip().split("\n"):
         if not line.strip():
             continue
         try:
             data = json.loads(line)
-            video = VideoInfo(
-                video_id=str(data.get("id", "")),
-                title=data.get("title", ""),
-                url=data.get("webpage_url") or data.get("url", ""),
-                view_count=int(data.get("view_count", 0) or 0),
-                like_count=int(data.get("like_count", 0) or 0),
-                comment_count=int(data.get("comment_count", 0) or 0),
-                share_count=int(data.get("share_count", 0) or 0),
-                duration=int(data.get("duration", 0) or 0),
-                upload_date=data.get("upload_date", ""),
-                description=data.get("description", ""),
-            )
-            videos.append(video)
+            videos_data.append({
+                "id": str(data.get("id", "")),
+                "desc": data.get("description", "") or data.get("title", ""),
+                "views": int(data.get("view_count", 0) or 0),
+                "likes": int(data.get("like_count", 0) or 0),
+                "comments": int(data.get("comment_count", 0) or 0),
+                "shares": int(data.get("share_count", 0) or 0),
+                "duration": int(data.get("duration", 0) or 0),
+                "createTime": data.get("upload_date", ""),
+            })
         except (json.JSONDecodeError, ValueError):
             continue
+    return videos_data
+
+
+def _parse_username(account_url):
+    """URLからユーザー名を抽出する."""
+    url = account_url.strip().rstrip("/")
+    if "@" in url:
+        # https://www.tiktok.com/@username or just @username
+        parts = url.split("@")
+        username = parts[-1].split("/")[0].split("?")[0]
+        return username
+    return url
+
+
+def extract_account_videos(account_url):
+    """TikTokアカウントの全動画メタデータを取得する."""
+    console.print(f"\n[bold cyan]アカウントから動画情報を取得中...[/bold cyan]")
+    console.print(f"  URL: {account_url}\n")
+
+    username = _parse_username(account_url)
+    videos_data = []
+
+    # 方法1: TikTokApi (Playwright) を試す
+    try:
+        console.print("  [dim]TikTokApi (Playwright) で取得中...[/dim]")
+        videos_data = asyncio.run(_fetch_with_tiktokapi(username))
+        if videos_data:
+            console.print(f"  [green]TikTokApi で {len(videos_data)} 本の動画を検出[/green]")
+    except Exception as e:
+        console.print(f"  [yellow]TikTokApi 失敗: {e}[/yellow]")
+        console.print("  [dim]yt-dlp にフォールバック中...[/dim]")
+
+    # 方法2: yt-dlp でフォールバック
+    if not videos_data:
+        try:
+            videos_data = _fetch_with_ytdlp(account_url)
+            if videos_data:
+                console.print(f"  [green]yt-dlp で {len(videos_data)} 本の動画を検出[/green]")
+            else:
+                console.print("  [red]yt-dlp でも取得できませんでした[/red]")
+        except Exception as e:
+            console.print(f"  [red]yt-dlp エラー: {e}[/red]")
+
+    # VideoInfoに変換
+    videos = []
+    for d in videos_data:
+        video = VideoInfo(
+            video_id=str(d.get("id", "")),
+            title=d.get("desc", "")[:100],
+            url=f"https://www.tiktok.com/@{username}/video/{d.get('id', '')}",
+            view_count=int(d.get("views", 0) or 0),
+            like_count=int(d.get("likes", 0) or 0),
+            comment_count=int(d.get("comments", 0) or 0),
+            share_count=int(d.get("shares", 0) or 0),
+            duration=int(d.get("duration", 0) or 0),
+            upload_date=str(d.get("createTime", "")),
+            description=d.get("desc", ""),
+        )
+        videos.append(video)
 
     console.print(f"  [green]合計 {len(videos)} 本の動画を検出[/green]")
     return videos
 
 
-def filter_viral_videos(videos: list[VideoInfo], min_views: int = 1_000_000) -> "list[VideoInfo]":
+def filter_viral_videos(videos, min_views=1_000_000):
     """指定再生数以上の動画をフィルタリングする."""
     viral = [v for v in videos if v.view_count >= min_views]
     viral.sort(key=lambda v: v.view_count, reverse=True)
@@ -107,8 +174,9 @@ def filter_viral_videos(videos: list[VideoInfo], min_views: int = 1_000_000) -> 
     return viral
 
 
-def download_video_audio(video: VideoInfo, output_dir: Path) -> Optional[Path]:
+def download_video_audio(video, output_dir):
     """動画の音声をダウンロードする."""
+    output_dir = Path(output_dir)
     output_path = output_dir / f"{video.video_id}.mp3"
 
     if output_path.exists():
@@ -135,8 +203,9 @@ def download_video_audio(video: VideoInfo, output_dir: Path) -> Optional[Path]:
     return None
 
 
-def save_videos_metadata(videos: list[VideoInfo], output_path: Path) -> None:
+def save_videos_metadata(videos, output_path):
     """動画メタデータをJSONファイルに保存する."""
+    output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     data = [asdict(v) for v in videos]
     output_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
