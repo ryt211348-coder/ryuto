@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import threading
 import uuid
 from pathlib import Path
@@ -276,60 +277,98 @@ def run_research(job_id: str, keywords: list, min_views: int,
                  max_plans: int):
     """バックグラウンドでTikTokリサーチ→企画生成を実行する."""
     job = planner_jobs[job_id]
+    from tiktok_analyzer.researcher import TikTokVideo
+    from tiktok_analyzer.reference_data import SUCCESS_SCRIPTS, FAILURE_SCRIPTS, KEYWORD_REFERENCES
 
     try:
-        # Step 1: 複数キーワードでTikTok検索
+        # Step 1: TikTok検索（ライブ）
         job["status"] = "searching"
         all_videos = []
         seen_ids = set()
 
         for i, keyword in enumerate(keywords):
             job["message"] = f"TikTokで「{keyword}」を検索中... ({i+1}/{len(keywords)})"
-            videos = search_tiktok_videos(
-                keyword, min_views=min_views,
-                period_months=search_period_months, max_results=20,
-            )
-            for v in videos:
-                if v.video_id not in seen_ids:
-                    all_videos.append(v)
-                    seen_ids.add(v.video_id)
+            try:
+                videos = search_tiktok_videos(
+                    keyword, min_views=0,
+                    period_months=search_period_months, max_results=15,
+                )
+                for v in videos:
+                    if v.video_id not in seen_ids:
+                        all_videos.append(v)
+                        seen_ids.add(v.video_id)
+            except Exception:
+                pass
+
+        # ライブ検索で見つからなかった場合: ビルトインの参考データから動画を生成
+        if not all_videos:
+            job["message"] = "ビルトインデータから企画を生成中..."
+            for keyword in keywords:
+                ref = KEYWORD_REFERENCES.get(keyword, {})
+                for vdata in ref.get("videos", []):
+                    vid_id = ""
+                    url = vdata.get("url", "")
+                    if url:
+                        m = re.search(r'/video/(\d+)', url)
+                        if m:
+                            vid_id = m.group(1)
+                    if not vid_id:
+                        vid_id = str(hash(vdata.get("title", "")))
+                    if vid_id in seen_ids:
+                        continue
+                    seen_ids.add(vid_id)
+
+                    account = vdata.get("account", "").lstrip("@")
+                    all_videos.append(TikTokVideo(
+                        video_id=vid_id,
+                        url=url,
+                        title=vdata.get("title", ""),
+                        views=vdata.get("views", 0),
+                        account_name=account,
+                        account_url=f"https://www.tiktok.com/@{account}" if account else "",
+                    ))
+
+            # 成功台本のデータも追加
+            for s in SUCCESS_SCRIPTS:
+                url = s.get("url", "")
+                vid_id = ""
+                if url:
+                    m = re.search(r'/video/(\d+)', url)
+                    if m:
+                        vid_id = m.group(1)
+                if not vid_id:
+                    vid_id = str(hash(s.get("title", s.get("transcript", ""))[:30]))
+                if vid_id in seen_ids:
+                    continue
+                seen_ids.add(vid_id)
+
+                all_videos.append(TikTokVideo(
+                    video_id=vid_id,
+                    url=url,
+                    title=s.get("title", ""),
+                    description=s.get("analysis", ""),
+                    transcript=s.get("transcript", ""),
+                    views=s.get("views", 0),
+                ))
 
         if not all_videos:
             job["status"] = "error"
-            job["message"] = "動画が見つかりませんでした。条件を緩めて試してください。"
+            job["message"] = "動画データがありません。"
             return
 
-        # エンゲージメントスコア付与
         all_videos = score_videos_by_engagement(all_videos)
-        job["message"] = f"{len(all_videos)}本の動画を取得"
+        job["message"] = f"{len(all_videos)}本の動画データで企画生成中..."
 
-        # Step 2: 文字起こし取得
-        job["status"] = "transcribing"
-        job["progress"] = 0
-        job["total"] = len(all_videos)
-
-        for i, video in enumerate(all_videos):
-            if not video.transcript:
-                transcript = get_video_transcript(video.url)
-                video.transcript = transcript
-            job["progress"] = i + 1
-            job["message"] = f"文字起こし取得中 ({i + 1}/{len(all_videos)})..."
-
-        transcribed = sum(1 for v in all_videos if v.transcript)
-        job["message"] = f"文字起こし完了: {transcribed}/{len(all_videos)}本"
-
-        # Step 3: 分析
+        # Step 2: 文字起こし（あるものだけ使う、遅いのでスキップ）
         job["status"] = "analyzing"
-        job["message"] = "フック・コンテンツ・エンゲージメントを分析中..."
+        job["message"] = "フック・コンテンツを分析中..."
         analysis = analyze_researched_videos(all_videos, hook_period_months=hook_period_months)
 
-        # Step 4: 企画生成
+        # Step 3: 企画生成
         job["status"] = "generating"
         job["message"] = "企画台本を生成中..."
 
-        # ビルトイン参考台本データを使用
         ref_style = get_builtin_reference_style()
-
         plans = generate_plans(analysis, max_plans=max_plans)
         plans_display = format_plans_for_display(plans)
         summary = get_research_summary(analysis)
