@@ -311,11 +311,9 @@ def run_research(job_id: str, keywords: list, min_views: int,
                  max_plans: int):
     """バックグラウンドでTikTokリサーチ→企画生成を実行する."""
     job = planner_jobs[job_id]
-    from tiktok_analyzer.researcher import TikTokVideo
-    from tiktok_analyzer.reference_data import SUCCESS_SCRIPTS, FAILURE_SCRIPTS, KEYWORD_REFERENCES
 
     try:
-        # Step 1: TikTok検索（ライブ）
+        # Step 1: TikTokライブ検索
         job["status"] = "searching"
         all_videos = []
         seen_ids = set()
@@ -331,69 +329,19 @@ def run_research(job_id: str, keywords: list, min_views: int,
                     if v.video_id not in seen_ids:
                         all_videos.append(v)
                         seen_ids.add(v.video_id)
-            except Exception:
-                pass
-
-        # ライブ検索で見つからなかった場合: ビルトインの参考データから動画を生成
-        if not all_videos:
-            job["message"] = "ビルトインデータから企画を生成中..."
-            for keyword in keywords:
-                ref = KEYWORD_REFERENCES.get(keyword, {})
-                for vdata in ref.get("videos", []):
-                    vid_id = ""
-                    url = vdata.get("url", "")
-                    if url:
-                        m = re.search(r'/video/(\d+)', url)
-                        if m:
-                            vid_id = m.group(1)
-                    if not vid_id:
-                        vid_id = str(hash(vdata.get("title", "")))
-                    if vid_id in seen_ids:
-                        continue
-                    seen_ids.add(vid_id)
-
-                    account = vdata.get("account", "").lstrip("@")
-                    all_videos.append(TikTokVideo(
-                        video_id=vid_id,
-                        url=url,
-                        title=vdata.get("title", ""),
-                        views=vdata.get("views", 0),
-                        account_name=account,
-                        account_url=f"https://www.tiktok.com/@{account}" if account else "",
-                    ))
-
-            # 成功台本のデータも追加
-            for s in SUCCESS_SCRIPTS:
-                url = s.get("url", "")
-                vid_id = ""
-                if url:
-                    m = re.search(r'/video/(\d+)', url)
-                    if m:
-                        vid_id = m.group(1)
-                if not vid_id:
-                    vid_id = str(hash(s.get("title", s.get("transcript", ""))[:30]))
-                if vid_id in seen_ids:
-                    continue
-                seen_ids.add(vid_id)
-
-                all_videos.append(TikTokVideo(
-                    video_id=vid_id,
-                    url=url,
-                    title=s.get("title", ""),
-                    description=s.get("analysis", ""),
-                    transcript=s.get("transcript", ""),
-                    views=s.get("views", 0),
-                ))
+            except Exception as e:
+                job["message"] = f"検索中にエラー: {e}"
 
         if not all_videos:
             job["status"] = "error"
-            job["message"] = "動画データがありません。"
+            job["message"] = "TikTokから動画を取得できませんでした。Playwright/yt-dlpのインストールを確認してください。"
             return
 
+        # エンゲージメントスコア付与
         all_videos = score_videos_by_engagement(all_videos)
-        job["message"] = f"{len(all_videos)}本の動画データで企画生成中..."
+        job["message"] = f"{len(all_videos)}本の動画を取得"
 
-        # Step 2: 文字起こし（あるものだけ使う、遅いのでスキップ）
+        # Step 2: 分析
         job["status"] = "analyzing"
         job["message"] = "フック・コンテンツを分析中..."
         analysis = analyze_researched_videos(all_videos, hook_period_months=hook_period_months)
