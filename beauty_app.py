@@ -50,6 +50,8 @@ from beauty_planner.reference_data import (
     ZUNDAMON_STYLE,
     SUNO_AI_STYLE,
     BEAUTY_CATEGORIES,
+    AUTO_SEARCH_KEYWORDS,
+    AUTO_SEARCH_HASHTAGS,
 )
 from beauty_planner.channels_data import BUILTIN_CHANNELS, TOP_TIKTOK_ACCOUNTS
 from beauty_planner.apify_client import (
@@ -134,39 +136,40 @@ def run_all():
 
         steps = []
 
-        # Step 1: 内蔵チャンネルロード
-        existing = load_json(CHANNELS_PATH, [])
-        if not existing:
-            existing_urls = set()
-            for ch in BUILTIN_CHANNELS:
-                if ch["url"] not in existing_urls:
-                    existing.append(ch)
-                    existing_urls.add(ch["url"])
-            save_json(CHANNELS_PATH, existing)
-        channels = existing
-        steps.append({"step": "channels", "count": len(channels)})
-
-        # Step 2: Apifyデータ収集
+        # Step 1: キーワード検索でデータ自動収集
         apify = get_apify_client()
         all_videos = []
+        keywords = AUTO_SEARCH_KEYWORDS[:6]
+        hashtags = AUTO_SEARCH_HASHTAGS[:4]
 
-        tiktok_users = list(set(
-            ch["name"] for ch in channels if ch.get("platform") == "TikTok"
-        ))[:20]  # Apify無料枠を考慮して上位20アカウント
-        if tiktok_users:
-            raw = apify.scrape_tiktok_profile(tiktok_users, 20)
-            all_videos.extend(normalize_tiktok_data(raw))
+        for kw in keywords:
+            try:
+                raw = apify.scrape_tiktok_keyword(kw, 15)
+                all_videos.extend(normalize_tiktok_data(raw))
+            except Exception:
+                continue
 
-        ig_users = list(set(
-            ch["name"] for ch in channels if ch.get("platform") == "Instagram"
-        ))[:10]
-        if ig_users:
-            raw = apify.scrape_instagram_profile(ig_users, 20)
-            all_videos.extend(normalize_instagram_data(raw))
+        for tag in hashtags:
+            try:
+                raw = apify.scrape_tiktok_hashtag([tag], 15)
+                all_videos.extend(normalize_tiktok_data(raw))
+            except Exception:
+                continue
+
+        # 重複除去
+        seen = set()
+        unique = []
+        for v in all_videos:
+            vid = v.get("video_id", "")
+            if vid and vid not in seen:
+                seen.add(vid)
+                unique.append(v)
+        all_videos = unique
 
         save_json(COLLECTED_DATA_PATH, {
             "videos": all_videos,
             "collected_at": datetime.now().isoformat(),
+            "keywords_used": keywords,
         })
         steps.append({"step": "collect", "total_videos": len(all_videos)})
 
@@ -261,42 +264,57 @@ COLLECTED_DATA_PATH = Path(__file__).parent / ".beauty_collected.json"
 
 @app.route("/api/collect-data", methods=["POST"])
 def collect_data():
-    """Apifyで競合チャンネルデータを自動収集."""
+    """Apifyでキーワード/ハッシュタグ検索して美容トレンド動画を自動収集."""
     try:
         apify = get_apify_client()
-        data = request.json
-        channels = data.get("channels", [])
-        max_videos = data.get("max_videos", 30)
+        data = request.json or {}
+        max_per_keyword = data.get("max_per_keyword", 20)
+        custom_keywords = data.get("keywords", [])
 
-        if not channels:
-            return jsonify({"ok": False, "error": "チャンネルが登録されていません"}), 400
+        # 検索キーワード（カスタム or 内蔵）
+        keywords = custom_keywords if custom_keywords else AUTO_SEARCH_KEYWORDS[:8]
+        hashtags = AUTO_SEARCH_HASHTAGS[:5]
 
         all_videos = []
 
-        # TikTokチャンネル収集
-        tiktok_users = [ch["name"] for ch in channels if ch.get("platform") == "TikTok"]
-        if tiktok_users:
-            raw = apify.scrape_tiktok_profile(tiktok_users, max_videos)
-            all_videos.extend(normalize_tiktok_data(raw))
+        # キーワード検索（TikTok）
+        for kw in keywords:
+            try:
+                raw = apify.scrape_tiktok_keyword(kw, max_per_keyword)
+                all_videos.extend(normalize_tiktok_data(raw))
+            except Exception:
+                continue
 
-        # Instagramチャンネル収集
-        ig_users = [ch["name"] for ch in channels if ch.get("platform") == "Instagram"]
-        if ig_users:
-            raw = apify.scrape_instagram_profile(ig_users, max_videos)
-            all_videos.extend(normalize_instagram_data(raw))
+        # ハッシュタグ検索（TikTok）
+        for tag in hashtags:
+            try:
+                raw = apify.scrape_tiktok_hashtag([tag], max_per_keyword)
+                all_videos.extend(normalize_tiktok_data(raw))
+            except Exception:
+                continue
+
+        # 重複除去（video_idベース）
+        seen = set()
+        unique_videos = []
+        for v in all_videos:
+            vid = v.get("video_id", "")
+            if vid and vid not in seen:
+                seen.add(vid)
+                unique_videos.append(v)
 
         # 保存
         save_json(COLLECTED_DATA_PATH, {
-            "videos": all_videos,
+            "videos": unique_videos,
             "collected_at": datetime.now().isoformat(),
-            "channel_count": len(channels),
+            "keywords_used": keywords,
+            "hashtags_used": hashtags,
         })
 
         return jsonify({
             "ok": True,
-            "total_videos": len(all_videos),
-            "tiktok_count": len([v for v in all_videos if v["platform"] == "TikTok"]),
-            "instagram_count": len([v for v in all_videos if v["platform"] == "Instagram"]),
+            "total_videos": len(unique_videos),
+            "keywords_used": len(keywords),
+            "hashtags_used": len(hashtags),
         })
 
     except ValueError as e:

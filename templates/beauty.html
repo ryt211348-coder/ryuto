@@ -227,7 +227,7 @@
     <!-- ワンクリック全自動 -->
     <div class="card" style="border-color:var(--accent);margin-bottom:1.5rem;">
         <div class="card-title" style="color:var(--accent);">ワンクリック全自動</div>
-        <p class="text-sm text-dim mb-1">内蔵81アカウントからデータ収集→トレンド分析→企画生成→台本生成まで全自動で実行します</p>
+        <p class="text-sm text-dim mb-1">美容系キーワードで自動検索→バズ動画収集→トレンド分析→企画生成→台本生成まで全自動。チャンネル登録不要です。</p>
         <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
             <select id="runAllScriptType">
                 <option value="karakuchi">辛口レビュー</option>
@@ -836,12 +836,8 @@ function toggleCategory(el) {
     }
 }
 
-// データ収集（Apify）
+// データ収集（Apify - キーワード自動検索）
 async function collectData() {
-    if (state.channels.length === 0) {
-        alert('先にチャンネルを登録してください');
-        return;
-    }
     const btn = $('btnCollect');
     btn.disabled = true;
     show($('collectLoading'));
@@ -849,13 +845,12 @@ async function collectData() {
 
     try {
         const data = await api('/api/collect-data', 'POST', {
-            channels: state.channels,
-            max_videos: 30,
+            max_per_keyword: 20,
         });
         if (!data.ok) throw new Error(data.error || 'データ収集に失敗しました');
         $('collectStats').innerHTML = `
-            合計 <strong>${data.total_videos}</strong> 動画を収集<br>
-            TikTok: ${data.tiktok_count} / Instagram: ${data.instagram_count}
+            合計 <strong>${data.total_videos}</strong> 動画を自動収集<br>
+            検索キーワード: ${data.keywords_used}件 / ハッシュタグ: ${data.hashtags_used}件
         `;
         show($('collectResult'));
     } catch (e) {
