@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNSリサーチツール - 食品 & 美容</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;background:#0a0a1a;color:#e0e0e0;min-height:100vh;overflow-x:hidden}
+.header{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;background:linear-gradient(135deg,#0d1117,#161b22);border-bottom:1px solid #30363d}
+.logo{font-size:20px;font-weight:700;color:#58a6ff}
+.logo-sub{font-size:12px;color:#8b949e;margin-left:12px}
+.control-bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:12px 24px;background:#0d1117;border-bottom:1px solid #21262d}
+.control-group{display:flex;align-items:center;gap:8px}
+.control-group label{font-size:12px;color:#8b949e;white-space:nowrap}
+.toggle-group{display:flex;gap:2px;background:#161b22;border-radius:8px;padding:2px}
+.toggle-btn{padding:5px 12px;border:none;background:transparent;color:#8b949e;font-size:12px;border-radius:6px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.toggle-btn.active{background:#1f6feb;color:#fff}
+.toggle-btn:hover:not(.active){color:#c9d1d9;background:#21262d}
+.breadcrumb{display:flex;align-items:center;gap:4px;padding:8px 24px;font-size:13px;color:#8b949e;background:#0d1117}
+.crumb{cursor:pointer;padding:2px 8px;border-radius:4px;transition:all .2s}
+.crumb:hover{color:#58a6ff;background:#161b22}
+.crumb.active{color:#e0e0e0;font-weight:600}
+.crumb-sep{color:#30363d;margin:0 2px}
+.main-content{position:relative;height:calc(100vh - 140px);overflow:hidden}
+.mindmap-area,.videos-area,.accounts-area{width:100%;height:100%;overflow-y:auto;position:absolute;top:0;left:0}
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;color:#8b949e}
+.spinner{width:40px;height:40px;margin-bottom:12px;border:3px solid #21262d;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.nodes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:24px}
+.node-card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px;cursor:pointer;transition:all .3s ease;position:relative;display:flex;flex-direction:column;gap:8px;min-width:160px}
+.node-card:hover{border-color:#58a6ff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(88,166,255,.15)}
+.node-card.food{border-left:3px solid #f0883e}
+.node-card.beauty{border-left:3px solid #f778ba}
+.node-badge{position:absolute;top:8px;right:8px;font-size:10px;padding:2px 6px;border-radius:10px;background:#21262d;color:#8b949e}
+.node-name{font-size:14px;font-weight:600;color:#e0e0e0}
+.node-volume{font-size:22px;font-weight:700}
+.node-volume.high{color:#3fb950}
+.node-volume.mid{color:#d29922}
+.node-volume.low{color:#8b949e}
+.node-children-hint{font-size:11px;color:#58a6ff}
+.node-bar{height:4px;background:#21262d;border-radius:2px;margin-top:4px}
+.node-bar-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.node-bar-fill.food{background:linear-gradient(90deg,#f0883e,#ffa657)}
+.node-bar-fill.beauty{background:linear-gradient(90deg,#f778ba,#ff9bce)}
+.videos-header,.accounts-header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #21262d;position:sticky;top:0;background:#0a0a1a;z-index:10}
+.videos-header h2,.accounts-header h2{font-size:16px;color:#e0e0e0}
+.sort-control select{background:#161b22;border:1px solid #30363d;color:#c9d1d9;padding:4px 8px;border-radius:6px;font-size:12px}
+.videos-grid,.accounts-grid{padding:16px 24px;display:flex;flex-direction:column;gap:8px}
+.video-card{display:grid;grid-template-columns:60px 1fr auto;gap:12px;align-items:center;padding:12px 16px;background:#161b22;border:1px solid #21262d;border-radius:8px;cursor:pointer;transition:all .2s}
+.video-card:hover{border-color:#30363d;background:#1c2129}
+.video-rank{font-size:24px;font-weight:700;color:#30363d;text-align:center}
+.video-rank.top3{color:#ffa657}
+.video-info{display:flex;flex-direction:column;gap:4px}
+.video-title{font-size:13px;font-weight:600;color:#e0e0e0}
+.video-meta{font-size:11px;color:#8b949e;display:flex;gap:12px;flex-wrap:wrap}
+.video-stats{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.video-views{font-size:16px;font-weight:700;color:#3fb950}
+.video-engagement{font-size:11px;color:#d29922}
+.platform-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600}
+.platform-badge.tiktok{background:#1a1a2e;color:#69c9d0}
+.platform-badge.instagram{background:#2a1a2e;color:#e1306c}
+.account-card{display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;padding:12px 16px;background:#161b22;border:1px solid #21262d;border-radius:8px;cursor:pointer;transition:all .2s}
+.account-card:hover{border-color:#30363d;background:#1c2129}
+.account-avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1f6feb,#58a6ff);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff}
+.account-info{display:flex;flex-direction:column;gap:2px}
+.account-name{font-size:14px;font-weight:600;color:#e0e0e0}
+.account-handle{font-size:12px;color:#8b949e}
+.account-meta{font-size:11px;color:#8b949e;display:flex;gap:12px}
+.account-stats{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.account-followers{font-size:14px;font-weight:700;color:#c9d1d9}
+.account-growth{font-size:13px;font-weight:600}
+.account-growth.positive{color:#3fb950}
+.account-growth.negative{color:#f85149}
+.side-panel{width:380px;background:#0d1117;border-left:1px solid #21262d;display:flex;flex-direction:column;overflow-y:auto;position:fixed;right:0;top:0;bottom:0;z-index:100;box-shadow:-4px 0 24px rgba(0,0,0,.3);transform:translateX(100%);transition:transform .3s ease}
+.side-panel.open{transform:translateX(0)}
+.panel-header{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #21262d;position:sticky;top:0;background:#0d1117;z-index:5}
+.panel-header h3{font-size:15px;color:#e0e0e0}
+.panel-close{background:none;border:none;color:#8b949e;font-size:24px;cursor:pointer;padding:0 4px;line-height:1}
+.panel-close:hover{color:#f85149}
+.panel-body{padding:16px;flex:1}
+.panel-section{margin-bottom:20px}
+.panel-section-title{font-size:12px;color:#8b949e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.panel-stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #161b22;font-size:13px}
+.panel-stat-label{color:#8b949e}
+.panel-stat-value{color:#e0e0e0;font-weight:600}
+.panel-tags{display:flex;flex-wrap:wrap;gap:4px}
+.panel-tag{font-size:11px;padding:2px 8px;border-radius:12px;background:#1f6feb22;color:#58a6ff;border:1px solid #1f6feb44}
+.hidden{display:none!important}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#484f58}
+@media(max-width:768px){.control-bar{padding:8px 12px;gap:8px}.toggle-btn{padding:4px 8px;font-size:11px}.nodes-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));padding:12px;gap:8px}.side-panel{width:100%}}
+</style>
+</head>
+<body>
+<header class="header"><div><span class="logo">SNS Research Tool</span><span class="logo-sub">食品 & 美容 キーワードマインドマップ</span></div></header>
+<div class="control-bar">
+<div class="control-group"><label>ジャンル</label><div class="toggle-group" id="genreToggle"><button class="toggle-btn active" data-value="food">🍱 食品</button><button class="toggle-btn" data-value="beauty">💄 美容</button></div></div>
+<div class="control-group"><label>プラットフォーム</label><div class="toggle-group" id="platformToggle"><button class="toggle-btn active" data-value="both">両方</button><button class="toggle-btn" data-value="tiktok">TikTok</button><button class="toggle-btn" data-value="instagram">Instagram</button></div></div>
+<div class="control-group"><label>期間</label><div class="toggle-group" id="periodToggle"><button class="toggle-btn" data-value="1week">1週間</button><button class="toggle-btn active" data-value="1month">1ヶ月</button><button class="toggle-btn" data-value="3months">3ヶ月</button><button class="toggle-btn" data-value="6months">半年</button><button class="toggle-btn" data-value="1year">1年</button></div></div>
+<div class="control-group"><label>表示</label><div class="toggle-group" id="viewToggle"><button class="toggle-btn active" data-value="mindmap">マインドマップ</button><button class="toggle-btn" data-value="videos">動画一覧</button><button class="toggle-btn" data-value="accounts">アカウント</button></div></div>
+</div>
+<div class="breadcrumb" id="breadcrumb"><span class="crumb active">トップ</span></div>
+<div class="main-content" id="mainContent">
+<div id="mindmapArea"><div class="nodes-grid" id="nodesGrid"></div></div>
+<div id="videosArea" class="hidden"><div class="videos-header"><h2 id="videosTitle">バズり動画一覧</h2><div class="sort-control"><select id="videoSort"><option value="views">再生数順</option><option value="likes">いいね順</option><option value="engagement">ER順</option><option value="recent">新しい順</option></select></div></div><div class="videos-grid" id="videosGrid"></div></div>
+<div id="accountsArea" class="hidden"><div class="accounts-header"><h2 id="accountsTitle">注目アカウント</h2><div class="sort-control"><select id="accountSort"><option value="growth">成長率順</option><option value="followers">フォロワー順</option><option value="engagement">ER順</option></select></div></div><div class="accounts-grid" id="accountsGrid"></div></div>
+</div>
+<div class="side-panel" id="sidePanel"><div class="panel-header"><h3 id="panelTitle">詳細</h3><button class="panel-close" onclick="closePanel()">&times;</button></div><div class="panel-body" id="panelBody"></div></div>
+
+<script>
+/* === 食品キーワードデータ === */
+const FOOD_DATA = {
+  "冷凍食品": {
+    volume: 89000, children: {
+      "冷凍パスタ": {volume:32000,children:{"マ・マー":12000,"日清":9500,"オーマイ":7200,"セブンプレミアム":5800,"ニップン":4200,"ローソン":3100,"トップバリュ":2800,"ファミマ":2500,"明治":2100,"デルモンテ":1800,"ハインツ":1500,"バリラ":1200,"ディチェコ":1000,"青の洞窟":3800,"予約でいっぱいの店":2900,"もちっと食感":2200,"大盛り":4100,"ナポリタン":5200,"ボロネーゼ":4800,"カルボナーラ":6100,"ペペロンチーノ":3200,"たらこ":4500,"明太子":3900,"ジェノベーゼ":2100,"ミートソース":5500,"和風":3300,"海老":2800,"きのこ":2400,"トマト":3600,"クリーム":4200,"バジル":1800,"ツナ":2000,"ベーコン":2500}},
+      "冷凍餃子": {volume:28000,children:{"味の素":11000,"大阪王将":8500,"餃子の王将":7200,"セブン冷凍餃子":5800,"ファミマ":3200,"ローソン":2800,"幸楽苑":2100,"リンガーハット":1800,"冷凍水餃子":4500,"羽根つき餃子":6200,"焼き餃子":7800,"蒸し餃子":2200,"海老餃子":3100,"しそ餃子":2500,"チーズ餃子":1900,"ニラ":3400,"キャベツ":2800,"にんにく":4200,"生姜":2100,"大葉":1700,"肉汁":5500,"パリパリ":4800,"ジューシー":5200,"皮もちもち":3600,"一口サイズ":2400,"BIG":3100,"レンジ":6500,"フライパン":4200,"ホットプレート":1800,"タレ":3400,"ポン酢":2100,"ラー油":2800,"酢":1500,"柚子胡椒":1200}},
+      "冷凍魚": {volume:22000,children:{"鮭":8200,"サバ":6800,"ブリ":4500,"ホッケ":3200,"赤魚":2800,"タラ":2400,"メカジキ":2100,"銀ダラ":3600,"アジ":2900,"サンマ":2200,"カレイ":1800,"西京漬け":4800,"塩焼き":5500,"みりん干し":3200,"煮付け":2800,"フライ":4200,"ムニエル":2400,"ホイル焼き":1900,"骨なし":6200,"骨取り":5800,"切り身":4500,"フィレ":3100,"一切れ":2700,"業務スーパー":5200,"コストコ":4800,"トップバリュ":2200,"セブン":3100,"ニチレイ":2800,"マルハニチロ":3400,"極洋":1500,"紀文":1200,"離乳食":2100,"お弁当":4500,"時短":5800,"簡単":6500}},
+      "冷凍うどん": {volume:18000,children:{"テーブルマーク":7200,"カトキチ":5800,"セブン":3200,"ファミマ":2500,"ローソン":2100,"きつねうどん":4500,"釜揚げ":3800,"ざるうどん":3200,"鍋焼き":4800,"カレーうどん":5200,"肉うどん":3600,"天ぷらうどん":2800,"とろろ":2100,"月見":1800,"わかめ":1500,"讃岐":6500,"稲庭":2200,"レンジ":7800,"鍋":4200,"つゆ":3500,"めんつゆ":2800,"白だし":2100}},
+      "冷凍チャーハン": {volume:25000,children:{"味の素":9800,"ニチレイ本格炒め":8500,"マルハニチロ":4200,"セブン":3600,"ファミマ":2800,"トップバリュ":2200,"冷凍ピラフ":5500,"エビチャーハン":4800,"五目":3200,"キムチ":2800,"ガーリック":3500,"高菜":2100,"カニ":1800,"あんかけ":2400,"パラパラ":7200,"べちゃべちゃ対策":3800}},
+      "冷凍ピザ": {volume:12000,children:{"ピザーラ":3200,"シャトレーゼ":4500,"コストコ":5800,"業務スーパー":4200,"セブン":2800,"トップバリュ":2100,"マルゲリータ":5500,"4種のチーズ":4200,"照り焼き":2800,"シーフード":2100}},
+      "アイスクリーム": {volume:35000,children:{"ハーゲンダッツ":12000,"MOW":5500,"スーパーカップ":8200,"雪見だいふく":6800,"パルム":4500,"ピノ":5200,"パピコ":3800,"あいすまんじゅう":2100,"チョコモナカ":6500,"サーティワン":4200}}
+    }
+  },
+  "時短レシピ": {
+    volume: 95000, children: {
+      "5分レシピ": {volume:38000,children:{"卵料理":8200,"スープ":6500,"サラダ":5800,"和え物":4200,"炒め物":7500,"丼もの":6800,"パスタ":5200,"おつまみ":4800,"朝食":6200,"お弁当":7800,"副菜":5500,"メイン":4200,"デザート":2800,"ドレッシング":2100,"ソース":1800,"タレ":2400,"レンジだけ":8500,"包丁なし":5200,"洗い物少ない":4800,"ワンパン":6500,"フライパンだけ":5800,"トースター":3200,"混ぜるだけ":7200,"かけるだけ":3800,"切って焼くだけ":4500}},
+      "10分レシピ": {volume:32000,children:{"メイン料理":9500,"副菜":6800,"スープ":5200,"サラダ":4500,"パスタ":7200,"丼":6500,"カレー":5800,"焼きそば":4200,"うどん":3800,"チャーハン":5500,"オムライス":4800,"ハンバーグ":3200,"唐揚げ":6200,"生姜焼き":5500,"肉じゃが":3800,"野菜炒め":4500}},
+      "作り置き": {volume:42000,children:{"日持ち1週間":12000,"冷凍OK":9800,"お弁当用":8500,"副菜":7200,"メイン":6500,"常備菜":8800,"きんぴら":4200,"ひじき":3500,"切り干し大根":3800,"なす":5200,"ピーマン":4800,"鶏むね":7500,"豚こま":6200,"ささみ":5500,"ツナ":4200,"ちくわ":3200}},
+      "ずぼら飯": {volume:28000,children:{"レンジ飯":9500,"ワンパン":7200,"缶詰アレンジ":5800,"冷凍食品アレンジ":6500,"もやし":4800,"豆腐":5200,"卵だけ":6800,"納豆":4200,"ツナ缶":5500,"サバ缶":4800,"コンビニ食材":3800,"業スー":5200}}
+    }
+  },
+  "ダイエット食": {
+    volume: 82000, children: {
+      "低糖質": {volume:35000,children:{"糖質ゼロ麺":6200,"オートミール":12000,"ブランパン":5800,"豆腐麺":4500,"しらたき":5200,"おからパウダー":7500,"大豆粉":3200,"アーモンドミルク":4800,"プロテインバー":8500,"低糖質スイーツ":6800,"糖質オフパン":5500,"ロカボ":4200,"コンビニ低糖質":7200,"シャトレーゼ糖質オフ":3800,"SUNAOアイス":5200}},
+      "高たんぱく": {volume:32000,children:{"鶏むね":9800,"ささみ":7500,"プロテイン":12000,"ギリシャヨーグルト":5800,"サラダチキン":8500,"ゆで卵":4200,"豆腐":5500,"納豆":4800,"魚":6200,"牛もも":3200,"豚ヒレ":2800,"エビ":3500,"いか":2100,"枝豆":4500,"プロテインバー":6800}},
+      "オートミール": {volume:38000,children:{"米化":12000,"おにぎり":8500,"お好み焼き":5800,"パンケーキ":6200,"リゾット":7500,"雑炊":5200,"チャーハン":4800,"クッキー":3800,"スムージー":4200,"オーバーナイト":6800,"グラノーラ":5500,"業スーオートミール":4200,"日食":3500,"クエーカー":2800,"ケロッグ":2100}},
+      "置き換え": {volume:18000,children:{"プロテインダイエット":6200,"スムージー":5800,"酵素ドリンク":4500,"青汁":3800,"チアシード":2800,"バターコーヒー":4200,"ファスティング":5200,"16時間断食":7500}}
+    }
+  },
+  "節約レシピ": {
+    volume: 78000, children: {
+      "もやし": {volume:22000,children:{"もやしナムル":8500,"もやし炒め":6200,"もやしスープ":5800,"もやしサラダ":4200,"もやし卵":5500,"もやしチーズ":3800,"もやし豚バラ":6800,"もやしラーメン":4500,"無限もやし":7200,"もやし節約術":3200}},
+      "豆腐": {volume:25000,children:{"豆腐ステーキ":5800,"麻婆豆腐":8200,"豆腐ハンバーグ":6500,"冷奴アレンジ":4800,"豆腐グラタン":3200,"豆腐チーズケーキ":5200,"揚げ出し豆腐":4500,"豆腐丼":3800,"豆腐サラダ":4200,"肉豆腐":5500}},
+      "鶏むね": {volume:28000,children:{"チキンカツ":5200,"よだれ鶏":6800,"タンドリーチキン":4500,"鶏ハム":7200,"チキン南蛮":8500,"照り焼き":5800,"蒸し鶏":6200,"鶏むね唐揚げ":7500,"下味冷凍":5500,"しっとり":9800}},
+      "業務スーパー": {volume:35000,children:{"冷凍野菜":8200,"冷凍肉":7500,"調味料":5800,"お菓子":6500,"チーズ":4800,"パスタソース":3200,"冷凍フルーツ":5200,"豆腐":2800,"もやし":2100,"鶏肉2kg":6800}}
+    }
+  },
+  "コンビニグルメ": {
+    volume: 72000, children: {
+      "セブンイレブン": {volume:32000,children:{"おにぎり":8200,"サンドイッチ":5800,"スイーツ":9500,"ホットスナック":6200,"冷凍食品":7500,"サラダ":4200,"パン":5500,"弁当":6800,"おでん":3800,"カップ麺":4500,"ドリンク":3200,"限定":7200}},
+      "ファミリーマート": {volume:22000,children:{"ファミチキ":8500,"スイーツ":7200,"おにぎり":5800,"パン":4500,"弁当":5200,"サラダ":3200,"ホットスナック":6800,"冷凍食品":4800,"ドリンク":2800,"限定":5500}},
+      "ローソン": {volume:18000,children:{"からあげクン":7200,"スイーツ":6800,"おにぎり":4500,"パン":5200,"バスチー":5800,"ナチュラルローソン":3200,"冷凍食品":4200,"弁当":3800,"ドリンク":2500,"限定":4800}}
+    }
+  },
+  "スイーツ": {
+    volume: 68000, children: {
+      "コンビニスイーツ": {volume:28000,children:{"プリン":6200,"シュークリーム":5800,"チーズケーキ":7500,"ティラミス":4200,"ロールケーキ":5500,"エクレア":3200,"大福":4800,"ケーキ":6800,"タルト":3500,"アイス":8500,"期間限定":7200,"新作":6500}},
+      "手作りスイーツ": {volume:22000,children:{"チョコ":7500,"クッキー":6200,"ケーキ":8500,"プリン":5800,"マフィン":4200,"パンケーキ":5500,"ドーナツ":4800,"タルト":3200,"ブラウニー":5200,"ティラミス":4500}},
+      "カフェスイーツ": {volume:18000,children:{"スタバ":8200,"コメダ":4500,"ドトール":2800,"タリーズ":2100,"サンマルク":1800,"スタバ新作":7500,"フラペチーノ":6800,"季節限定":5200,"テイクアウト":3500}}
+    }
+  }
+};
+/* === 美容キーワードデータ === */
+const BEAUTY_DATA = {
+  "プチプラ": {
+    volume: 98000, children: {
+      "化粧水": {volume:35000,children:{"ハトムギ化粧水":9800,"無印良品":8500,"肌ラボ":7200,"ちふれ":5800,"セザンヌ":4500,"メラノCC":6200,"なめらか本舗":3800,"菊正宗":3200,"アクアレーベル":4200,"ナチュリエ":5500,"1000円以下":8200,"500円以下":5800,"大容量":6500,"しっとり":7500,"さっぱり":5200,"美白":6800,"毛穴":7200,"ニキビ":5500,"乾燥肌":6200,"脂性肌":4800}},
+      "ファンデーション": {volume:28000,children:{"セザンヌ":6200,"キャンメイク":7500,"マジョマジョ":4200,"メイベリン":5800,"レブロン":4500,"ケイト":5200,"インテグレート":3800,"リキッド":7200,"パウダー":5500,"クッション":8500,"BBクリーム":6800,"CCクリーム":4200,"カバー力":7800,"崩れにくい":6500,"ツヤ":5200,"マット":3800,"乾燥しない":5800}},
+      "リップ": {volume:25000,children:{"キャンメイク":5800,"セザンヌ":4500,"ケイト":5200,"オペラ":7200,"ロムアンド":8500,"リカフロッシュ":3200,"ちふれ":2800,"ヴィセ":4200,"マジョマジョ":3500,"ティント":7800,"グロス":4500,"マット":3800,"シアー":5200,"ブラウン系":4800,"ピンク系":5500,"レッド系":3200,"コーラル":4200,"ベージュ":3800}},
+      "アイシャドウ": {volume:22000,children:{"キャンメイク":6500,"エクセル":7200,"セザンヌ":4800,"ケイト":5200,"マジョマジョ":3800,"ヴィセ":4500,"エチュード":5800,"ロムアンド":6200,"パレット":7500,"単色":4200,"ラメ":6800,"マット":3500,"ブラウン":5800,"ピンク":4500,"オレンジ":3200,"バーガンディ":2800}}
+    }
+  },
+  "スキンケア": {
+    volume: 92000, children: {
+      "毛穴ケア": {volume:38000,children:{"酵素洗顔":7200,"クレイパック":5800,"ビタミンC美容液":8500,"レチノール":6200,"AHA":4500,"BHA":3800,"毛穴パック":5200,"収れん化粧水":4200,"角栓除去":6800,"黒ずみ":7500,"開き毛穴":5800,"たるみ毛穴":4200,"いちご鼻":8200,"Tゾーン":3500,"頬":2800,"オバジ":5200,"メラノCC":6500,"タカミ":4800,"DUO":5800,"ファンケル":3200}},
+      "ニキビケア": {volume:32000,children:{"洗顔":7500,"化粧水":6200,"美容液":5800,"パッチ":4500,"ティーツリー":5200,"サリチル酸":3800,"ベンゾイル":2800,"ノンコメド":4200,"大人ニキビ":7200,"思春期ニキビ":5800,"顎ニキビ":4500,"おでこ":3200,"頬":2800,"背中":3500,"ペアアクネ":5500,"ビフナイト":2200,"メンソレータム":4800,"オルビス":3200,"NOV":2800}},
+      "美白": {volume:28000,children:{"ビタミンC":8500,"トラネキサム酸":6200,"アルブチン":4500,"ナイアシンアミド":7200,"美白美容液":6800,"美白化粧水":5800,"シミ対策":7500,"くすみ":5200,"トーンアップ":4800,"日焼け止め":8200,"HAKU":5500,"メラノCC":6200,"白潤":4200,"トランシーノ":3800,"ケシミン":3200}},
+      "乾燥対策": {volume:25000,children:{"セラミド":7200,"ヒアルロン酸":6500,"スクワラン":4200,"ワセリン":5800,"保湿クリーム":6800,"パック":5200,"ミスト":3500,"ボディクリーム":4800,"ハンドクリーム":4200,"リップクリーム":3800,"キュレル":5500,"ミノン":4200,"ヒフミド":2800,"松山油脂":2200,"無印":5800}}
+    }
+  },
+  "肌荒れ": {
+    volume: 75000, children: {
+      "敏感肌": {volume:28000,children:{"低刺激":7200,"無添加":5800,"オーガニック":4500,"アルコールフリー":5200,"パラベンフリー":3800,"セラミド":6500,"キュレル":5800,"ミノン":4200,"NOV":3200,"dプログラム":4800,"アベンヌ":3500,"ラロッシュポゼ":5200,"エトヴォス":2800,"アクセーヌ":2200,"肌に優しい":6800}},
+      "マスク荒れ": {volume:22000,children:{"摩擦":5200,"蒸れ":4500,"ニキビ":6800,"かゆみ":3800,"赤み":4200,"対策スプレー":2800,"保湿":5500,"下地":4800,"パウダー":3200,"マスク用コスメ":3500}},
+      "花粉肌荒れ": {volume:15000,children:{"バリア機能":4200,"スプレー":3500,"保湿":5200,"赤み":3800,"かゆみ":4500,"イハダ":5800,"dプログラム":3200,"アレルバリア":4200}},
+      "ストレス肌": {volume:10000,children:{"ホルモンバランス":3200,"睡眠":4500,"食事":3800,"サプリ":2800,"インナーケア":4200,"腸活":5200,"ビタミン":3500,"亜鉛":2200}}
+    }
+  },
+  "韓国コスメ": {
+    volume: 85000, children: {
+      "ベースメイク": {volume:32000,children:{"クッションファンデ":8500,"BBクリーム":5200,"下地":6800,"コンシーラー":5500,"パウダー":4200,"ミシャ":5800,"クリオ":6200,"ティルティル":7500,"VT":4800,"イニスフリー":3200,"エチュード":4500,"ラネージュ":3800,"トーンアップ":5200,"水光肌":7200,"ツヤ肌":5800}},
+      "リップ": {volume:28000,children:{"ロムアンド":8500,"ペリペラ":5200,"エチュード":4800,"クリオ":5500,"ヒンス":6200,"ティント":8200,"ベルベット":5800,"グロス":4200,"マット":3500,"グラデーション":6800,"MLBB":5200}},
+      "スキンケア": {volume:25000,children:{"CICA":7200,"ムグンファ":2200,"ドクダミ":4500,"パック":8500,"美容液":6800,"トナー":5200,"クリーム":4800,"VT":5500,"メディヒール":6200,"イニスフリー":3800,"ラネージュ":4200,"CNP":3500,"goodal":2800}}
+    }
+  },
+  "ヘアケア": {
+    volume: 65000, children: {
+      "シャンプー": {volume:28000,children:{"&honey":5800,"ボタニスト":5200,"YOLU":6500,"ダイアン":4200,"いち髪":3800,"ラックス":4500,"パンテーン":3200,"ミルボン":5500,"サロン品質":4800,"アミノ酸系":6200,"ノンシリコン":5500,"しっとり":4800,"さらさら":5200,"ダメージケア":6800,"頭皮ケア":4200,"フケ":3500,"かゆみ":2800,"くせ毛":5800,"猫っ毛":3200}},
+      "トリートメント": {volume:22000,children:{"フィーノ":8500,"ミルボン":5200,"&honey":4500,"YOLU":3800,"洗い流さない":7200,"ヘアオイル":8200,"ヘアミルク":5500,"ヘアマスク":4800,"モロッカンオイル":3200,"N.":5800,"サロン専売":4200,"プチプラ":6500,"ダメージ補修":5200,"ツヤ":4500}},
+      "カラー": {volume:15000,children:{"イルミナ":4200,"アディクシー":3500,"セルフカラー":5800,"インナーカラー":6200,"ハイライト":4500,"グラデーション":3800,"ブリーチ":5200,"暗髪":4800,"透明感":5500,"アッシュ":4200,"ベージュ":3800,"ピンク":2800}}
+    }
+  },
+  "日焼け止め": {
+    volume: 58000, children: {
+      "顔用": {volume:25000,children:{"アネッサ":6800,"ビオレ":5500,"スキンアクア":7200,"アリー":4200,"ラロッシュポゼ":5800,"キュレル":3200,"NOV":2800,"下地兼用":6500,"トーンアップ":7500,"SPF50":5200,"PA++++":4800,"石鹸で落ちる":5500,"紫外線吸収剤フリー":3800,"敏感肌用":4500}},
+      "ボディ用": {volume:18000,children:{"スプレー":5200,"ジェル":4500,"ミルク":5800,"スティック":3200,"ウォータープルーフ":6200,"汗に強い":5500,"塗り直し":4800,"大容量":3800,"子供用":2800,"アウトドア":3200}},
+      "プチプラ日焼け止め": {volume:15000,children:{"ビオレUV":5800,"スキンアクア":6200,"ニベア":4500,"サンカット":3200,"コパトーン":2800,"1000円以下":7200,"ドラッグストア":5500,"コスパ":6800}}
+    }
+  }
+};
+/* === 動画・アカウントモックデータ生成 === */
+function generateVideos(keyword, genre, platform, count=30) {
+  const platforms = platform === 'both' ? ['tiktok','instagram'] : [platform];
+  const vids = [];
+  for(let i=0;i<count;i++){
+    const p = platforms[i%platforms.length];
+    const views = Math.floor(Math.random()*5000000)+50000;
+    const likes = Math.floor(views*(Math.random()*0.08+0.02));
+    const comments = Math.floor(likes*(Math.random()*0.1+0.01));
+    const daysAgo = Math.floor(Math.random()*365);
+    const d = new Date(); d.setDate(d.getDate()-daysAgo);
+    vids.push({
+      id: 'v'+Math.random().toString(36).slice(2,8),
+      title: `【${keyword}】${genre==='food'?'これ知らないと損！':'マジで変わった！'}バズり動画#${i+1}`,
+      platform: p,
+      views, likes, comments,
+      shares: Math.floor(comments*(Math.random()*2+0.5)),
+      date: d.toISOString().slice(0,10),
+      daysAgo,
+      engagement: ((likes+comments)/views*100).toFixed(2),
+      account: `@${genre==='food'?'gourmet':'beauty'}_creator_${Math.floor(Math.random()*500)}`,
+      duration: Math.floor(Math.random()*120)+15,
+      keywords: [keyword, genre==='food'?'レシピ':'メイク', genre==='food'?'簡単':'おすすめ']
+    });
+  }
+  return vids.sort((a,b)=>b.views-a.views);
+}
+
+function generateAccounts(keyword, genre, platform, count=20) {
+  const platforms = platform === 'both' ? ['tiktok','instagram'] : [platform];
+  const accs = [];
+  for(let i=0;i<count;i++){
+    const p = platforms[i%platforms.length];
+    const followers = Math.floor(Math.random()*2000000)+1000;
+    const growth = (Math.random()*40-5).toFixed(1);
+    accs.push({
+      id: 'a'+Math.random().toString(36).slice(2,8),
+      name: `${genre==='food'?'グルメ':'美容'}クリエイター${i+1}`,
+      handle: `@${genre==='food'?'food':'beauty'}_${Math.random().toString(36).slice(2,7)}`,
+      platform: p,
+      followers,
+      growth: parseFloat(growth),
+      avgViews: Math.floor(followers*(Math.random()*0.3+0.05)),
+      avgEngagement: (Math.random()*8+1).toFixed(2),
+      posts: Math.floor(Math.random()*500)+10,
+      topKeyword: keyword
+    });
+  }
+  return accs.sort((a,b)=>b.growth-a.growth);
+}
+
+/* === 状態管理 === */
+let state = {
+  genre: 'food',
+  platform: 'both',
+  period: '1month',
+  view: 'mindmap',
+  path: [],
+  currentData: null
+};
+
+function getTopData() {
+  return state.genre === 'food' ? FOOD_DATA : BEAUTY_DATA;
+}
+
+function getDataAtPath() {
+  let data = getTopData();
+  for (const key of state.path) {
+    if (data[key] && data[key].children) data = data[key].children;
+    else if (data[key]) return null;
+    else return null;
+  }
+  return data;
+}
+
+function getPeriodMultiplier() {
+  const m = {
+    '1week': 0.15, '1month': 0.4, '3months': 0.7,
+    '6months': 0.85, '1year': 1.0
+  };
+  return m[state.period] || 1;
+}
+
+/* === 描画 === */
+function formatNum(n) {
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(1)+'K';
+  return n.toString();
+}
+
+function renderBreadcrumb() {
+  const el = document.getElementById('breadcrumb');
+  let html = `<span class="crumb ${state.path.length===0?'active':''}" onclick="navigateTo(-1)">トップ</span>`;
+  state.path.forEach((p, i) => {
+    html += `<span class="crumb-sep">›</span>`;
+    html += `<span class="crumb ${i===state.path.length-1?'active':''}" onclick="navigateTo(${i})">${p}</span>`;
+  });
+  el.innerHTML = html;
+}
+
+function renderMindmap() {
+  const grid = document.getElementById('nodesGrid');
+  const data = getDataAtPath();
+  if (!data) { grid.innerHTML = '<div class="loading">データがありません</div>'; return; }
+
+  const mult = getPeriodMultiplier();
+  const entries = Object.entries(data);
+  const maxVol = Math.max(...entries.map(([,v]) => typeof v === 'object' ? (v.volume||v) : v));
+  const cls = state.genre === 'food' ? 'food' : 'beauty';
+
+  let html = '';
+  entries.sort((a,b) => {
+    const va = typeof a[1]==='object' ? (a[1].volume||0) : a[1];
+    const vb = typeof b[1]==='object' ? (b[1].volume||0) : b[1];
+    return vb - va;
+  });
+
+  entries.forEach(([name, val]) => {
+    const vol = typeof val === 'object' ? (val.volume || 0) : val;
+    const adjVol = Math.floor(vol * mult);
+    const pct = (vol / maxVol * 100).toFixed(0);
+    const hasChildren = typeof val === 'object' && val.children;
+    const childCount = hasChildren ? Object.keys(val.children).length : 0;
+    const volClass = adjVol > 50000 ? 'high' : adjVol > 10000 ? 'mid' : 'low';
+    const level = state.path.length;
+
+    html += `<div class="node-card ${cls}" onclick="${hasChildren ? `drillDown('${name.replace(/'/g,"\\'")}')` : `showKeywordDetail('${name.replace(/'/g,"\\'")}', ${adjVol})`}">
+      <span class="node-badge">Lv${level+1}</span>
+      <div class="node-name">${name}</div>
+      <div class="node-volume ${volClass}">${formatNum(adjVol)}</div>
+      <div class="node-bar"><div class="node-bar-fill ${cls}" style="width:${pct}%"></div></div>
+      ${hasChildren ? `<div class="node-children-hint">▶ ${childCount}件の子キーワード</div>` : '<div class="node-children-hint">📊 詳細を見る</div>'}
+    </div>`;
+  });
+  grid.innerHTML = html;
+}
+
+function renderVideos() {
+  const keyword = state.path.length > 0 ? state.path[state.path.length-1] : (state.genre==='food'?'食品':'美容');
+  const videos = generateVideos(keyword, state.genre, state.platform);
+  const title = document.getElementById('videosTitle');
+  title.textContent = `「${keyword}」のバズり動画`;
+
+  const grid = document.getElementById('videosGrid');
+  let html = '';
+  videos.forEach((v,i) => {
+    html += `<div class="video-card" onclick="showVideoDetail(${JSON.stringify(v).replace(/"/g,'&quot;')})">
+      <div class="video-rank ${i<3?'top3':''}">${i+1}</div>
+      <div class="video-info">
+        <div class="video-title">${v.title}</div>
+        <div class="video-meta">
+          <span class="platform-badge ${v.platform}">${v.platform==='tiktok'?'TikTok':'Instagram'}</span>
+          <span>${v.account}</span>
+          <span>${v.date}</span>
+          <span>${v.duration}秒</span>
+        </div>
+      </div>
+      <div class="video-stats">
+        <div class="video-views">${formatNum(v.views)}再生</div>
+        <div class="video-engagement">ER ${v.engagement}%</div>
+      </div>
+    </div>`;
+  });
+  grid.innerHTML = html;
+}
+
+function renderAccounts() {
+  const keyword = state.path.length > 0 ? state.path[state.path.length-1] : (state.genre==='food'?'食品':'美容');
+  const accounts = generateAccounts(keyword, state.genre, state.platform);
+  const title = document.getElementById('accountsTitle');
+  title.textContent = `「${keyword}」の注目アカウント`;
+
+  const grid = document.getElementById('accountsGrid');
+  let html = '';
+  accounts.forEach(a => {
+    const growthCls = a.growth >= 0 ? 'positive' : 'negative';
+    html += `<div class="account-card" onclick="showAccountDetail(${JSON.stringify(a).replace(/"/g,'&quot;')})">
+      <div class="account-avatar">${a.name[0]}</div>
+      <div class="account-info">
+        <div class="account-name">${a.name}</div>
+        <div class="account-handle">${a.handle} <span class="platform-badge ${a.platform}">${a.platform==='tiktok'?'TikTok':'IG'}</span></div>
+        <div class="account-meta"><span>投稿${a.posts}件</span><span>平均${formatNum(a.avgViews)}再生</span></div>
+      </div>
+      <div class="account-stats">
+        <div class="account-followers">${formatNum(a.followers)}フォロワー</div>
+        <div class="account-growth ${growthCls}">${a.growth>=0?'+':''}${a.growth}%</div>
+      </div>
+    </div>`;
+  });
+  grid.innerHTML = html;
+}
+
+function render() {
+  document.getElementById('mindmapArea').classList.toggle('hidden', state.view !== 'mindmap');
+  document.getElementById('videosArea').classList.toggle('hidden', state.view !== 'videos');
+  document.getElementById('accountsArea').classList.toggle('hidden', state.view !== 'accounts');
+  renderBreadcrumb();
+  if(state.view === 'mindmap') renderMindmap();
+  else if(state.view === 'videos') renderVideos();
+  else renderAccounts();
+}
+
+/* === ナビゲーション === */
+function drillDown(name) {
+  state.path.push(name);
+  render();
+}
+
+function navigateTo(index) {
+  if(index < 0) state.path = [];
+  else state.path = state.path.slice(0, index+1);
+  render();
+}
+
+/* === サイドパネル === */
+function closePanel() {
+  document.getElementById('sidePanel').classList.remove('open');
+}
+
+function showKeywordDetail(name, vol) {
+  const panel = document.getElementById('sidePanel');
+  const title = document.getElementById('panelTitle');
+  const body = document.getElementById('panelBody');
+  title.textContent = name;
+  body.innerHTML = `
+    <div class="panel-section">
+      <div class="panel-section-title">キーワード情報</div>
+      <div class="panel-stat"><span class="panel-stat-label">検索ボリューム</span><span class="panel-stat-value">${formatNum(vol)}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">ジャンル</span><span class="panel-stat-value">${state.genre==='food'?'食品':'美容'}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">階層</span><span class="panel-stat-value">Lv${state.path.length+1}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">期間</span><span class="panel-stat-value">${state.period}</span></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">関連パス</div>
+      <div class="panel-tags">${state.path.map(p=>`<span class="panel-tag">${p}</span>`).join('')}<span class="panel-tag">${name}</span></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">推定パフォーマンス</div>
+      <div class="panel-stat"><span class="panel-stat-label">平均再生数</span><span class="panel-stat-value">${formatNum(Math.floor(vol*12+Math.random()*50000))}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">平均ER</span><span class="panel-stat-value">${(Math.random()*6+1.5).toFixed(2)}%</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">競合度</span><span class="panel-stat-value">${vol>30000?'高':vol>10000?'中':'低'}</span></div>
+    </div>`;
+  panel.classList.add('open');
+}
+
+function showVideoDetail(v) {
+  const panel = document.getElementById('sidePanel');
+  const title = document.getElementById('panelTitle');
+  const body = document.getElementById('panelBody');
+  title.textContent = '動画詳細';
+  body.innerHTML = `
+    <div class="panel-section">
+      <div class="panel-section-title">動画情報</div>
+      <div style="font-size:13px;color:#e0e0e0;margin-bottom:12px">${v.title}</div>
+      <div class="panel-stat"><span class="panel-stat-label">プラットフォーム</span><span class="panel-stat-value">${v.platform==='tiktok'?'TikTok':'Instagram'}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">再生数</span><span class="panel-stat-value">${formatNum(v.views)}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">いいね</span><span class="panel-stat-value">${formatNum(v.likes)}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">コメント</span><span class="panel-stat-value">${formatNum(v.comments)}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">シェア</span><span class="panel-stat-value">${formatNum(v.shares)}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">ER</span><span class="panel-stat-value">${v.engagement}%</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">投稿日</span><span class="panel-stat-value">${v.date}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">長さ</span><span class="panel-stat-value">${v.duration}秒</span></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">アカウント</div>
+      <div style="font-size:14px;font-weight:600;color:#58a6ff">${v.account}</div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">キーワード</div>
+      <div class="panel-tags">${v.keywords.map(k=>`<span class="panel-tag">${k}</span>`).join('')}</div>
+    </div>`;
+  panel.classList.add('open');
+}
+
+function showAccountDetail(a) {
+  const panel = document.getElementById('sidePanel');
+  const title = document.getElementById('panelTitle');
+  const body = document.getElementById('panelBody');
+  title.textContent = a.name;
+  body.innerHTML = `
+    <div class="panel-section">
+      <div class="panel-section-title">アカウント情報</div>
+      <div class="panel-stat"><span class="panel-stat-label">ハンドル</span><span class="panel-stat-value">${a.handle}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">プラットフォーム</span><span class="panel-stat-value">${a.platform==='tiktok'?'TikTok':'Instagram'}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">フォロワー</span><span class="panel-stat-value">${formatNum(a.followers)}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">成長率</span><span class="panel-stat-value" style="color:${a.growth>=0?'#3fb950':'#f85149'}">${a.growth>=0?'+':''}${a.growth}%</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">平均再生数</span><span class="panel-stat-value">${formatNum(a.avgViews)}</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">平均ER</span><span class="panel-stat-value">${a.avgEngagement}%</span></div>
+      <div class="panel-stat"><span class="panel-stat-label">投稿数</span><span class="panel-stat-value">${a.posts}</span></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">注力キーワード</div>
+      <div class="panel-tags"><span class="panel-tag">${a.topKeyword}</span></div>
+    </div>`;
+  panel.classList.add('open');
+}
+
+/* === イベント設定 === */
+function setupToggles(groupId, stateKey) {
+  const group = document.getElementById(groupId);
+  group.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      group.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state[stateKey] = btn.dataset.value;
+      closePanel();
+      render();
+    });
+  });
+}
+
+setupToggles('genreToggle','genre');
+setupToggles('platformToggle','platform');
+setupToggles('periodToggle','period');
+setupToggles('viewToggle','view');
+
+/* === 初期描画 === */
+render();
+</script>
+</body>
+</body>
+</html>
