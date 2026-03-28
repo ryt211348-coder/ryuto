@@ -105,46 +105,19 @@ def discover_trending_keywords(period_months: int = 3,
     console.print("\n[bold cyan]トレンドキーワードを自動発見中...[/bold cyan]")
     results = []
 
-    for seed in TREND_SEED_KEYWORDS:
-        try:
-            videos = search_tiktok_videos(
-                seed, min_views=0,  # 発見フェーズではフィルタを緩める
-                period_months=period_months * 2, max_results=10,
-            )
-            if not videos:
-                continue
+    # まずAPIが使えるか素早くチェック（1キーワードだけ試す）
+    api_available = False
+    try:
+        test_videos = search_tiktok_videos("ニキビ", min_views=0, period_months=12, max_results=3)
+        if test_videos:
+            api_available = True
+            console.print("  [green]API接続OK[/green]")
+    except Exception:
+        pass
 
-            # min_views以上の動画だけでスコア計算
-            viral = [v for v in videos if v.views >= min_views]
-            total_views = sum(v.views for v in videos)
-            avg_views = total_views // len(videos) if videos else 0
-            avg_eng = sum(_calc_engagement_rate(v) for v in videos) / len(videos)
-            top_views = max(v.views for v in videos)
-
-            hooks = []
-            for v in sorted(videos, key=lambda x: x.views, reverse=True)[:3]:
-                text = v.transcript or v.description or v.title
-                if text:
-                    hooks.append(text[:30])
-
-            kw = TrendKeyword(
-                keyword=seed,
-                estimated_volume=total_views,
-                avg_views=avg_views,
-                avg_engagement=avg_eng,
-                top_video_views=top_views,
-                video_count=len(videos),
-                sample_hooks=hooks,
-            )
-            results.append(kw)
-            console.print(f"  [green]{seed}: {len(videos)}本, 平均{avg_views:,}再生[/green]")
-
-        except Exception as e:
-            console.print(f"  [dim]{seed}: {e}[/dim]")
-
-    # API検索が全て失敗した場合: シードキーワードをそのまま候補として返す
-    if not results:
-        console.print("  [yellow]API検索が利用できません。おすすめキーワードを提示します。[/yellow]")
+    if not api_available:
+        # APIが使えない場合: すぐにおすすめキーワードを返す（待たせない）
+        console.print("  [yellow]API未接続。おすすめキーワードを提示します。[/yellow]")
         top_seeds = [
             ("ニキビ スキンケア", "ニキビの原因・対策・ケア方法"),
             ("毛穴 ケア", "毛穴の黒ずみ・角栓・いちご鼻対策"),
@@ -167,6 +140,41 @@ def discover_trending_keywords(period_months: int = 3,
                 video_count=0,
                 sample_hooks=[desc],
             ))
+        return results
+
+    # APIが使える場合: 上位5キーワードだけ検索（全30+は遅すぎる）
+    priority_seeds = TREND_SEED_KEYWORDS[:8]
+    for seed in priority_seeds:
+        try:
+            videos = search_tiktok_videos(
+                seed, min_views=0, period_months=period_months * 2, max_results=10,
+            )
+            if not videos:
+                continue
+
+            total_views = sum(v.views for v in videos)
+            avg_views = total_views // len(videos) if videos else 0
+            avg_eng = sum(_calc_engagement_rate(v) for v in videos) / len(videos)
+            top_views = max(v.views for v in videos)
+
+            hooks = []
+            for v in sorted(videos, key=lambda x: x.views, reverse=True)[:3]:
+                text = v.transcript or v.description or v.title
+                if text:
+                    hooks.append(text[:30])
+
+            results.append(TrendKeyword(
+                keyword=seed,
+                estimated_volume=total_views,
+                avg_views=avg_views,
+                avg_engagement=avg_eng,
+                top_video_views=top_views,
+                video_count=len(videos),
+                sample_hooks=hooks,
+            ))
+            console.print(f"  [green]{seed}: {len(videos)}本[/green]")
+        except Exception as e:
+            console.print(f"  [dim]{seed}: {e}[/dim]")
 
     results.sort(key=lambda k: k.estimated_volume * (1 + k.avg_engagement) + 1, reverse=True)
     return results[:max_keywords]
