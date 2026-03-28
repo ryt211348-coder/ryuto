@@ -645,55 +645,199 @@ def _get_account_tiktokapi(username: str) -> Optional[TikTokAccount]:
 # ===== Web Search Fallback =====
 
 def _search_web_fallback(keyword: str, max_results: int = 20) -> list[TikTokVideo]:
-    """Web検索でTikTok動画を探すフォールバック（複数検索エンジン対応）."""
+    """TikTok検索ページ + Web検索で動画を探す（完全無料）."""
     videos = []
     seen_ids = set()
 
-    # 方法1: DuckDuckGo（ブロックされにくい）
+    # 方法1: TikTok検索ページに直接アクセス
     try:
-        search_query = f"site:tiktok.com {keyword}"
-        resp = http_requests.get(
-            "https://html.duckduckgo.com/html/",
-            params={"q": search_query},
-            headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            },
-            timeout=15,
-        )
-        if resp.status_code == 200:
-            _extract_tiktok_urls(resp.text, videos, seen_ids)
-            if videos:
-                console.print(f"  [green]DuckDuckGo: {len(videos)}件取得[/green]")
+        _search_tiktok_direct(keyword, videos, seen_ids, max_results)
+        if videos:
+            console.print(f"  [green]TikTok直接検索: {len(videos)}件取得[/green]")
     except Exception as e:
-        console.print(f"  [dim]DuckDuckGo: {e}[/dim]")
+        console.print(f"  [dim]TikTok直接検索: {e}[/dim]")
 
-    # 方法2: Google（DuckDuckGoで不足の場合）
+    # 方法2: DuckDuckGo
     if len(videos) < 5:
         try:
-            search_query = f"site:tiktok.com {keyword} スキンケア"
-            resp = http_requests.get(
-                "https://www.google.com/search",
-                params={"q": search_query, "num": 20},
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                },
-                timeout=15,
-            )
-            if resp.status_code == 200:
-                _extract_tiktok_urls(resp.text, videos, seen_ids)
-                if videos:
-                    console.print(f"  [green]Google: {len(videos)}件取得[/green]")
+            for query in [f"site:tiktok.com {keyword}", f"tiktok {keyword} バズ 再生"]:
+                resp = http_requests.get(
+                    "https://html.duckduckgo.com/html/",
+                    params={"q": query},
+                    headers={"User-Agent": _ua()},
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    _extract_tiktok_urls(resp.text, videos, seen_ids)
+            if videos:
+                console.print(f"  [green]DuckDuckGo: {len(videos)}件取得[/green]")
+        except Exception as e:
+            console.print(f"  [dim]DuckDuckGo: {e}[/dim]")
+
+    # 方法3: Google
+    if len(videos) < 5:
+        try:
+            for query in [f"site:tiktok.com {keyword}", f"tiktok.com {keyword} 万再生"]:
+                resp = http_requests.get(
+                    "https://www.google.com/search",
+                    params={"q": query, "num": 20},
+                    headers={"User-Agent": _ua()},
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    _extract_tiktok_urls(resp.text, videos, seen_ids)
+            if videos:
+                console.print(f"  [green]Google: {len(videos)}件取得[/green]")
         except Exception as e:
             console.print(f"  [dim]Google: {e}[/dim]")
 
     return videos[:max_results]
 
 
+def _ua():
+    """ブラウザっぽいUser-Agent."""
+    return ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
+
+
+def _search_tiktok_direct(keyword: str, videos: list, seen_ids: set, max_results: int = 20):
+    """TikTokの検索ページから動画データを取得する."""
+    import urllib.parse
+    encoded = urllib.parse.quote(keyword)
+    url = f"https://www.tiktok.com/search/video?q={encoded}"
+
+    headers = {
+        "User-Agent": _ua(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+        "Referer": "https://www.tiktok.com/",
+    }
+
+    resp = http_requests.get(url, headers=headers, timeout=20)
+    if resp.status_code != 200:
+        return
+
+    # TikTokページに埋め込まれたJSONデータを抽出
+    # __UNIVERSAL_DATA_FOR_REHYDRATION__ スクリプトタグを探す
+    json_match = re.search(
+        r'<script\s+id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>',
+        resp.text, re.DOTALL
+    )
+
+    if json_match:
+        try:
+            data = json.loads(json_match.group(1))
+            _parse_tiktok_search_json(data, videos, seen_ids, max_results)
+            return
+        except json.JSONDecodeError:
+            pass
+
+    # SIGI_STATE も試す
+    sigi_match = re.search(
+        r'<script\s+id="SIGI_STATE"[^>]*>(.*?)</script>',
+        resp.text, re.DOTALL
+    )
+    if sigi_match:
+        try:
+            data = json.loads(sigi_match.group(1))
+            _parse_tiktok_sigi_state(data, videos, seen_ids, max_results)
+            return
+        except json.JSONDecodeError:
+            pass
+
+    # 最後の手段: HTMLからURLを直接抽出
+    _extract_tiktok_urls(resp.text, videos, seen_ids)
+
+
+def _parse_tiktok_search_json(data: dict, videos: list, seen_ids: set, max_results: int):
+    """TikTokの__UNIVERSAL_DATA_FOR_REHYDRATION__からデータを抽出."""
+    # データ構造を探索
+    def _find_items(obj, depth=0):
+        if depth > 8 or len(videos) >= max_results:
+            return
+        if isinstance(obj, dict):
+            # 動画データっぽい構造を検出
+            vid_id = str(obj.get("id", obj.get("video_id", "")))
+            stats = obj.get("stats", obj.get("statistics", {}))
+            author = obj.get("author", {})
+
+            if vid_id and isinstance(stats, dict) and stats.get("playCount", stats.get("play_count")):
+                if vid_id not in seen_ids:
+                    seen_ids.add(vid_id)
+                    username = ""
+                    if isinstance(author, dict):
+                        username = author.get("uniqueId", author.get("username", ""))
+
+                    v = TikTokVideo(
+                        video_id=vid_id,
+                        url=f"https://www.tiktok.com/@{username}/video/{vid_id}" if username else "",
+                        title=(obj.get("desc", "") or "")[:100],
+                        description=obj.get("desc", ""),
+                        views=int(stats.get("playCount", stats.get("play_count", 0)) or 0),
+                        likes=int(stats.get("diggCount", stats.get("like_count", 0)) or 0),
+                        comments=int(stats.get("commentCount", stats.get("comment_count", 0)) or 0),
+                        shares=int(stats.get("shareCount", stats.get("share_count", 0)) or 0),
+                        duration=int(obj.get("video", {}).get("duration", 0) or 0),
+                        upload_timestamp=int(obj.get("createTime", 0) or 0),
+                        account_name=username,
+                        account_url=f"https://www.tiktok.com/@{username}" if username else "",
+                        account_id=username,
+                    )
+                    if v.upload_timestamp:
+                        try:
+                            v.upload_date = datetime.fromtimestamp(v.upload_timestamp).strftime("%Y-%m-%d")
+                        except (ValueError, OSError):
+                            pass
+                    videos.append(v)
+                return
+
+            for val in obj.values():
+                _find_items(val, depth + 1)
+        elif isinstance(obj, list):
+            for item in obj:
+                _find_items(item, depth + 1)
+
+    _find_items(data)
+
+
+def _parse_tiktok_sigi_state(data: dict, videos: list, seen_ids: set, max_results: int):
+    """TikTokのSIGI_STATEからデータを抽出."""
+    item_module = data.get("ItemModule", {})
+    if isinstance(item_module, dict):
+        for vid_id, item in item_module.items():
+            if len(videos) >= max_results:
+                break
+            if vid_id in seen_ids:
+                continue
+            seen_ids.add(vid_id)
+
+            stats = item.get("stats", {})
+            username = item.get("author", "")
+
+            v = TikTokVideo(
+                video_id=vid_id,
+                url=f"https://www.tiktok.com/@{username}/video/{vid_id}" if username else "",
+                title=(item.get("desc", "") or "")[:100],
+                description=item.get("desc", ""),
+                views=int(stats.get("playCount", 0) or 0),
+                likes=int(stats.get("diggCount", 0) or 0),
+                comments=int(stats.get("commentCount", 0) or 0),
+                shares=int(stats.get("shareCount", 0) or 0),
+                duration=int(item.get("video", {}).get("duration", 0) or 0),
+                upload_timestamp=int(item.get("createTime", 0) or 0),
+                account_name=username,
+                account_url=f"https://www.tiktok.com/@{username}" if username else "",
+            )
+            if v.upload_timestamp:
+                try:
+                    v.upload_date = datetime.fromtimestamp(v.upload_timestamp).strftime("%Y-%m-%d")
+                except (ValueError, OSError):
+                    pass
+            videos.append(v)
+
+
 def _extract_tiktok_urls(html_text: str, videos: list, seen_ids: set):
     """HTMLテキストからTikTok動画URLを抽出してvideosリストに追加する."""
-    # @username/video/id パターン
     matches = re.findall(r'tiktok\.com/@([\w.]+)/video/(\d+)', html_text)
     for username, vid_id in matches:
         if vid_id in seen_ids:
