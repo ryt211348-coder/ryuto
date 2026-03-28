@@ -150,3 +150,124 @@ STYLE_RULES = {
         "怒りの声色が足りないと訴求が弱くなる",
     ],
 }
+
+
+# キーワードごとの関連動画・アカウント情報
+KEYWORD_REFERENCES = {
+    "ニキビ スキンケア": {
+        "desc": "ニキビの原因・対策・ケア方法",
+        "videos": [
+            {"title": "ニキビに効く生活ハック方法", "views": 4900000, "account": "@health_hack_ai"},
+            {"title": "ニキビ対策のライフハック", "views": 1100000, "account": "@life_upgrade_lab.jp"},
+            {"url": "https://www.tiktok.com/@biyouhin_honne/video/7609971102311255317", "title": "ニキビに悩んでるお前たち聞け！", "views": 100000, "account": "@biyouhin_honne"},
+        ],
+        "accounts": [
+            {"name": "@health_hack_ai", "url": "https://www.tiktok.com/@health_hack_ai", "note": "AIスキンケア系"},
+            {"name": "@biyouhin_honne", "url": "https://www.tiktok.com/@biyouhin_honne", "note": "美容品本音レビュー"},
+            {"name": "@uraakahost", "url": "https://www.tiktok.com/@uraakahost", "note": "ニキビ擬人化系"},
+        ],
+    },
+    "毛穴 ケア": {
+        "desc": "毛穴の黒ずみ・角栓・いちご鼻対策",
+        "videos": [
+            {"url": "https://www.tiktok.com/@monotachinohonne/video/7610772635319864583", "title": "よぉ！俺は角栓だ！", "views": 2500000, "account": "@monotachinohonne"},
+            {"title": "毛穴に悩んでるお前たち聞け！", "views": 800000, "account": "@biyouhin_honne"},
+        ],
+        "accounts": [
+            {"name": "@monotachinohonne", "url": "https://www.tiktok.com/@monotachinohonne", "note": "モノの本音・擬人化系"},
+            {"name": "@biyouhin_honne", "url": "https://www.tiktok.com/@biyouhin_honne", "note": "美容品本音レビュー"},
+            {"name": "@health_hack_ai", "url": "https://www.tiktok.com/@health_hack_ai", "note": "AIスキンケア系"},
+        ],
+    },
+    "スキンケア ルーティン": {
+        "desc": "朝夜のスキンケア手順",
+        "videos": [
+            {"title": "最近の保湿ライフハック", "views": 3800000, "account": "@life_hack_ai_world"},
+            {"url": "https://www.tiktok.com/@biyouhin_honne/video/7609598384671853845", "title": "スキンケアにお金かけてるお前たち聞け！", "views": 1600000, "account": "@biyouhin_honne"},
+        ],
+        "accounts": [
+            {"name": "@life_hack_ai_world", "url": "https://www.tiktok.com/@life_hack_ai_world", "note": "ライフハック系"},
+            {"name": "@biyouhin_honne", "url": "https://www.tiktok.com/@biyouhin_honne", "note": "美容品本音レビュー"},
+            {"name": "@cosme_plus", "url": "https://www.tiktok.com/@cosme_plus", "note": "コスメ情報"},
+        ],
+    },
+    "美白 透明感": {
+        "desc": "くすみ対策・トーンアップ・ビタミンC美容液",
+        "videos": [
+            {"title": "最近の保湿ライフハック（ビタミンC美容液パート）", "views": 3800000, "account": "@life_hack_ai_world"},
+            {"title": "美容液の効果を最大限に引き出す方法", "views": 1700000, "account": "@biyouhin_honne"},
+        ],
+        "accounts": [
+            {"name": "@biyouhin_honne", "url": "https://www.tiktok.com/@biyouhin_honne", "note": "美容品本音レビュー"},
+            {"name": "@life_hack_ai_world", "url": "https://www.tiktok.com/@life_hack_ai_world", "note": "ライフハック系"},
+        ],
+    },
+    "乾燥肌 保湿": {
+        "desc": "保湿ケア・インナードライ対策",
+        "videos": [
+            {"title": "最近の保湿ライフハック", "views": 3800000, "account": "@life_hack_ai_world"},
+            {"title": "インナードライのお前達聞け！", "views": 780000, "account": "@biyouhin_honne"},
+        ],
+        "accounts": [
+            {"name": "@life_hack_ai_world", "url": "https://www.tiktok.com/@life_hack_ai_world", "note": "ライフハック系"},
+            {"name": "@biyouhin_honne", "url": "https://www.tiktok.com/@biyouhin_honne", "note": "美容品本音レビュー"},
+        ],
+    },
+    "韓国 スキンケア": {
+        "desc": "韓国コスメ・アヌア・クオリティファーストなど話題の商品",
+        "videos": [
+            {"title": "フェイスパックの活用法と美容の秘訣", "views": 1200000, "account": "@biyouhin_honne"},
+        ],
+        "accounts": [
+            {"name": "@biyouhin_honne", "url": "https://www.tiktok.com/@biyouhin_honne", "note": "美容品本音レビュー"},
+            {"name": "@cosme_plus", "url": "https://www.tiktok.com/@cosme_plus", "note": "コスメ情報"},
+        ],
+    },
+    "敏感肌 赤み 鎮静": {
+        "desc": "敏感肌向けスキンケア・CICA",
+        "videos": [
+            {"title": "肌質のわからないお前たち聞け！", "views": 950000, "account": "@biyouhin_honne"},
+        ],
+        "accounts": [
+            {"name": "@biyouhin_honne", "url": "https://www.tiktok.com/@biyouhin_honne", "note": "美容品本音レビュー"},
+            {"name": "@tokyo.esthetic", "url": "https://www.tiktok.com/@tokyo.esthetic", "note": "エステ系"},
+        ],
+    },
+    "ニキビ跡 治し方": {
+        "desc": "ニキビ跡・クレーター対策",
+        "videos": [
+            {"title": "ニキビに効く生活ハック方法（紫ニキビ→クレーター警告）", "views": 4900000, "account": "@health_hack_ai"},
+            {"title": "角質ケアの効果的な方法：ハーブピーリング", "views": 1100000, "account": "@life_upgrade_lab.jp"},
+        ],
+        "accounts": [
+            {"name": "@health_hack_ai", "url": "https://www.tiktok.com/@health_hack_ai", "note": "AIスキンケア系"},
+            {"name": "@beauty_ai_biyouzatsugaku", "url": "https://www.tiktok.com/@beauty_ai_biyouzatsugaku", "note": "美容AI雑学"},
+        ],
+    },
+    "美容 ライフハック": {
+        "desc": "美容の裏技・豆知識・擬人化フォーマット",
+        "videos": [
+            {"title": "ニキビに効く生活ハック方法", "views": 4900000, "account": "@health_hack_ai"},
+            {"url": "https://www.tiktok.com/@life_hack_ai_world/video/7604846779409943809", "title": "俺様を1週間も放置するとは（枕擬人化）", "views": 3600000, "account": "@life_hack_ai_world"},
+            {"title": "俺は髪の毛", "views": 2300000, "account": "@lifeha9man"},
+        ],
+        "accounts": [
+            {"name": "@life_hack_ai_world", "url": "https://www.tiktok.com/@life_hack_ai_world", "note": "ライフハック系 360万再生"},
+            {"name": "@health_hack_ai", "url": "https://www.tiktok.com/@health_hack_ai", "note": "AIスキンケア系 490万再生"},
+            {"name": "@lifeha9man", "url": "https://www.tiktok.com/@lifeha9man", "note": "ライフハック系 230万再生"},
+        ],
+    },
+    "擬人化 スキンケア": {
+        "desc": "コスメ・肌悩み擬人化フォーマット（最も伸びるフォーマット）",
+        "videos": [
+            {"title": "ニキビに効く生活ハック方法（ニキビ擬人化）", "views": 4900000, "account": "@health_hack_ai"},
+            {"title": "最近の保湿ライフハック（コスメ擬人化）", "views": 3800000, "account": "@life_hack_ai_world"},
+            {"url": "https://www.tiktok.com/@monotachinohonne/video/7610772635319864583", "title": "よぉ！俺は角栓だ！", "views": 2500000, "account": "@monotachinohonne"},
+        ],
+        "accounts": [
+            {"name": "@monotachinohonne", "url": "https://www.tiktok.com/@monotachinohonne", "note": "モノの本音・擬人化特化"},
+            {"name": "@life_hack_ai_world", "url": "https://www.tiktok.com/@life_hack_ai_world", "note": "ライフハック擬人化"},
+            {"name": "@health_hack_ai", "url": "https://www.tiktok.com/@health_hack_ai", "note": "AI美容擬人化"},
+        ],
+    },
+}
