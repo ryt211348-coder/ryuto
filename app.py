@@ -20,22 +20,14 @@ from tiktok_analyzer.analyzer import (
     generate_report,
 )
 from tiktok_analyzer.planner import (
-    parse_csv,
     analyze_researched_videos,
-    generate_plans,
-    format_plans_for_display,
-    get_research_summary,
-    get_builtin_reference_style,
 )
 from tiktok_analyzer.researcher import (
     search_tiktok_videos,
-    get_video_transcript,
     get_account_info,
     format_account_for_display,
-    discover_trending_keywords,
     score_videos_by_engagement,
     analyze_account_personality,
-    format_trend_keyword_for_display,
 )
 
 app = Flask(__name__)
@@ -302,65 +294,95 @@ def planner():
     return render_template("planner.html")
 
 
-# 企画メーカー用ジョブ管理
-planner_jobs = {}
+# ===== 美容動画リサーチ API =====
+research_jobs = {}
+
+# 美容系ハッシュタグ（検索に使用）
+BEAUTY_HASHTAGS = [
+    "スキンケア", "ニキビ", "毛穴", "美白", "韓国コスメ",
+    "美容", "コスメレビュー", "スキンケアルーティン", "肌荒れ",
+    "保湿", "美容液", "プチプラコスメ", "敏感肌", "シミ",
+    "ニキビケア", "美肌", "垢抜け", "メイク", "化粧水",
+]
 
 
-def run_research(job_id: str, keywords: list, min_views: int,
-                 hook_period_months: int, search_period_months: int,
-                 max_plans: int):
-    """バックグラウンドでTikTokリサーチ→企画生成を実行する."""
-    job = planner_jobs[job_id]
+def run_beauty_search(job_id: str, platform: str, period_days: int,
+                      min_views: int, limit: int):
+    """バックグラウンドで美容動画を検索する."""
+    job = research_jobs[job_id]
+    all_videos = []
+    seen_ids = set()
 
     try:
-        # Step 1: TikTokライブ検索
         job["status"] = "searching"
-        all_videos = []
-        seen_ids = set()
 
-        for i, keyword in enumerate(keywords):
-            job["message"] = f"TikTokで「{keyword}」を検索中... ({i+1}/{len(keywords)})"
+        for i, tag in enumerate(BEAUTY_HASHTAGS):
+            if len(all_videos) >= limit:
+                break
+            job["message"] = f"「{tag}」を検索中... ({i+1}/{len(BEAUTY_HASHTAGS)}) 現在{len(all_videos)}件"
+
             try:
                 videos = search_tiktok_videos(
-                    keyword, min_views=0,
-                    period_months=search_period_months, max_results=15,
+                    tag, min_views=0,
+                    period_months=max(period_days // 30, 1),
+                    max_results=min(limit // 3, 50),
                 )
                 for v in videos:
-                    if v.video_id not in seen_ids:
+                    if v.video_id and v.video_id not in seen_ids:
                         all_videos.append(v)
                         seen_ids.add(v.video_id)
             except Exception as e:
-                job["message"] = f"検索中にエラー: {e}"
+                job["message"] = f"「{tag}」検索エラー: {e}"
 
         if not all_videos:
             job["status"] = "error"
-            job["message"] = "TikTokから動画を取得できませんでした。Playwright/yt-dlpのインストールを確認してください。"
+            job["message"] = "動画を取得できませんでした。Playwright + Chromiumがインストールされているか確認してください。"
             return
 
         # エンゲージメントスコア付与
         all_videos = score_videos_by_engagement(all_videos)
-        job["message"] = f"{len(all_videos)}本の動画を取得"
 
-        # Step 2: 分析
-        job["status"] = "analyzing"
-        job["message"] = "フック・コンテンツを分析中..."
-        analysis = analyze_researched_videos(all_videos, hook_period_months=hook_period_months)
+        # フィルタリング: 再生数
+        if min_views > 0:
+            all_videos = [v for v in all_videos if v.views >= min_views]
 
-        # Step 3: 企画生成
-        job["status"] = "generating"
-        job["message"] = "企画台本を生成中..."
+        # ソート: 再生数順
+        all_videos.sort(key=lambda v: v.views, reverse=True)
+        all_videos = all_videos[:limit]
 
-        ref_style = get_builtin_reference_style()
-        plans = generate_plans(analysis, max_plans=max_plans)
-        plans_display = format_plans_for_display(plans)
-        summary = get_research_summary(analysis)
+        # 結果を整形
+        video_list = []
+        accounts = set()
+        total_views = 0
+        for v in all_videos:
+            total_views += v.views
+            if v.account_name:
+                accounts.add(v.account_name)
+            video_list.append({
+                "video_id": v.video_id,
+                "url": v.url,
+                "title": v.title,
+                "description": v.description[:100] if v.description else "",
+                "views": v.views,
+                "likes": v.likes,
+                "comments": v.comments,
+                "shares": v.shares,
+                "duration": v.duration,
+                "upload_date": v.upload_date,
+                "account_name": v.account_name,
+                "account_url": v.account_url,
+                "thumbnail": v.thumbnail,
+            })
 
         job["status"] = "completed"
-        job["message"] = "企画生成完了！"
+        job["message"] = f"{len(video_list)}件の動画を取得完了"
         job["result"] = {
-            "plans": plans_display,
-            "summary": summary,
-            "reference_style": ref_style,
+            "videos": video_list,
+            "summary": {
+                "total_views": total_views,
+                "avg_views": total_views // len(video_list) if video_list else 0,
+                "unique_accounts": len(accounts),
+            },
         }
 
     except Exception as e:
@@ -368,79 +390,52 @@ def run_research(job_id: str, keywords: list, min_views: int,
         job["message"] = f"エラーが発生しました: {str(e)}"
 
 
-@app.route("/api/planner/discover", methods=["POST"])
-def planner_discover():
-    """トレンドキーワードを自動発見する."""
+@app.route("/api/research/search", methods=["POST"])
+def research_search():
     data = request.get_json()
+    platform = data.get("platform", "tiktok")
+    period_days = int(data.get("period_days", 30))
     min_views = int(data.get("min_views", 500_000))
-    period_months = int(data.get("search_period_months", 6))
-
-    try:
-        keywords = discover_trending_keywords(
-            period_months=period_months,
-            min_views=min_views,
-            max_keywords=10,
-        )
-        return jsonify({
-            "keywords": [format_trend_keyword_for_display(kw) for kw in keywords],
-        })
-    except Exception as e:
-        return jsonify({"error": f"トレンド発見中にエラー: {str(e)}"}), 500
-
-
-@app.route("/api/planner/research", methods=["POST"])
-def planner_research():
-    data = request.get_json()
-    keywords = data.get("keywords", [])
-    if not keywords:
-        return jsonify({"error": "キーワードを1つ以上選択してください"}), 400
-
-    min_views = int(data.get("min_views", 500_000))
-    hook_period_months = int(data.get("hook_period_months", 3))
-    search_period_months = int(data.get("search_period_months", 6))
-    max_plans = int(data.get("max_plans", 6))
+    limit = int(data.get("limit", 500))
 
     job_id = str(uuid.uuid4())[:8]
-    planner_jobs[job_id] = {
+    research_jobs[job_id] = {
         "status": "queued",
-        "message": "リサーチを開始しています...",
-        "progress": 0,
-        "total": 0,
+        "message": "検索を開始しています...",
     }
 
     thread = threading.Thread(
-        target=run_research,
-        args=(job_id, keywords, min_views, hook_period_months,
-              search_period_months, max_plans),
+        target=run_beauty_search,
+        args=(job_id, platform, period_days, min_views, limit),
         daemon=True,
     )
     thread.start()
-
     return jsonify({"job_id": job_id})
 
 
-@app.route("/api/planner/status/<job_id>")
-def planner_status(job_id):
-    job = planner_jobs.get(job_id)
+@app.route("/api/research/status/<job_id>")
+def research_status(job_id):
+    job = research_jobs.get(job_id)
     if not job:
         return jsonify({"error": "ジョブが見つかりません"}), 404
     return jsonify(job)
 
 
-@app.route("/api/planner/account", methods=["POST"])
-def planner_account():
+@app.route("/api/research/account", methods=["POST"])
+def research_account():
     data = request.get_json()
     account_url = data.get("account_url", "").strip()
+    username = data.get("username", "").strip()
+    if not account_url and username:
+        account_url = f"https://www.tiktok.com/@{username}"
     if not account_url:
-        return jsonify({"error": "アカウントURLが必要です"}), 400
+        return jsonify({"error": "アカウント情報が必要です"}), 400
 
     account = get_account_info(account_url)
     if not account:
         return jsonify({"error": "アカウント情報を取得できませんでした"}), 404
 
-    # 属人性分析
     account = analyze_account_personality(account)
-
     return jsonify({"account": format_account_for_display(account)})
 
 
