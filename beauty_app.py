@@ -387,7 +387,7 @@ def save_channels():
 
 # === トレンド分析 ===
 @app.route("/api/analyze-trends", methods=["POST"])
-def analyze_trends():
+def analyze_trends_claude():
     """Claude web_search でトレンド分析を実行."""
     try:
         client = get_anthropic_client()
