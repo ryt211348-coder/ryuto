@@ -108,18 +108,19 @@ def discover_trending_keywords(period_months: int = 3,
     for seed in TREND_SEED_KEYWORDS:
         try:
             videos = search_tiktok_videos(
-                seed, min_views=min_views,
-                period_months=period_months, max_results=10,
+                seed, min_views=0,  # 発見フェーズではフィルタを緩める
+                period_months=period_months * 2, max_results=10,
             )
             if not videos:
                 continue
 
+            # min_views以上の動画だけでスコア計算
+            viral = [v for v in videos if v.views >= min_views]
             total_views = sum(v.views for v in videos)
             avg_views = total_views // len(videos) if videos else 0
             avg_eng = sum(_calc_engagement_rate(v) for v in videos) / len(videos)
             top_views = max(v.views for v in videos)
 
-            # サンプルフック（冒頭30文字）
             hooks = []
             for v in sorted(videos, key=lambda x: x.views, reverse=True)[:3]:
                 text = v.transcript or v.description or v.title
@@ -141,8 +142,33 @@ def discover_trending_keywords(period_months: int = 3,
         except Exception as e:
             console.print(f"  [dim]{seed}: {e}[/dim]")
 
-    # エンゲージメント×ボリュームでソート
-    results.sort(key=lambda k: k.estimated_volume * (1 + k.avg_engagement), reverse=True)
+    # API検索が全て失敗した場合: シードキーワードをそのまま候補として返す
+    if not results:
+        console.print("  [yellow]API検索が利用できません。おすすめキーワードを提示します。[/yellow]")
+        top_seeds = [
+            ("ニキビ スキンケア", "ニキビの原因・対策・ケア方法"),
+            ("毛穴 ケア", "毛穴の黒ずみ・角栓・いちご鼻対策"),
+            ("スキンケア ルーティン", "朝夜のスキンケア手順"),
+            ("美白 透明感", "くすみ対策・トーンアップ"),
+            ("乾燥肌 保湿", "保湿ケア・インナードライ対策"),
+            ("韓国 スキンケア", "韓国コスメ・話題の商品"),
+            ("敏感肌 赤み 鎮静", "敏感肌向けスキンケア"),
+            ("ニキビ跡 治し方", "ニキビ跡・クレーター対策"),
+            ("美容 ライフハック", "美容の裏技・豆知識"),
+            ("擬人化 スキンケア", "コスメ擬人化フォーマット"),
+        ]
+        for keyword, desc in top_seeds[:max_keywords]:
+            results.append(TrendKeyword(
+                keyword=keyword,
+                estimated_volume=0,
+                avg_views=0,
+                avg_engagement=0,
+                top_video_views=0,
+                video_count=0,
+                sample_hooks=[desc],
+            ))
+
+    results.sort(key=lambda k: k.estimated_volume * (1 + k.avg_engagement) + 1, reverse=True)
     return results[:max_keywords]
 
 
@@ -584,42 +610,67 @@ def _get_account_tiktokapi(username: str) -> Optional[TikTokAccount]:
 # ===== Web Search Fallback =====
 
 def _search_web_fallback(keyword: str, max_results: int = 20) -> list[TikTokVideo]:
-    """Web検索でTikTok動画を探すフォールバック."""
+    """Web検索でTikTok動画を探すフォールバック（複数検索エンジン対応）."""
     videos = []
-    search_query = f"site:tiktok.com {keyword} スキンケア"
+    seen_ids = set()
 
+    # 方法1: DuckDuckGo（ブロックされにくい）
     try:
-        # Google検索をHTTPリクエストで試行
+        search_query = f"site:tiktok.com {keyword}"
         resp = http_requests.get(
-            "https://www.google.com/search",
-            params={"q": search_query, "num": 20},
+            "https://html.duckduckgo.com/html/",
+            params={"q": search_query},
             headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                              "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             },
             timeout=15,
         )
         if resp.status_code == 200:
-            # TikTok動画URLを抽出
-            urls = re.findall(r'https://www\.tiktok\.com/@[\w.]+/video/(\d+)', resp.text)
-            usernames = re.findall(r'https://www\.tiktok\.com/@([\w.]+)/video/', resp.text)
-
-            for vid_id, username in zip(urls, usernames):
-                v = TikTokVideo(
-                    video_id=vid_id,
-                    url=f"https://www.tiktok.com/@{username}/video/{vid_id}",
-                    account_name=username,
-                    account_url=f"https://www.tiktok.com/@{username}",
-                    account_id=username,
-                )
-                videos.append(v)
-
+            _extract_tiktok_urls(resp.text, videos, seen_ids)
             if videos:
-                console.print(f"  [green]Web検索: {len(videos)}件のURL取得[/green]")
+                console.print(f"  [green]DuckDuckGo: {len(videos)}件取得[/green]")
     except Exception as e:
-        console.print(f"  [dim]Web検索: {e}[/dim]")
+        console.print(f"  [dim]DuckDuckGo: {e}[/dim]")
+
+    # 方法2: Google（DuckDuckGoで不足の場合）
+    if len(videos) < 5:
+        try:
+            search_query = f"site:tiktok.com {keyword} スキンケア"
+            resp = http_requests.get(
+                "https://www.google.com/search",
+                params={"q": search_query, "num": 20},
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                },
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                _extract_tiktok_urls(resp.text, videos, seen_ids)
+                if videos:
+                    console.print(f"  [green]Google: {len(videos)}件取得[/green]")
+        except Exception as e:
+            console.print(f"  [dim]Google: {e}[/dim]")
 
     return videos[:max_results]
+
+
+def _extract_tiktok_urls(html_text: str, videos: list, seen_ids: set):
+    """HTMLテキストからTikTok動画URLを抽出してvideosリストに追加する."""
+    # @username/video/id パターン
+    matches = re.findall(r'tiktok\.com/@([\w.]+)/video/(\d+)', html_text)
+    for username, vid_id in matches:
+        if vid_id in seen_ids:
+            continue
+        seen_ids.add(vid_id)
+        videos.append(TikTokVideo(
+            video_id=vid_id,
+            url=f"https://www.tiktok.com/@{username}/video/{vid_id}",
+            account_name=username,
+            account_url=f"https://www.tiktok.com/@{username}",
+            account_id=username,
+        ))
 
 
 # ===== yt-dlp Fallback =====
