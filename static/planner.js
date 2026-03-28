@@ -46,13 +46,32 @@ function showKeywordSelection(keywords) {
                 ${i < 3 ? '<span class="badge" style="background:rgba(255,45,85,.15);color:var(--accent);font-size:.65rem">おすすめ</span>' : ''}
                 <span class="kw-check" id="kw-check-${i}"></span>
             </div>
+            ${kw.desc ? `<div style="font-size:.8rem;color:var(--dim);margin-bottom:.4rem">${esc(kw.desc)}</div>` : ''}
             <div class="kw-stats">
                 <span>${fmtNum(kw.estimated_volume)}総再生</span>
                 <span>${kw.video_count}本</span>
-                <span>平均${fmtNum(kw.avg_views)}再生</span>
-                <span>Eng ${kw.avg_engagement}%</span>
+                <span>TOP ${fmtNum(kw.top_video_views)}再生</span>
             </div>
-            ${kw.sample_hooks && kw.sample_hooks.length ? `<div class="kw-hooks">${kw.sample_hooks.map(h => `<span class="kw-hook">「${esc(h)}」</span>`).join('')}</div>` : ''}
+            ${kw.ref_videos && kw.ref_videos.length ? `
+                <div class="kw-videos">
+                    <div style="font-size:.7rem;color:var(--dim);margin-top:.5rem;margin-bottom:.2rem">参考動画:</div>
+                    ${kw.ref_videos.map(v => `
+                        <div class="kw-video-row">
+                            <span class="kw-video-views">${fmtNum(v.views)}再生</span>
+                            <span class="kw-video-title">${esc(v.title || '')}</span>
+                            ${v.url ? `<a href="${esc(v.url)}" target="_blank" rel="noopener" class="kw-video-link" onclick="event.stopPropagation()">↗</a>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            ${kw.ref_accounts && kw.ref_accounts.length ? `
+                <div class="kw-accounts">
+                    <div style="font-size:.7rem;color:var(--dim);margin-top:.5rem;margin-bottom:.2rem">注目アカウント:</div>
+                    ${kw.ref_accounts.map(a => `
+                        <a href="${esc(a.url)}" target="_blank" rel="noopener" class="kw-account-chip" onclick="event.stopPropagation()">${esc(a.name)} <span style="color:var(--dim)">${esc(a.note || '')}</span></a>
+                    `).join('')}
+                </div>
+            ` : ''}
         </div>
     `).join('');
 
