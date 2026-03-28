@@ -71,6 +71,40 @@ def save_api_key(key):
 load_api_key()
 
 
+def _ensure_playwright():
+    """Playwrightとブラウザを自動インストールする."""
+    try:
+        from playwright.sync_api import sync_playwright
+        # ブラウザが使えるかテスト
+        with sync_playwright() as p:
+            try:
+                browser = p.chromium.launch(headless=True)
+                browser.close()
+                print("[OK] Playwright + Chromium 利用可能")
+                return True
+            except Exception:
+                pass
+    except ImportError:
+        pass
+
+    print("[Setup] Playwrightをインストール中...")
+    import subprocess, sys
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", "playwright"],
+                       capture_output=True, timeout=120)
+        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"],
+                       capture_output=True, timeout=300)
+        print("[OK] Playwright + Chromium インストール完了")
+        return True
+    except Exception as e:
+        print(f"[WARN] Playwrightインストール失敗: {e}")
+        return False
+
+
+# 起動時にPlaywrightを自動セットアップ
+_ensure_playwright()
+
+
 def run_analysis(job_id: str, account_url: str, min_views: int, whisper_model: str):
     """バックグラウンドで分析を実行する."""
     job = jobs[job_id]
