@@ -854,7 +854,7 @@ def format_trend_keyword_for_display(kw: TrendKeyword) -> dict:
         "top_video_views": kw.top_video_views,
         "video_count": kw.video_count,
         "sample_hooks": kw.sample_hooks,
-        "ref_videos": ref.get("videos", [])[:3],
+        "ref_videos": ref.get("videos", [])[:10],
         "ref_accounts": ref.get("accounts", [])[:3],
         "desc": ref.get("desc", ""),
     }
