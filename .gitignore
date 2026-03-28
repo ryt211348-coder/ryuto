@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 results/
+.beauty_*.json
+.api_config.json
