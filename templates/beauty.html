@@ -246,7 +246,7 @@
     <!-- ===== 設定タブ ===== -->
     <div class="tab-panel" id="panel-settings">
         <div class="card">
-            <div class="card-title">API設定</div>
+            <div class="card-title">Anthropic API設定（台本生成用）</div>
             <div class="form-group">
                 <label>Anthropic API Key</label>
                 <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
@@ -254,6 +254,20 @@
             <div class="flex-between mt-1">
                 <span id="apiKeyStatus" class="text-sm text-dim"></span>
                 <button class="btn btn-primary btn-sm" onclick="saveApiKey()">保存</button>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">Apify API設定（データ収集用）</div>
+            <div class="form-group">
+                <label>Apify API Token</label>
+                <input type="password" id="apifyTokenInput" placeholder="apify_api_..." />
+            </div>
+            <div class="text-sm text-dim mb-1">
+                <a href="https://console.apify.com/account/integrations" target="_blank" style="color:var(--cyan);">Apify Console</a> → Integrations → API Token から取得
+            </div>
+            <div class="flex-between mt-1">
+                <span id="apifyTokenStatus" class="text-sm text-dim"></span>
+                <button class="btn btn-primary btn-sm" onclick="saveApifyToken()">保存</button>
             </div>
         </div>
     </div>
@@ -315,9 +329,43 @@
                 <option value="500000">50万再生以上</option>
                 <option value="1000000">100万再生以上</option>
             </select>
-            <button class="btn btn-primary btn-sm" id="btnAnalyze" onclick="runTrendAnalysis()">
-                トレンド分析を実行
+            <button class="btn btn-cyan btn-sm" id="btnCollect" onclick="collectData()">
+                1. データ収集
             </button>
+            <button class="btn btn-primary btn-sm" id="btnAnalyze" onclick="runTrendAnalysis()">
+                2. トレンド分析
+            </button>
+        </div>
+
+        <!-- 収集ステータス -->
+        <div id="collectLoading" class="loading hidden">
+            <div class="spinner"></div>
+            <span>Apifyでデータ収集中...（1〜3分程度）</span>
+        </div>
+        <div id="collectResult" class="hidden">
+            <div class="card" style="border-color:var(--green);">
+                <div class="card-title text-green">データ収集完了</div>
+                <div id="collectStats" class="text-sm"></div>
+            </div>
+        </div>
+
+        <!-- 文字起こし -->
+        <div class="card">
+            <div class="card-title">動画文字起こし（kotoba-whisper）</div>
+            <div class="form-row">
+                <div class="form-group" style="flex:3;">
+                    <input type="text" id="transcribeUrl" placeholder="TikTok/Instagram 動画URLを入力" />
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <button class="btn btn-secondary btn-full" onclick="transcribeVideo()">文字起こし</button>
+                </div>
+            </div>
+            <div id="transcribeLoading" class="loading hidden">
+                <div class="spinner"></div><span>文字起こし中...</span>
+            </div>
+            <div id="transcribeResult" class="hidden">
+                <div class="script-output" id="transcribeOutput" style="max-height:300px;"></div>
+            </div>
         </div>
 
         <!-- カテゴリ選択 -->
@@ -337,9 +385,9 @@
             <!-- 統計サマリー -->
             <div class="stats-grid" id="trendStats"></div>
 
-            <!-- トレンド商品TOP -->
+            <!-- 人気動画TOP -->
             <div class="card">
-                <div class="card-title">トレンド商品ランキング</div>
+                <div class="card-title">人気動画ランキング</div>
                 <div id="trendProducts"></div>
             </div>
 
@@ -349,9 +397,9 @@
                 <div id="hotKeywords"></div>
             </div>
 
-            <!-- 共通トピック -->
+            <!-- エンゲージメント高い動画 -->
             <div class="card">
-                <div class="card-title">共通トピック</div>
+                <div class="card-title">エンゲージメント率TOP</div>
                 <div id="commonTopics"></div>
             </div>
 
@@ -588,8 +636,15 @@ async function loadApiConfig() {
         $('apiKeyStatus').textContent = 'Key設定済み: ' + data.masked_key;
         $('apiKeyStatus').className = 'text-sm text-green';
     } else {
-        $('apiKeyStatus').textContent = 'APIキー未設定';
+        $('apiKeyStatus').textContent = 'APIキー未設定（台本生成に必要）';
         $('apiKeyStatus').className = 'text-sm text-accent';
+    }
+    if (data.has_apify) {
+        $('apifyTokenStatus').textContent = 'Token設定済み: ' + data.apify_masked;
+        $('apifyTokenStatus').className = 'text-sm text-green';
+    } else {
+        $('apifyTokenStatus').textContent = 'Apifyトークン未設定（データ収集に必要）';
+        $('apifyTokenStatus').className = 'text-sm text-accent';
     }
 }
 
@@ -598,6 +653,15 @@ async function saveApiKey() {
     if (!key) return alert('APIキーを入力してください');
     await api('/api/config', 'POST', { anthropic_api_key: key });
     $('apiKeyInput').value = '';
+    await loadApiConfig();
+    alert('保存しました');
+}
+
+async function saveApifyToken() {
+    const token = $('apifyTokenInput').value.trim();
+    if (!token) return alert('Apify APIトークンを入力してください');
+    await api('/api/config', 'POST', { apify_api_token: token });
+    $('apifyTokenInput').value = '';
     await loadApiConfig();
     alert('保存しました');
 }
@@ -673,6 +737,37 @@ function toggleCategory(el) {
     }
 }
 
+// データ収集（Apify）
+async function collectData() {
+    if (state.channels.length === 0) {
+        alert('先にチャンネルを登録してください');
+        return;
+    }
+    const btn = $('btnCollect');
+    btn.disabled = true;
+    show($('collectLoading'));
+    hide($('collectResult'));
+
+    try {
+        const data = await api('/api/collect-data', 'POST', {
+            channels: state.channels,
+            max_videos: 30,
+        });
+        if (!data.ok) throw new Error(data.error || 'データ収集に失敗しました');
+        $('collectStats').innerHTML = `
+            合計 <strong>${data.total_videos}</strong> 動画を収集<br>
+            TikTok: ${data.tiktok_count} / Instagram: ${data.instagram_count}
+        `;
+        show($('collectResult'));
+    } catch (e) {
+        alert('エラー: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        hide($('collectLoading'));
+    }
+}
+
+// トレンド分析（ローカル集計・APIなし）
 async function runTrendAnalysis() {
     const btn = $('btnAnalyze');
     btn.disabled = true;
@@ -680,11 +775,9 @@ async function runTrendAnalysis() {
     hide($('trendResults'));
 
     try {
-        const data = await api('/api/analyze-trends', 'POST', {
-            channels: state.channels,
+        const data = await api('/api/analyze-collected', 'POST', {
             period: $('filterPeriod').value,
             min_views: parseInt($('filterViews').value),
-            categories: state.selectedCategories,
         });
 
         if (!data.ok) throw new Error(data.error || '分析に失敗しました');
@@ -699,37 +792,61 @@ async function runTrendAnalysis() {
     }
 }
 
+// 文字起こし
+async function transcribeVideo() {
+    const url = $('transcribeUrl').value.trim();
+    if (!url) return alert('動画URLを入力してください');
+    show($('transcribeLoading'));
+    hide($('transcribeResult'));
+
+    try {
+        const data = await api('/api/transcribe', 'POST', { url });
+        if (!data.ok) throw new Error(data.error || '文字起こしに失敗しました');
+        $('transcribeOutput').textContent = data.text;
+        show($('transcribeResult'));
+    } catch (e) {
+        alert('エラー: ' + e.message);
+    } finally {
+        hide($('transcribeLoading'));
+    }
+}
+
 function renderTrendResults(data) {
     // 統計サマリー
-    const products = data.trending_products || [];
+    const videos = data.trending_videos || [];
     const keywords = data.hot_keywords || [];
-    const topics = data.common_topics || [];
     const accounts = data.account_insights || [];
+    const highEng = data.high_engagement || [];
 
     $('trendStats').innerHTML = `
-        <div class="stat-card"><div class="stat-val">${products.length}</div><div class="stat-lbl">トレンド商品</div></div>
+        <div class="stat-card"><div class="stat-val">${data.total_videos || 0}</div><div class="stat-lbl">動画数</div></div>
+        <div class="stat-card"><div class="stat-val">${formatNum(data.total_views)}</div><div class="stat-lbl">総再生数</div></div>
+        <div class="stat-card"><div class="stat-val">${formatNum(data.avg_views)}</div><div class="stat-lbl">平均再生</div></div>
         <div class="stat-card"><div class="stat-val">${keywords.length}</div><div class="stat-lbl">ホットKW</div></div>
-        <div class="stat-card"><div class="stat-val">${topics.length}</div><div class="stat-lbl">共通トピック</div></div>
-        <div class="stat-card"><div class="stat-val">${accounts.length}</div><div class="stat-lbl">アカウント</div></div>
         <div class="stat-card"><div class="stat-val">${data.period || '-'}</div><div class="stat-lbl">分析期間</div></div>
     `;
 
-    // トレンド商品
-    $('trendProducts').innerHTML = products.map(p => `
+    function formatNum(n) {
+        if (!n) return '0';
+        if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+        return n.toLocaleString();
+    }
+
+    // 人気動画ランキング
+    $('trendProducts').innerHTML = videos.map(v => `
         <div class="product-card">
             <div class="flex-between">
                 <div style="display:flex;align-items:center;gap:.5rem;">
-                    <span class="product-rank">${p.rank || '-'}</span>
-                    <strong>${escHtml(p.product_name)}</strong>
-                    <span class="badge badge-cyan">${escHtml(p.brand || '')}</span>
-                    <span class="badge badge-pink">${escHtml(p.category || '')}</span>
+                    <span class="product-rank">${v.rank || '-'}</span>
+                    <strong>${escHtml(v.author)}</strong>
+                    <span class="badge ${v.platform === 'TikTok' ? 'badge-pink' : 'badge-purple'}">${escHtml(v.platform || '')}</span>
                 </div>
-                <span class="text-sm text-cyan">Buzz: ${p.buzz_score || '-'}/100</span>
+                <span class="text-sm text-cyan">${formatNum(v.views)}再生 | ER: ${v.engagement_rate}%</span>
             </div>
-            <div class="text-sm text-dim mt-1">${escHtml(p.why_trending || '')}</div>
+            <div class="text-sm text-dim mt-1">${escHtml(v.description || '')}</div>
             <div class="text-sm mt-1">
-                ${(p.platforms || []).map(pl => `<span class="badge badge-purple">${escHtml(pl)}</span>`).join(' ')}
-                ${(p.related_hashtags || []).map(h => `<span class="badge badge-yellow">${escHtml(h)}</span>`).join(' ')}
+                ${v.url ? `<a href="${escHtml(v.url)}" target="_blank" style="color:var(--cyan);font-size:.75rem;">動画を見る</a>` : ''}
+                ${(v.hashtags || []).map(h => `<span class="badge badge-yellow">#${escHtml(h)}</span>`).join(' ')}
             </div>
         </div>
     `).join('') || '<p class="text-dim text-sm">データなし</p>';
@@ -743,12 +860,15 @@ function renderTrendResults(data) {
         }).join(' ')
     }</div>` || '<p class="text-dim text-sm">データなし</p>';
 
-    // 共通トピック
-    $('commonTopics').innerHTML = topics.map(t => `
+    // エンゲージメント高い動画
+    $('commonTopics').innerHTML = highEng.map(v => `
         <div class="product-card">
-            <strong>${escHtml(t.topic)}</strong>
-            <div class="text-sm text-dim">${escHtml(t.description || '')}</div>
-            <div class="text-sm mt-1">${escHtml(t.content_angle || '')}</div>
+            <div class="flex-between">
+                <strong>${escHtml(v.author)}</strong>
+                <span class="badge badge-pink">ER: ${v.engagement_rate}%</span>
+            </div>
+            <div class="text-sm text-dim">${escHtml(v.description || '')}</div>
+            <div class="text-sm mt-1">${formatNum(v.views)}再生 | ${formatNum(v.likes)}いいね | ${formatNum(v.comments)}コメント</div>
         </div>
     `).join('') || '<p class="text-dim text-sm">データなし</p>';
 
@@ -760,37 +880,21 @@ function renderTrendResults(data) {
                 <span class="badge ${a.platform === 'TikTok' ? 'badge-pink' : 'badge-purple'}">${escHtml(a.platform || '')}</span>
             </div>
             <div class="text-sm mt-1">
-                <span class="text-dim">投稿頻度:</span> ${escHtml(a.posting_frequency || '-')}
-                <span class="text-dim" style="margin-left:.5rem;">エンゲージ:</span> ${escHtml(a.engagement_trend || '-')}
-                <span class="text-dim" style="margin-left:.5rem;">月間再生:</span> ${escHtml(a.estimated_monthly_views || '-')}
+                <span class="text-dim">動画数:</span> ${a.video_count}本
+                <span class="text-dim" style="margin-left:.5rem;">月間投稿:</span> ${a.monthly_posts}本
+                <span class="text-dim" style="margin-left:.5rem;">総再生:</span> ${formatNum(a.total_views)}
+                <span class="text-dim" style="margin-left:.5rem;">平均再生:</span> ${formatNum(a.avg_views)}
             </div>
-            <div class="text-sm text-dim mt-1">最近の注力: ${escHtml(a.recent_focus || '-')}</div>
+            <div class="text-sm text-dim mt-1">
+                最終投稿: ${escHtml(a.last_post_date || '-')} |
+                Best: ${escHtml((a.best_video_desc || '').substring(0, 50))} (${formatNum(a.best_video_views)}再生)
+            </div>
         </div>
     `).join('') || '<p class="text-dim text-sm">データなし</p>';
 
-    // 季節トレンド
-    const seasonal = data.seasonal_trends || [];
-    $('seasonalTrends').innerHTML = seasonal.map(s => `
-        <div class="list-item">
-            <div class="list-item-info">
-                <div class="list-item-name">${escHtml(s.category)}</div>
-                <div class="list-item-meta">${escHtml(s.reason || '')} | ピーク: ${escHtml(s.peak_timing || '-')}</div>
-            </div>
-            <span class="badge ${s.demand_level === '高' ? 'badge-pink' : s.demand_level === '中' ? 'badge-yellow' : 'badge-cyan'}">${escHtml(s.demand_level || '')}</span>
-        </div>
-    `).join('') || '<p class="text-dim text-sm">データなし</p>';
-
-    // ペインポイント
-    const pains = data.viewer_pain_points || [];
-    $('painPoints').innerHTML = pains.map(p => `
-        <div class="product-card">
-            <div class="flex-between">
-                <strong>${escHtml(p.pain_point)}</strong>
-                <span class="badge ${p.frequency === '高' ? 'badge-pink' : 'badge-yellow'}">${escHtml(p.frequency || '')}</span>
-            </div>
-            <div class="text-sm text-dim">${escHtml(p.target_skin_type || '')} | ${escHtml(p.content_opportunity || '')}</div>
-        </div>
-    `).join('') || '<p class="text-dim text-sm">データなし</p>';
+    // 季節トレンド・ペインポイントはApifyデータに含まれないので非表示
+    $('seasonalTrends').innerHTML = '<p class="text-dim text-sm">Apifyデータからは季節分析は行いません</p>';
+    $('painPoints').innerHTML = '<p class="text-dim text-sm">コメント分析は今後の機能追加予定です</p>';
 }
 
 function goToPlansFromTrends() {

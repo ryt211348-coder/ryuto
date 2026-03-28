@@ -51,6 +51,22 @@ from beauty_planner.reference_data import (
     SUNO_AI_STYLE,
     BEAUTY_CATEGORIES,
 )
+from beauty_planner.apify_client import (
+    ApifyClient,
+    normalize_tiktok_data,
+    normalize_instagram_data,
+)
+from beauty_planner.trend_analyzer import analyze_trends, filter_by_period, filter_by_views
+from beauty_planner.transcriber_kotoba import transcribe_video
+
+
+def get_apify_client():
+    """Apifyクライアントを取得."""
+    config = load_json(CONFIG_PATH)
+    token = config.get("apify_api_token", "") or os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
+        raise ValueError("Apify APIトークンが設定されていません")
+    return ApifyClient(token)
 
 
 @app.route("/")
@@ -64,16 +80,121 @@ def get_config():
     config = load_json(CONFIG_PATH)
     key = config.get("anthropic_api_key", "")
     masked = key[:8] + "..." + key[-4:] if len(key) > 12 else ""
-    return jsonify({"has_key": bool(key), "masked_key": masked})
+    apify_token = config.get("apify_api_token", "")
+    apify_masked = apify_token[:8] + "..." + apify_token[-4:] if len(apify_token) > 12 else ""
+    return jsonify({
+        "has_key": bool(key), "masked_key": masked,
+        "has_apify": bool(apify_token), "apify_masked": apify_masked,
+    })
 
 
 @app.route("/api/config", methods=["POST"])
 def save_config():
     data = request.json
     config = load_json(CONFIG_PATH)
-    config["anthropic_api_key"] = data.get("anthropic_api_key", "")
+    config["anthropic_api_key"] = data.get("anthropic_api_key", config.get("anthropic_api_key", ""))
+    if data.get("apify_api_token"):
+        config["apify_api_token"] = data.get("apify_api_token", "")
     save_json(CONFIG_PATH, config)
     return jsonify({"ok": True})
+
+
+# === Apifyデータ収集 ===
+COLLECTED_DATA_PATH = Path(__file__).parent / ".beauty_collected.json"
+
+
+@app.route("/api/collect-data", methods=["POST"])
+def collect_data():
+    """Apifyで競合チャンネルデータを自動収集."""
+    try:
+        apify = get_apify_client()
+        data = request.json
+        channels = data.get("channels", [])
+        max_videos = data.get("max_videos", 30)
+
+        if not channels:
+            return jsonify({"ok": False, "error": "チャンネルが登録されていません"}), 400
+
+        all_videos = []
+
+        # TikTokチャンネル収集
+        tiktok_users = [ch["name"] for ch in channels if ch.get("platform") == "TikTok"]
+        if tiktok_users:
+            raw = apify.scrape_tiktok_profile(tiktok_users, max_videos)
+            all_videos.extend(normalize_tiktok_data(raw))
+
+        # Instagramチャンネル収集
+        ig_users = [ch["name"] for ch in channels if ch.get("platform") == "Instagram"]
+        if ig_users:
+            raw = apify.scrape_instagram_profile(ig_users, max_videos)
+            all_videos.extend(normalize_instagram_data(raw))
+
+        # 保存
+        save_json(COLLECTED_DATA_PATH, {
+            "videos": all_videos,
+            "collected_at": datetime.now().isoformat(),
+            "channel_count": len(channels),
+        })
+
+        return jsonify({
+            "ok": True,
+            "total_videos": len(all_videos),
+            "tiktok_count": len([v for v in all_videos if v["platform"] == "TikTok"]),
+            "instagram_count": len([v for v in all_videos if v["platform"] == "Instagram"]),
+        })
+
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/analyze-collected", methods=["POST"])
+def analyze_collected():
+    """収集済みデータをトレンド分析（APIなし・ローカル集計）."""
+    try:
+        collected = load_json(COLLECTED_DATA_PATH)
+        videos = collected.get("videos", [])
+        if not videos:
+            return jsonify({"ok": False, "error": "まだデータが収集されていません。先にデータ収集を実行してください。"}), 400
+
+        data = request.json
+        period = data.get("period", "3months")
+        min_views = data.get("min_views", 0)
+
+        result = analyze_trends(videos, period, min_views)
+
+        # 履歴保存
+        all_trends = load_json(TRENDS_PATH, [])
+        result["_timestamp"] = datetime.now().isoformat()
+        all_trends.insert(0, result)
+        if len(all_trends) > 30:
+            all_trends = all_trends[:30]
+        save_json(TRENDS_PATH, all_trends)
+
+        return jsonify({"ok": True, "data": result})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/transcribe", methods=["POST"])
+def transcribe():
+    """動画URLから文字起こし."""
+    try:
+        data = request.json
+        video_url = data.get("url", "")
+        if not video_url:
+            return jsonify({"ok": False, "error": "URLを指定してください"}), 400
+
+        text = transcribe_video(video_url)
+        return jsonify({"ok": True, "text": text, "url": video_url})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 # === チャンネル管理 ===
