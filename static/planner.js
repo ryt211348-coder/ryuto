@@ -46,32 +46,10 @@ function showKeywordSelection(keywords) {
                 ${i < 3 ? '<span class="badge" style="background:rgba(255,45,85,.15);color:var(--accent);font-size:.65rem">おすすめ</span>' : ''}
                 <span class="kw-check" id="kw-check-${i}"></span>
             </div>
-            ${kw.desc ? `<div style="font-size:.8rem;color:var(--dim);margin-bottom:.4rem">${esc(kw.desc)}</div>` : ''}
             <div class="kw-stats">
-                <span>${fmtNum(kw.estimated_volume)}総再生</span>
-                <span>${kw.video_count}本</span>
-                <span>TOP ${fmtNum(kw.top_video_views)}再生</span>
+                ${kw.video_count > 0 ? `<span>${fmtNum(kw.estimated_volume)}総再生</span><span>${kw.video_count}本</span><span>TOP ${fmtNum(kw.top_video_views)}再生</span>` : '<span style="color:var(--dim)">リサーチ開始で検索されます</span>'}
             </div>
-            ${kw.ref_videos && kw.ref_videos.length ? `
-                <div class="kw-videos">
-                    <div style="font-size:.7rem;color:var(--dim);margin-top:.5rem;margin-bottom:.2rem">参考動画:</div>
-                    ${kw.ref_videos.map(v => `
-                        <div class="kw-video-row">
-                            <span class="kw-video-views">${fmtNum(v.views)}再生</span>
-                            <span class="kw-video-title">${esc(v.title || '')}</span>
-                            ${v.url ? `<a href="${esc(v.url)}" target="_blank" rel="noopener" class="kw-video-link" onclick="event.stopPropagation()">↗</a>` : ''}
-                        </div>
-                    `).join('')}
-                </div>
-            ` : ''}
-            ${kw.ref_accounts && kw.ref_accounts.length ? `
-                <div class="kw-accounts">
-                    <div style="font-size:.7rem;color:var(--dim);margin-top:.5rem;margin-bottom:.2rem">注目アカウント:</div>
-                    ${kw.ref_accounts.map(a => `
-                        <a href="${esc(a.url)}" target="_blank" rel="noopener" class="kw-account-chip" onclick="event.stopPropagation()">${esc(a.name)} <span style="color:var(--dim)">${esc(a.note || '')}</span></a>
-                    `).join('')}
-                </div>
-            ` : ''}
+            ${kw.sample_hooks && kw.sample_hooks.length ? `<div class="kw-hooks">${kw.sample_hooks.map(h => `<span class="kw-hook">「${esc(h)}」</span>`).join('')}</div>` : ''}
         </div>
     `).join('');
 
@@ -185,7 +163,6 @@ function showResults(data) {
     renderVideos(data.summary.all_videos || []);
     renderHooks(data.summary.top_hooks);
     renderTopics(data.summary.topic_counts, data.summary.hook_type_counts);
-    renderReference(data.reference_style);
 }
 
 function renderSummary(s) {
@@ -316,45 +293,6 @@ function renderTopics(tc, htc) {
         html += '</div>';
     }
     el.innerHTML = html || '<div class="empty-state"><p>データなし</p></div>';
-}
-
-function renderReference(ref) {
-    const el = document.getElementById('referenceAnalysis');
-    if (!ref || !ref.script_count) { el.innerHTML = '<div class="empty-state"><p>参考台本CSVがアップロードされていません</p></div>'; return; }
-    let html = `<div class="card"><h3 class="section-subtitle">参考台本の分析結果</h3>
-        <div class="stats-grid" style="margin-bottom:1rem">
-            <div class="stat-card"><div class="stat-value">${ref.script_count}</div><div class="stat-label">参考台本数</div></div>
-            <div class="stat-card"><div class="stat-value">${ref.success_count||0}</div><div class="stat-label">成功パターン</div></div>
-            <div class="stat-card"><div class="stat-value">${ref.failure_count||0}</div><div class="stat-label">失敗パターン</div></div>
-            <div class="stat-card"><div class="stat-value">${ref.avg_length||0}字</div><div class="stat-label">平均台本長</div></div>
-        </div>`;
-
-    if (ref.success_patterns && ref.success_patterns.length) {
-        html += '<h4 style="color:var(--green);margin:1rem 0 .5rem">伸びたパターンの特徴</h4>';
-        ref.success_patterns.forEach(p => {
-            html += `<div style="background:var(--bg);border-radius:8px;padding:.75rem;margin-bottom:.5rem;border-left:3px solid var(--green)">
-                <div style="font-size:.8rem;color:var(--green);font-weight:600">${fmtNum(p.views)}万再生 ― 「${esc(p.hook)}」</div>
-                <div style="font-size:.85rem;color:var(--text-dim);margin-top:.3rem">${esc(p.note)}</div>
-            </div>`;
-        });
-    }
-
-    if (ref.failure_patterns && ref.failure_patterns.length) {
-        html += '<h4 style="color:var(--accent);margin:1rem 0 .5rem">伸びなかったパターン（避けるべき）</h4>';
-        ref.failure_patterns.forEach(p => {
-            html += `<div style="background:var(--bg);border-radius:8px;padding:.75rem;margin-bottom:.5rem;border-left:3px solid var(--accent)">
-                <div style="font-size:.8rem;color:var(--accent);font-weight:600">${fmtNum(p.views)}万再生 ― 「${esc(p.hook)}」</div>
-                <div style="font-size:.85rem;color:var(--text-dim);margin-top:.3rem">${esc(p.note)}</div>
-            </div>`;
-        });
-    }
-
-    if (ref.voice_samples && ref.voice_samples.length) {
-        html += '<h4 style="color:var(--purple);margin:1rem 0 .5rem">声の雰囲気サンプル</h4>';
-        ref.voice_samples.forEach(v => { html += `<div style="background:var(--bg);border-radius:8px;padding:.75rem;margin-bottom:.5rem;font-size:.85rem;color:var(--text-dim)">${esc(v)}</div>`; });
-    }
-    html += '</div>';
-    el.innerHTML = html;
 }
 
 // ===== アカウント情報モーダル =====
