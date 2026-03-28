@@ -116,29 +116,23 @@ def discover_trending_keywords(period_months: int = 3,
         pass
 
     if not api_available:
-        # APIが使えない場合: すぐにおすすめキーワードを返す（待たせない）
-        console.print("  [yellow]API未接続。おすすめキーワードを提示します。[/yellow]")
-        top_seeds = [
-            ("ニキビ スキンケア", "ニキビの原因・対策・ケア方法"),
-            ("毛穴 ケア", "毛穴の黒ずみ・角栓・いちご鼻対策"),
-            ("スキンケア ルーティン", "朝夜のスキンケア手順"),
-            ("美白 透明感", "くすみ対策・トーンアップ"),
-            ("乾燥肌 保湿", "保湿ケア・インナードライ対策"),
-            ("韓国 スキンケア", "韓国コスメ・話題の商品"),
-            ("敏感肌 赤み 鎮静", "敏感肌向けスキンケア"),
-            ("ニキビ跡 治し方", "ニキビ跡・クレーター対策"),
-            ("美容 ライフハック", "美容の裏技・豆知識"),
-            ("擬人化 スキンケア", "コスメ擬人化フォーマット"),
-        ]
-        for keyword, desc in top_seeds[:max_keywords]:
+        # APIが使えない場合: ビルトインの参考データからキーワード候補を返す
+        console.print("  [yellow]API未接続。参考データからキーワードを提示します。[/yellow]")
+        from .reference_data import KEYWORD_REFERENCES
+        for keyword, ref in list(KEYWORD_REFERENCES.items())[:max_keywords]:
+            vids = ref.get("videos", [])
+            total_views = sum(v.get("views", 0) for v in vids)
+            top_views = max((v.get("views", 0) for v in vids), default=0)
+            avg_views = total_views // len(vids) if vids else 0
+            hooks = [v.get("title", "")[:30] for v in vids if v.get("title")]
             results.append(TrendKeyword(
                 keyword=keyword,
-                estimated_volume=0,
-                avg_views=0,
+                estimated_volume=total_views,
+                avg_views=avg_views,
                 avg_engagement=0,
-                top_video_views=0,
-                video_count=0,
-                sample_hooks=[desc],
+                top_video_views=top_views,
+                video_count=len(vids),
+                sample_hooks=hooks[:3],
             ))
         return results
 
@@ -849,6 +843,9 @@ def format_account_for_display(account: TikTokAccount) -> dict:
 
 def format_trend_keyword_for_display(kw: TrendKeyword) -> dict:
     """TrendKeywordをフロント表示用に整形する."""
+    from .reference_data import KEYWORD_REFERENCES
+    ref = KEYWORD_REFERENCES.get(kw.keyword, {})
+
     return {
         "keyword": kw.keyword,
         "estimated_volume": kw.estimated_volume,
@@ -857,4 +854,7 @@ def format_trend_keyword_for_display(kw: TrendKeyword) -> dict:
         "top_video_views": kw.top_video_views,
         "video_count": kw.video_count,
         "sample_hooks": kw.sample_hooks,
+        "ref_videos": ref.get("videos", [])[:3],
+        "ref_accounts": ref.get("accounts", [])[:3],
+        "desc": ref.get("desc", ""),
     }
