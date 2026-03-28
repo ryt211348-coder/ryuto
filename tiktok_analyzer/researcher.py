@@ -116,23 +116,17 @@ def discover_trending_keywords(period_months: int = 3,
         pass
 
     if not api_available:
-        # APIが使えない場合: ビルトインの参考データからキーワード候補を返す
-        console.print("  [yellow]API未接続。参考データからキーワードを提示します。[/yellow]")
-        from .reference_data import KEYWORD_REFERENCES
-        for keyword, ref in list(KEYWORD_REFERENCES.items())[:max_keywords]:
-            vids = ref.get("videos", [])
-            total_views = sum(v.get("views", 0) for v in vids)
-            top_views = max((v.get("views", 0) for v in vids), default=0)
-            avg_views = total_views // len(vids) if vids else 0
-            hooks = [v.get("title", "")[:30] for v in vids if v.get("title")]
+        # APIが使えない場合: シードキーワードを候補として返す
+        console.print("  [yellow]検索API未接続。おすすめキーワードを提示します。[/yellow]")
+        for seed in TREND_SEED_KEYWORDS[:max_keywords]:
             results.append(TrendKeyword(
-                keyword=keyword,
-                estimated_volume=total_views,
-                avg_views=avg_views,
+                keyword=seed,
+                estimated_volume=0,
+                avg_views=0,
                 avg_engagement=0,
-                top_video_views=top_views,
-                video_count=len(vids),
-                sample_hooks=hooks[:3],
+                top_video_views=0,
+                video_count=0,
+                sample_hooks=[],
             ))
         return results
 
@@ -1199,9 +1193,6 @@ def format_account_for_display(account: TikTokAccount) -> dict:
 
 def format_trend_keyword_for_display(kw: TrendKeyword) -> dict:
     """TrendKeywordをフロント表示用に整形する."""
-    from .reference_data import KEYWORD_REFERENCES
-    ref = KEYWORD_REFERENCES.get(kw.keyword, {})
-
     return {
         "keyword": kw.keyword,
         "estimated_volume": kw.estimated_volume,
@@ -1210,7 +1201,4 @@ def format_trend_keyword_for_display(kw: TrendKeyword) -> dict:
         "top_video_views": kw.top_video_views,
         "video_count": kw.video_count,
         "sample_hooks": kw.sample_hooks,
-        "ref_videos": ref.get("videos", [])[:10],
-        "ref_accounts": ref.get("accounts", [])[:3],
-        "desc": ref.get("desc", ""),
     }
