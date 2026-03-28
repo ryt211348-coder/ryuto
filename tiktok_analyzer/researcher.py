@@ -297,53 +297,86 @@ def _detect_trending_products(videos: list[TikTokVideo]) -> list[str]:
 
 def search_tiktok_videos(keyword: str, min_views: int = 500_000,
                          period_months: int = 3, max_results: int = 30) -> list[TikTokVideo]:
-    """TikTokでキーワード検索し、条件に合う動画を返す."""
+    """TikTokでキーワード検索し、条件に合う動画を返す（完全無料）."""
     videos = []
+    seen_ids = set()
 
-    # 方法1: ScrapeCreators API で検索
+    # 方法1: Web検索でTikTok動画URLを収集（無料・無制限）
+    web_videos = _search_web_fallback(keyword, max_results * 2)
+    for v in web_videos:
+        if v.video_id not in seen_ids:
+            videos.append(v)
+            seen_ids.add(v.video_id)
+
+    # 方法2: ScrapeCreators API（APIキーがある場合のみ）
     sc_videos = _search_scrapecreators(keyword, max_results)
-    if sc_videos:
-        videos.extend(sc_videos)
+    for v in sc_videos:
+        if v.video_id not in seen_ids:
+            videos.append(v)
+            seen_ids.add(v.video_id)
 
-    # 方法2: TikTokApi で検索
-    if len(videos) < max_results:
-        try:
-            api_videos = _search_tiktokapi(keyword, max_results - len(videos))
-            videos.extend(api_videos)
-        except Exception as e:
-            console.print(f"  [dim]TikTokApi検索: {e}[/dim]")
-
-    # 方法3: Web検索でTikTok動画を探す
-    if len(videos) < 5:
-        web_videos = _search_web_fallback(keyword, max_results)
-        # 重複排除
-        existing_ids = {v.video_id for v in videos}
-        for v in web_videos:
-            if v.video_id not in existing_ids:
-                videos.append(v)
-                existing_ids.add(v.video_id)
+    # 方法3: 見つかったURLのメタデータをyt-dlpで取得（無料・無制限）
+    if videos:
+        console.print(f"  [cyan]{len(videos)}件のURLのメタデータを取得中...[/cyan]")
+        _enrich_videos_with_ytdlp(videos)
 
     # フィルタリング
     cutoff = datetime.now() - timedelta(days=period_months * 30)
     filtered = []
     for v in videos:
-        # 再生数フィルタ
-        if v.views < min_views:
+        if min_views > 0 and v.views < min_views:
             continue
-        # 期間フィルタ
         if v.upload_timestamp:
-            vdate = datetime.fromtimestamp(v.upload_timestamp)
-            if vdate < cutoff:
-                continue
+            try:
+                vdate = datetime.fromtimestamp(v.upload_timestamp)
+                if vdate < cutoff:
+                    continue
+            except (ValueError, OSError):
+                pass
         elif v.upload_date:
             parsed = _parse_date(v.upload_date)
             if parsed and parsed < cutoff:
                 continue
         filtered.append(v)
 
-    # 再生数順でソート
     filtered.sort(key=lambda v: v.views, reverse=True)
     return filtered[:max_results]
+
+
+def _enrich_videos_with_ytdlp(videos: list[TikTokVideo], max_enrich: int = 15):
+    """yt-dlpで動画のメタデータ（再生数等）を無料で取得する."""
+    for i, v in enumerate(videos[:max_enrich]):
+        if v.views > 0:  # 既にメタデータがある場合はスキップ
+            continue
+        if not v.url:
+            continue
+        try:
+            cmd = [
+                sys.executable, "-m", "yt_dlp",
+                "--dump-json", "--no-download", "--no-warnings", "--quiet",
+                v.url,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0 and result.stdout:
+                data = json.loads(result.stdout)
+                v.views = int(data.get("view_count", 0) or 0)
+                v.likes = int(data.get("like_count", 0) or 0)
+                v.comments = int(data.get("comment_count", 0) or 0)
+                v.shares = int(data.get("repost_count", data.get("share_count", 0)) or 0)
+                v.duration = int(data.get("duration", 0) or 0)
+                v.title = (data.get("description", "") or data.get("title", ""))[:100]
+                v.description = data.get("description", "")
+                v.upload_date = data.get("upload_date", "")
+                v.thumbnail = data.get("thumbnail", "")
+
+                uploader = data.get("uploader", data.get("channel", ""))
+                if uploader and not v.account_name:
+                    v.account_name = uploader
+                    v.account_url = f"https://www.tiktok.com/@{uploader}"
+
+                console.print(f"    [green]✓ {v.video_id[:8]}... {v.views:,}再生[/green]")
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
+            console.print(f"    [dim]✗ {v.video_id[:8]}...: {e}[/dim]")
 
 
 def get_video_transcript(video_url: str) -> str:
