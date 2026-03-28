@@ -313,7 +313,20 @@ def search_tiktok_videos(keyword: str, min_views: int = 500_000,
     except Exception as e:
         console.print(f"  [dim]Playwright: {e}[/dim]")
 
-    # 方法2: Web検索フォールバック
+    # 方法2: yt-dlpでTikTokハッシュタグページから取得（無料・無制限）
+    if len(videos) < 5:
+        try:
+            tag_videos = _search_with_ytdlp_hashtag(keyword, max_results)
+            for v in tag_videos:
+                if v.video_id and v.video_id not in seen_ids:
+                    videos.append(v)
+                    seen_ids.add(v.video_id)
+            if tag_videos:
+                console.print(f"  [green]yt-dlp: {len(tag_videos)}件取得[/green]")
+        except Exception as e:
+            console.print(f"  [dim]yt-dlp: {e}[/dim]")
+
+    # 方法3: Web検索フォールバック
     if len(videos) < 5:
         web_videos = _search_web_fallback(keyword, max_results * 2)
         for v in web_videos:
@@ -321,7 +334,7 @@ def search_tiktok_videos(keyword: str, min_views: int = 500_000,
                 videos.append(v)
                 seen_ids.add(v.video_id)
 
-    # 方法3: メタデータ未取得のURLをyt-dlpで補完
+    # 方法4: メタデータ未取得のURLをyt-dlpで補完
     needs_enrich = [v for v in videos if v.views == 0 and v.url]
     if needs_enrich:
         console.print(f"  [cyan]{len(needs_enrich)}件のメタデータを取得中...[/cyan]")
@@ -650,6 +663,67 @@ def _get_account_tiktokapi(username: str) -> Optional[TikTokAccount]:
 
 
 # ===== Web Search Fallback =====
+
+def _search_with_ytdlp_hashtag(keyword: str, max_results: int = 20) -> list[TikTokVideo]:
+    """yt-dlpでTikTokのハッシュタグ/検索ページから動画一覧を取得する（無料・無制限）."""
+    videos = []
+
+    # キーワードからハッシュタグURLを生成（スペース除去）
+    tag = keyword.replace(" ", "").replace("　", "")
+    urls_to_try = [
+        f"https://www.tiktok.com/tag/{tag}",
+        f"https://www.tiktok.com/search?q={keyword}",
+    ]
+
+    for url in urls_to_try:
+        if len(videos) >= max_results:
+            break
+        try:
+            cmd = [
+                sys.executable, "-m", "yt_dlp",
+                "--dump-json", "--flat-playlist",
+                "--playlist-items", f"1:{max_results}",
+                "--no-download", "--no-warnings", "--quiet",
+                url,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if result.returncode != 0 or not result.stdout:
+                continue
+
+            for line in result.stdout.strip().split("\n"):
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                    vid_id = str(data.get("id", ""))
+                    if not vid_id:
+                        continue
+
+                    uploader = data.get("uploader", data.get("channel", ""))
+                    v = TikTokVideo(
+                        video_id=vid_id,
+                        url=data.get("url", data.get("webpage_url", f"https://www.tiktok.com/@{uploader}/video/{vid_id}")),
+                        title=(data.get("description", "") or data.get("title", ""))[:100],
+                        description=data.get("description", ""),
+                        views=int(data.get("view_count", 0) or 0),
+                        likes=int(data.get("like_count", 0) or 0),
+                        comments=int(data.get("comment_count", 0) or 0),
+                        shares=int(data.get("repost_count", 0) or 0),
+                        duration=int(data.get("duration", 0) or 0),
+                        upload_date=data.get("upload_date", ""),
+                        account_name=uploader,
+                        account_url=f"https://www.tiktok.com/@{uploader}" if uploader else "",
+                        account_id=uploader,
+                        thumbnail=data.get("thumbnail", ""),
+                    )
+                    videos.append(v)
+                except json.JSONDecodeError:
+                    continue
+        except (subprocess.TimeoutExpired, Exception) as e:
+            console.print(f"  [dim]yt-dlp tag ({url}): {e}[/dim]")
+
+    return videos[:max_results]
+
 
 def _search_with_playwright(keyword: str, max_results: int = 20) -> list[TikTokVideo]:
     """Playwrightでブラウザを自動操作してTikTok検索する（無料・無制限）."""
