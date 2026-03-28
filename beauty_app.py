@@ -51,6 +51,7 @@ from beauty_planner.reference_data import (
     SUNO_AI_STYLE,
     BEAUTY_CATEGORIES,
 )
+from beauty_planner.channels_data import BUILTIN_CHANNELS, TOP_TIKTOK_ACCOUNTS
 from beauty_planner.apify_client import (
     ApifyClient,
     normalize_tiktok_data,
@@ -97,6 +98,161 @@ def save_config():
         config["apify_api_token"] = data.get("apify_api_token", "")
     save_json(CONFIG_PATH, config)
     return jsonify({"ok": True})
+
+
+# === 内蔵チャンネル ===
+@app.route("/api/builtin-channels", methods=["GET"])
+def get_builtin_channels():
+    """内蔵の競合チャンネル一覧を返す."""
+    return jsonify(BUILTIN_CHANNELS)
+
+
+@app.route("/api/load-builtin-channels", methods=["POST"])
+def load_builtin_channels():
+    """内蔵チャンネルを登録済みチャンネルにマージ."""
+    existing = load_json(CHANNELS_PATH, [])
+    existing_urls = {ch.get("url", "") for ch in existing}
+    added = 0
+    for ch in BUILTIN_CHANNELS:
+        if ch["url"] not in existing_urls:
+            existing.append(ch)
+            existing_urls.add(ch["url"])
+            added += 1
+    save_json(CHANNELS_PATH, existing)
+    return jsonify({"ok": True, "added": added, "total": len(existing)})
+
+
+# === ワンクリック全自動 ===
+@app.route("/api/run-all", methods=["POST"])
+def run_all():
+    """ワンクリックで収集→分析→企画→台本まで全自動実行."""
+    try:
+        data = request.json or {}
+        script_type = data.get("script_type", "karakuchi")
+        num_plans = data.get("num_plans", 5)
+        target_duration = data.get("target_duration", 35)
+
+        steps = []
+
+        # Step 1: 内蔵チャンネルロード
+        existing = load_json(CHANNELS_PATH, [])
+        if not existing:
+            existing_urls = set()
+            for ch in BUILTIN_CHANNELS:
+                if ch["url"] not in existing_urls:
+                    existing.append(ch)
+                    existing_urls.add(ch["url"])
+            save_json(CHANNELS_PATH, existing)
+        channels = existing
+        steps.append({"step": "channels", "count": len(channels)})
+
+        # Step 2: Apifyデータ収集
+        apify = get_apify_client()
+        all_videos = []
+
+        tiktok_users = list(set(
+            ch["name"] for ch in channels if ch.get("platform") == "TikTok"
+        ))[:20]  # Apify無料枠を考慮して上位20アカウント
+        if tiktok_users:
+            raw = apify.scrape_tiktok_profile(tiktok_users, 20)
+            all_videos.extend(normalize_tiktok_data(raw))
+
+        ig_users = list(set(
+            ch["name"] for ch in channels if ch.get("platform") == "Instagram"
+        ))[:10]
+        if ig_users:
+            raw = apify.scrape_instagram_profile(ig_users, 20)
+            all_videos.extend(normalize_instagram_data(raw))
+
+        save_json(COLLECTED_DATA_PATH, {
+            "videos": all_videos,
+            "collected_at": datetime.now().isoformat(),
+        })
+        steps.append({"step": "collect", "total_videos": len(all_videos)})
+
+        # Step 3: トレンド分析
+        period = data.get("period", "3months")
+        min_views = data.get("min_views", 0)
+        trend_result = analyze_trends(all_videos, period, min_views)
+        steps.append({"step": "analyze", "total_analyzed": trend_result.get("total_videos", 0)})
+
+        # Step 4: 企画生成（Claude API）
+        client = get_anthropic_client()
+        plan_prompt = _build_plan_prompt(trend_result, num_plans)
+        plan_response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=6000,
+            messages=[{"role": "user", "content": plan_prompt}],
+        )
+        plan_text = "".join(b.text for b in plan_response.content if hasattr(b, "text"))
+        json_s = plan_text.find("{")
+        json_e = plan_text.rfind("}") + 1
+        plans_data = json.loads(plan_text[json_s:json_e]) if json_s >= 0 else {"plans": []}
+        steps.append({"step": "plans", "count": len(plans_data.get("plans", []))})
+
+        # Step 5: 台本生成（最初の企画で）
+        script_text = ""
+        if plans_data.get("plans"):
+            first_plan = plans_data["plans"][0]
+            from beauty_planner.reference_data import KARAKUCHI_REFERENCE, ZUNDAMON_STYLE, SUNO_AI_STYLE
+            if script_type == "karakuchi":
+                sp = _build_karakuchi_prompt(first_plan, target_duration, "")
+            elif script_type == "zundamon":
+                sp = _build_zundamon_prompt(first_plan, target_duration, "")
+            else:
+                sp = _build_suno_prompt(first_plan, target_duration, "")
+
+            script_response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4000,
+                messages=[{"role": "user", "content": sp}],
+            )
+            script_text = "".join(b.text for b in script_response.content if hasattr(b, "text"))
+        steps.append({"step": "script", "type": script_type, "length": len(script_text)})
+
+        return jsonify({
+            "ok": True,
+            "steps": steps,
+            "trend_data": trend_result,
+            "plans": plans_data,
+            "script": script_text,
+            "script_type": script_type,
+        })
+
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+def _build_plan_prompt(trend_data, num_plans):
+    """トレンドデータから企画生成プロンプトを構築."""
+    return f"""あなたは美容系ショート動画の企画プロデューサーです。
+以下の実データを元に、{num_plans}本の企画案を生成してください。
+
+【収集データサマリー】
+- 分析動画数: {trend_data.get('total_videos', 0)}
+- 総再生数: {trend_data.get('total_views', 0):,}
+- 平均再生数: {trend_data.get('avg_views', 0):,}
+- 期間: {trend_data.get('period', '')}
+
+【人気動画TOP5】
+{json.dumps(trend_data.get('trending_videos', [])[:5], ensure_ascii=False, indent=2)}
+
+【ホットキーワード】
+{json.dumps(trend_data.get('hot_keywords', [])[:10], ensure_ascii=False, indent=2)}
+
+【参考: 伸びている企画パターン】
+- 「プチプラで1番良い○○はこれだぜっ☆」→400万+再生
+- 「市販で1番良い○○」→400万+再生
+- 商品4〜5個紹介、最初は辛口→最後にイチオシ
+- プチプラ（〜1500円）が視聴者に最も刺さる
+
+JSON形式で回答:
+```json
+{{"plans": [{{"id": 1, "title": "企画タイトル", "category": "カテゴリ", "target_products": ["商品名"], "hook": "冒頭の引き", "structure": "構成", "why_this_works": "伸びる理由", "estimated_engagement": "高/中/低", "recommended_script_type": "辛口レビュー/ずんだもん/Suno AI歌", "target_duration_sec": 35, "keywords": ["KW"], "comment_bait": "コメント誘発ポイント"}}]}}
+```"""
 
 
 # === Apifyデータ収集 ===

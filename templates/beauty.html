@@ -224,6 +224,34 @@
         <p>競合分析 → トレンド発見 → 企画生成 → 台本生成</p>
     </header>
 
+    <!-- ワンクリック全自動 -->
+    <div class="card" style="border-color:var(--accent);margin-bottom:1.5rem;">
+        <div class="card-title" style="color:var(--accent);">ワンクリック全自動</div>
+        <p class="text-sm text-dim mb-1">内蔵81アカウントからデータ収集→トレンド分析→企画生成→台本生成まで全自動で実行します</p>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+            <select id="runAllScriptType">
+                <option value="karakuchi">辛口レビュー</option>
+                <option value="zundamon">ずんだもん</option>
+                <option value="suno">Suno AI歌詞</option>
+            </select>
+            <select id="runAllPlanCount">
+                <option value="3">企画3本</option>
+                <option value="5" selected>企画5本</option>
+                <option value="8">企画8本</option>
+            </select>
+            <button class="btn btn-primary" id="btnRunAll" onclick="runAll()">
+                全自動実行
+            </button>
+        </div>
+        <div id="runAllLoading" class="loading hidden">
+            <div class="spinner"></div>
+            <span id="runAllStatus">全自動処理中...（2〜5分程度）</span>
+        </div>
+        <div id="runAllResult" class="hidden">
+            <div id="runAllSteps" class="text-sm mt-1"></div>
+        </div>
+    </div>
+
     <!-- Navigation -->
     <nav class="nav-tabs" id="navTabs">
         <button class="nav-tab active" data-tab="channels">
@@ -277,7 +305,10 @@
         <div class="card">
             <div class="card-title flex-between">
                 <span>競合チャンネル登録</span>
-                <button class="btn btn-primary btn-sm" onclick="addChannel()">+ 追加</button>
+                <div>
+                    <button class="btn btn-cyan btn-sm" onclick="loadBuiltinChannels()">内蔵81ch読み込み</button>
+                    <button class="btn btn-primary btn-sm" onclick="addChannel()">+ 手動追加</button>
+                </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -655,6 +686,74 @@ async function saveApiKey() {
     $('apiKeyInput').value = '';
     await loadApiConfig();
     alert('保存しました');
+}
+
+// ============================
+// 内蔵チャンネル読み込み
+// ============================
+async function loadBuiltinChannels() {
+    const data = await api('/api/load-builtin-channels', 'POST');
+    if (data.ok) {
+        alert(`${data.added}チャンネル追加しました（合計${data.total}）`);
+        await loadChannels();
+    }
+}
+
+// ============================
+// ワンクリック全自動
+// ============================
+async function runAll() {
+    const btn = $('btnRunAll');
+    btn.disabled = true;
+    show($('runAllLoading'));
+    hide($('runAllResult'));
+    $('runAllStatus').textContent = '全自動処理中...（2〜5分程度）';
+
+    try {
+        const data = await api('/api/run-all', 'POST', {
+            script_type: $('runAllScriptType').value,
+            num_plans: parseInt($('runAllPlanCount').value),
+            period: '3months',
+        });
+
+        if (!data.ok) throw new Error(data.error || '全自動処理に失敗しました');
+
+        // 結果をstateに保存
+        state.latestTrends = data.trend_data;
+        state.latestPlans = data.plans;
+        updateScriptPlanSelect();
+
+        // ステップ結果表示
+        const steps = data.steps || [];
+        $('runAllSteps').innerHTML = steps.map(s => {
+            if (s.step === 'channels') return `チャンネル: ${s.count}件`;
+            if (s.step === 'collect') return `データ収集: ${s.total_videos}動画`;
+            if (s.step === 'analyze') return `トレンド分析: ${s.total_analyzed}動画分析`;
+            if (s.step === 'plans') return `企画生成: ${s.count}本`;
+            if (s.step === 'script') return `台本生成: ${s.type}（${s.length}文字）`;
+            return JSON.stringify(s);
+        }).map(t => `<div class="badge badge-green" style="margin:.2rem;">${t}</div>`).join('');
+
+        // 台本も表示
+        if (data.script) {
+            $('scriptOutput').textContent = data.script;
+            show($('scriptResult'));
+            const typeLabel = {karakuchi:'辛口レビュー', zundamon:'ずんだもん', suno:'Suno AI歌詞'}[$('runAllScriptType').value];
+            $('scriptResultTitle').textContent = `${typeLabel} - 自動生成`;
+        }
+
+        // 各タブにも反映
+        if (data.trend_data) renderTrendResults(data.trend_data);
+        if (data.plans) renderPlans(data.plans);
+
+        show($('runAllResult'));
+        show($('trendResults'));
+    } catch (e) {
+        alert('エラー: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        hide($('runAllLoading'));
+    }
 }
 
 async function saveApifyToken() {
