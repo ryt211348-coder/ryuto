@@ -3,159 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok スキンケア企画メーカー</title>
+    <title>美容動画リサーチツール</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/planner.css">
 </head>
 <body>
     <div class="container">
-        <nav class="nav-bar">
-            <a href="/analyzer" class="nav-link">分析ツール</a>
-            <a href="/" class="nav-link active">企画メーカー</a>
-        </nav>
-
         <header class="header">
-            <h1>スキンケア企画メーカー</h1>
-            <p class="subtitle">TikTokを自動リサーチ → トレンドキーワード提案 → フック×ハウツーをマッチング → 企画台本を生成</p>
+            <h1>美容動画リサーチツール</h1>
+            <p class="subtitle">TikTok・Instagramのバズ美容動画を自動収集 → 再生数順にランキング表示</p>
         </header>
 
-        <!-- Step 1: 設定 -->
-        <section class="input-section" id="inputSection">
-            <div class="form-card">
-                <p class="section-desc" style="margin-bottom:1.5rem">参考台本の成功/失敗パターン・声の雰囲気はビルトイン済みです。</p>
+        <!-- プラットフォーム切り替え -->
+        <div class="platform-tabs">
+            <button class="platform-tab active" id="tab-tiktok" onclick="switchPlatform('tiktok')">TikTok</button>
+            <button class="platform-tab" id="tab-instagram" onclick="switchPlatform('instagram')">Instagram</button>
+        </div>
 
-                <h2 class="section-title">リサーチ条件</h2>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="minViews">最低再生数</label>
-                        <select id="minViews">
-                            <option value="100000">10万再生</option>
-                            <option value="300000">30万再生</option>
-                            <option value="500000" selected>50万再生</option>
-                            <option value="1000000">100万再生</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="hookPeriod">フック参照期間</label>
-                        <select id="hookPeriod">
-                            <option value="1">直近1ヶ月</option>
-                            <option value="3" selected>直近3ヶ月</option>
-                            <option value="6">直近6ヶ月</option>
-                            <option value="12">直近1年</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="searchPeriod">リサーチ全体期間</label>
-                        <select id="searchPeriod">
-                            <option value="3">直近3ヶ月</option>
-                            <option value="6" selected>直近6ヶ月</option>
-                            <option value="12">直近1年</option>
-                            <option value="24">直近2年</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="maxPlans">生成パターン数</label>
-                        <select id="maxPlans">
-                            <option value="3">3パターン</option>
-                            <option value="6" selected>6パターン</option>
-                            <option value="10">10パターン</option>
-                        </select>
-                    </div>
-                </div>
-
-                <button class="btn-primary" id="discoverBtn" onclick="startDiscovery()" style="margin-top:1.5rem">
-                    トレンドキーワードを自動発見
-                </button>
+        <!-- フィルター -->
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>期間</label>
+                <select id="periodFilter" onchange="applyFilters()">
+                    <option value="7">直近1週間</option>
+                    <option value="30" selected>直近1ヶ月</option>
+                    <option value="90">直近3ヶ月</option>
+                    <option value="180">直近6ヶ月</option>
+                    <option value="365">直近1年</option>
+                    <option value="9999">1年以上前</option>
+                </select>
             </div>
-        </section>
-
-        <!-- Step 2: キーワード選択 -->
-        <section class="keyword-section hidden" id="keywordSection">
-            <div class="form-card">
-                <h2 class="section-title">トレンドキーワード候補</h2>
-                <p class="section-desc">ボリュームとエンゲージメントが高いキーワードを自動検出しました。使いたいものを選んでください（複数選択可）。</p>
-                <div id="keywordGrid"></div>
-                <div class="form-group" style="margin-top:1.5rem">
-                    <label for="customKeyword">追加キーワード（任意）</label>
-                    <input type="text" id="customKeyword" placeholder="独自のキーワードを追加できます">
-                </div>
-                <div style="display:flex;gap:1rem;margin-top:1rem">
-                    <button class="btn-primary" id="researchBtn" onclick="startResearchWithKeywords()" style="flex:1">
-                        選択したキーワードでリサーチ開始
-                    </button>
-                    <button class="btn-secondary" onclick="resetPlanner()">戻る</button>
-                </div>
+            <div class="filter-group">
+                <label>最低再生数</label>
+                <select id="minViewsFilter" onchange="applyFilters()">
+                    <option value="0">指定なし</option>
+                    <option value="10000">1万再生以上</option>
+                    <option value="100000">10万再生以上</option>
+                    <option value="500000" selected>50万再生以上</option>
+                    <option value="1000000">100万再生以上</option>
+                </select>
             </div>
-        </section>
-
-        <!-- プログレス -->
-        <section class="loading-section hidden" id="loadingSection">
-            <div class="progress-card">
-                <div class="progress-steps">
-                    <div class="step" id="rs1" data-status="waiting">
-                        <div class="step-icon">1</div>
-                        <div class="step-label">トレンド発見</div>
-                    </div>
-                    <div class="step-line"></div>
-                    <div class="step" id="rs2" data-status="waiting">
-                        <div class="step-icon">2</div>
-                        <div class="step-label">動画リサーチ</div>
-                    </div>
-                    <div class="step-line"></div>
-                    <div class="step" id="rs3" data-status="waiting">
-                        <div class="step-icon">3</div>
-                        <div class="step-label">文字起こし</div>
-                    </div>
-                    <div class="step-line"></div>
-                    <div class="step" id="rs4" data-status="waiting">
-                        <div class="step-icon">4</div>
-                        <div class="step-label">企画生成</div>
-                    </div>
-                </div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar" id="researchProgressBar"></div>
-                </div>
-                <p class="progress-message" id="researchMessage">準備中...</p>
-                <button class="btn-secondary" onclick="location.reload()" style="margin-top:1rem">キャンセル</button>
+            <div class="filter-group">
+                <label>表示件数</label>
+                <select id="limitFilter" onchange="applyFilters()">
+                    <option value="50">50件</option>
+                    <option value="100">100件</option>
+                    <option value="200">200件</option>
+                    <option value="500" selected>500件</option>
+                </select>
             </div>
-        </section>
+            <button class="btn-primary" id="searchBtn" onclick="startSearch()" style="padding:.6rem 1.5rem;width:auto">
+                検索開始
+            </button>
+        </div>
 
-        <!-- エラー -->
-        <section class="error-section hidden" id="errorSection">
-            <div class="error-card">
-                <p id="plannerError"></p>
-                <button class="btn-secondary" onclick="resetPlanner()">やり直す</button>
-            </div>
-        </section>
+        <!-- ステータス -->
+        <div class="search-status hidden" id="searchStatus">
+            <div class="spinner" style="width:24px;height:24px;border-width:2px"></div>
+            <span id="searchMessage">検索中...</span>
+        </div>
 
-        <!-- 結果 -->
-        <section class="result-section hidden" id="resultSection">
-            <div id="summaryCard"></div>
+        <!-- 結果サマリー -->
+        <div class="result-summary hidden" id="resultSummary"></div>
 
-            <div class="tabs">
-                <button class="tab active" onclick="switchPlannerTab('plans')">企画台本</button>
-                <button class="tab" onclick="switchPlannerTab('videos')">リサーチ動画</button>
-                <button class="tab" onclick="switchPlannerTab('hooks')">フック一覧</button>
-                <button class="tab" onclick="switchPlannerTab('topics')">トピック分析</button>
-            </div>
+        <!-- 動画リスト -->
+        <div id="videoList"></div>
 
-            <div class="tab-content active" id="ptab-plans"><div id="plansList"></div></div>
-            <div class="tab-content" id="ptab-videos"><div id="researchedVideos"></div></div>
-            <div class="tab-content" id="ptab-hooks"><div id="hooksCandidates"></div></div>
-            <div class="tab-content" id="ptab-topics"><div id="topicsAnalysis"></div></div>
-
-            <button class="btn-secondary" onclick="resetPlanner()" style="margin-top:2rem">新しいリサーチを開始</button>
-        </section>
-
-        <!-- アカウント情報モーダル -->
-        <div class="modal-overlay hidden" id="accountModal" onclick="closeAccountModal(event)">
-            <div class="modal-card" onclick="event.stopPropagation()">
-                <button class="modal-close" onclick="closeAccountModal()">&times;</button>
+        <!-- アカウント詳細モーダル -->
+        <div class="modal-overlay hidden" id="accountModal" onclick="closeModal(event)">
+            <div class="modal-card modal-wide" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeModal()">&times;</button>
                 <div id="accountContent">
                     <div class="spinner" style="margin:2rem auto"></div>
-                    <p style="text-align:center;color:var(--text-dim)">読み込み中...</p>
                 </div>
             </div>
         </div>
