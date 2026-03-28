@@ -301,24 +301,31 @@ def search_tiktok_videos(keyword: str, min_views: int = 500_000,
     videos = []
     seen_ids = set()
 
-    # 方法1: Web検索でTikTok動画URLを収集（無料・無制限）
-    web_videos = _search_web_fallback(keyword, max_results * 2)
-    for v in web_videos:
-        if v.video_id not in seen_ids:
-            videos.append(v)
-            seen_ids.add(v.video_id)
+    # 方法1: Playwrightでブラウザ自動操作（最も確実・無料・無制限）
+    try:
+        pw_videos = _search_with_playwright(keyword, max_results)
+        for v in pw_videos:
+            if v.video_id and v.video_id not in seen_ids:
+                videos.append(v)
+                seen_ids.add(v.video_id)
+        if videos:
+            console.print(f"  [green]Playwright: {len(videos)}件取得[/green]")
+    except Exception as e:
+        console.print(f"  [dim]Playwright: {e}[/dim]")
 
-    # 方法2: ScrapeCreators API（APIキーがある場合のみ）
-    sc_videos = _search_scrapecreators(keyword, max_results)
-    for v in sc_videos:
-        if v.video_id not in seen_ids:
-            videos.append(v)
-            seen_ids.add(v.video_id)
+    # 方法2: Web検索フォールバック
+    if len(videos) < 5:
+        web_videos = _search_web_fallback(keyword, max_results * 2)
+        for v in web_videos:
+            if v.video_id and v.video_id not in seen_ids:
+                videos.append(v)
+                seen_ids.add(v.video_id)
 
-    # 方法3: 見つかったURLのメタデータをyt-dlpで取得（無料・無制限）
-    if videos:
-        console.print(f"  [cyan]{len(videos)}件のURLのメタデータを取得中...[/cyan]")
-        _enrich_videos_with_ytdlp(videos)
+    # 方法3: メタデータ未取得のURLをyt-dlpで補完
+    needs_enrich = [v for v in videos if v.views == 0 and v.url]
+    if needs_enrich:
+        console.print(f"  [cyan]{len(needs_enrich)}件のメタデータを取得中...[/cyan]")
+        _enrich_videos_with_ytdlp(needs_enrich)
 
     # フィルタリング
     cutoff = datetime.now() - timedelta(days=period_months * 30)
@@ -643,6 +650,104 @@ def _get_account_tiktokapi(username: str) -> Optional[TikTokAccount]:
 
 
 # ===== Web Search Fallback =====
+
+def _search_with_playwright(keyword: str, max_results: int = 20) -> list[TikTokVideo]:
+    """Playwrightでブラウザを自動操作してTikTok検索する（無料・無制限）."""
+    from playwright.sync_api import sync_playwright
+    import urllib.parse
+
+    videos = []
+    encoded = urllib.parse.quote(keyword)
+    url = f"https://www.tiktok.com/search/video?q={encoded}&t={int(time.time())}"
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent=_ua(),
+            viewport={"width": 1280, "height": 800},
+            locale="ja-JP",
+        )
+        page = context.new_page()
+
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # 検索結果が読み込まれるのを待つ
+            page.wait_for_timeout(5000)
+            # スクロールしてもっと動画を読み込む
+            for _ in range(3):
+                page.evaluate("window.scrollBy(0, 1000)")
+                page.wait_for_timeout(2000)
+
+            # ページのHTMLから動画データを抽出
+            html = page.content()
+
+            # 埋め込みJSONを試す
+            json_match = re.search(
+                r'<script\s+id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>',
+                html, re.DOTALL
+            )
+            seen = set()
+            if json_match:
+                try:
+                    data = json.loads(json_match.group(1))
+                    _parse_tiktok_search_json(data, videos, seen, max_results)
+                except json.JSONDecodeError:
+                    pass
+
+            sigi_match = re.search(
+                r'<script\s+id="SIGI_STATE"[^>]*>(.*?)</script>',
+                html, re.DOTALL
+            )
+            if sigi_match and len(videos) < 5:
+                try:
+                    data = json.loads(sigi_match.group(1))
+                    _parse_tiktok_sigi_state(data, videos, seen, max_results)
+                except json.JSONDecodeError:
+                    pass
+
+            # JSONが取れなかった場合はHTMLからURLを抽出
+            if len(videos) < 5:
+                _extract_tiktok_urls(html, videos, seen)
+
+            # ページ内のJavaScriptで取得できるデータも試す
+            if len(videos) < 5:
+                try:
+                    js_data = page.evaluate("""
+                        () => {
+                            const items = [];
+                            const links = document.querySelectorAll('a[href*="/video/"]');
+                            links.forEach(link => {
+                                const href = link.href || '';
+                                const match = href.match(/@([\\w.]+)\\/video\\/(\\d+)/);
+                                if (match) {
+                                    items.push({username: match[1], videoId: match[2], href: href});
+                                }
+                            });
+                            return items;
+                        }
+                    """)
+                    for item in js_data:
+                        vid_id = item.get("videoId", "")
+                        username = item.get("username", "")
+                        if vid_id and vid_id not in seen:
+                            seen.add(vid_id)
+                            videos.append(TikTokVideo(
+                                video_id=vid_id,
+                                url=f"https://www.tiktok.com/@{username}/video/{vid_id}",
+                                account_name=username,
+                                account_url=f"https://www.tiktok.com/@{username}",
+                                account_id=username,
+                            ))
+                except Exception:
+                    pass
+
+        except Exception as e:
+            console.print(f"  [dim]Playwright page error: {e}[/dim]")
+        finally:
+            browser.close()
+
+    return videos[:max_results]
+
 
 def _search_web_fallback(keyword: str, max_results: int = 20) -> list[TikTokVideo]:
     """TikTok検索ページ + Web検索で動画を探す（完全無料）."""
