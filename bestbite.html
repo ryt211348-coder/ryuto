@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BestBite - レストラン総合比較ツール</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+--primary:#e63946;--primary-dark:#c1121f;--bg:#fafafa;--bg-card:#fff;
+--text:#1d1d1d;--text-light:#6b7280;--border:#e5e7eb;
+--shadow:0 2px 8px rgba(0,0,0,.08);--shadow-lg:0 8px 24px rgba(0,0,0,.12);
+--radius:12px;--radius-sm:8px;
+--score-high:#16a34a;--score-mid:#f59e0b;--score-low:#9ca3af;
+--reserve-ok:#16a34a;--reserve-few:#f59e0b;--reserve-full:#dc2626;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+.header{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;padding:24px 0;text-align:center}
+.header-inner{max-width:1200px;margin:0 auto;padding:0 20px}
+.logo{font-size:32px;font-weight:800;letter-spacing:-1px}
+.tagline{font-size:14px;opacity:.85;margin-top:4px}
+.main{max-width:1200px;margin:0 auto;padding:24px 20px 60px}
+.search-panel{background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-bottom:20px}
+.search-title{font-size:18px;font-weight:700;margin-bottom:16px}
+.search-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:16px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:13px;font-weight:600;color:var(--text-light)}
+.form-group select{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:#fff;color:var(--text);cursor:pointer;transition:border-color .2s}
+.form-group select:focus{outline:none;border-color:var(--primary)}
+.checkbox-group{justify-content:flex-end}
+.checkbox-group label{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:var(--text);cursor:pointer}
+.checkbox-group input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary)}
+.search-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.sort-group{display:flex;align-items:center;gap:8px}
+.sort-group label{font-size:13px;font-weight:600;color:var(--text-light);white-space:nowrap}
+.sort-group select{padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:#fff}
+.btn-search{background:var(--primary);color:#fff;border:none;padding:12px 40px;border-radius:var(--radius-sm);font-size:16px;font-weight:700;cursor:pointer;transition:background .2s,transform .1s}
+.btn-search:hover{background:var(--primary-dark)}
+.btn-search:active{transform:scale(.98)}
+.score-explanation{margin-bottom:20px}
+.score-explanation details{background:var(--bg-card);border-radius:var(--radius-sm);padding:12px 16px;border:1px solid var(--border)}
+.score-explanation summary{font-size:13px;font-weight:600;color:var(--text-light);cursor:pointer}
+.score-explanation p{font-size:13px;color:var(--text-light);margin-top:8px;line-height:1.7}
+.result-count{font-size:14px;color:var(--text-light);margin-bottom:16px;font-weight:600}
+.result-count strong{color:var(--primary);font-size:20px}
+.results-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:20px}
+.restaurant-card{background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .2s}
+.restaurant-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.card-header{padding:16px 20px 12px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.card-info{flex:1;min-width:0}
+.card-name{font-size:17px;font-weight:700;line-height:1.3;margin-bottom:4px}
+.card-meta{font-size:13px;color:var(--text-light);display:flex;gap:8px;flex-wrap:wrap}
+.score-badge{flex-shrink:0;width:56px;height:56px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800}
+.score-badge .score-num{font-size:18px;line-height:1}
+.score-badge .score-label{font-size:8px;opacity:.9;margin-top:2px}
+.score-high{background:var(--score-high)}.score-mid{background:var(--score-mid)}.score-low{background:var(--score-low)}
+.card-reviews{padding:0 20px 12px;display:flex;flex-direction:column;gap:6px}
+.review-row{display:flex;align-items:center;gap:8px;font-size:12px}
+.review-source{width:90px;font-weight:600;color:var(--text-light);flex-shrink:0}
+.review-bar-bg{flex:1;height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden}
+.review-bar{height:100%;border-radius:4px;transition:width .4s ease}
+.bar-tabelog{background:#ff6600}.bar-hotpepper{background:#e4007f}.bar-google{background:#4285f4}
+.review-rating{width:30px;text-align:right;font-weight:700;font-size:13px}
+.review-count{width:65px;text-align:right;font-size:11px;color:var(--text-light)}
+.card-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.card-price{font-size:14px;font-weight:700}
+.card-tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:11px;padding:3px 8px;border-radius:20px;background:#f3f4f6;color:var(--text-light);font-weight:500}
+.tag-atmosphere{background:#ede9fe;color:#7c3aed}
+.reservation-badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px}
+.reserve-available{background:#dcfce7;color:var(--reserve-ok)}
+.reserve-few{background:#fef9c3;color:var(--reserve-few)}
+.reserve-full{background:#fee2e2;color:var(--reserve-full)}
+.modal{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center}
+.modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+.modal-content{position:relative;background:var(--bg-card);border-radius:var(--radius);max-width:700px;width:90%;max-height:85vh;overflow-y:auto;padding:32px;box-shadow:var(--shadow-lg)}
+.modal-close{position:absolute;top:12px;right:16px;background:none;border:none;font-size:28px;color:var(--text-light);cursor:pointer;line-height:1}
+.modal-close:hover{color:var(--text)}
+.detail-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px}
+.detail-name{font-size:22px;font-weight:800}
+.detail-sub{font-size:14px;color:var(--text-light);margin-top:4px}
+.detail-section{margin-bottom:20px}
+.detail-section h3{font-size:14px;font-weight:700;color:var(--text-light);margin-bottom:8px;letter-spacing:.5px}
+.detail-description{font-size:15px;line-height:1.7}
+.detail-info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.detail-info-item{display:flex;flex-direction:column;gap:2px}
+.info-label{font-size:12px;color:var(--text-light);font-weight:600}
+.info-value{font-size:14px;font-weight:500}
+.detail-reviews{display:flex;flex-direction:column;gap:10px}
+.detail-review-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#f9fafb;border-radius:var(--radius-sm)}
+.detail-review-source{width:110px;font-weight:700;font-size:14px}
+.detail-review-rating{font-size:20px;font-weight:800;width:45px}
+.detail-review-count{font-size:13px;color:var(--text-light)}
+.detail-review-bar-bg{flex:1;height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden}
+.detail-review-bar{height:100%;border-radius:5px}
+.detail-tags{display:flex;flex-wrap:wrap;gap:8px}
+.detail-tag{font-size:13px;padding:5px 14px;border-radius:20px;background:#f3f4f6;font-weight:500}
+.footer{text-align:center;padding:24px;font-size:13px;color:var(--text-light);border-top:1px solid var(--border)}
+.no-results{text-align:center;padding:60px 20px;color:var(--text-light)}
+.no-results h3{font-size:18px;margin-bottom:8px;color:var(--text)}
+@media(max-width:768px){
+.search-grid{grid-template-columns:repeat(2,1fr)}
+.results-grid{grid-template-columns:1fr}
+.detail-info-grid{grid-template-columns:1fr}
+.search-actions{flex-direction:column;align-items:stretch}
+.btn-search{width:100%}
+}
+@media(max-width:480px){
+.search-grid{grid-template-columns:1fr}
+.logo{font-size:24px}
+}
+</style>
+</head>
+<body>
+<header class="header">
+<div class="header-inner">
+<h1 class="logo">BestBite</h1>
+<p class="tagline">食べログ・ホットペッパー・Google 口コミを総合比較</p>
+</div>
+</header>
+<main class="main">
+<section class="search-panel">
+<h2 class="search-title">レストランを探す</h2>
+<div class="search-grid">
+<div class="form-group"><label for="area">エリア</label><select id="area"><option value="">すべてのエリア</option></select></div>
+<div class="form-group"><label for="genre">料理ジャンル</label><select id="genre"><option value="">すべてのジャンル</option></select></div>
+<div class="form-group"><label for="atmosphere">雰囲気</label><select id="atmosphere"><option value="">こだわりなし</option></select></div>
+<div class="form-group"><label for="party_size">人数</label><select id="party_size">
+<option value="0">指定なし</option><option value="2">2人</option><option value="4">4人</option><option value="6">6人</option><option value="8">8人</option><option value="10">10人</option><option value="20">20人以上</option><option value="50">50人以上</option>
+</select></div>
+<div class="form-group"><label for="budget_min">予算（下限）</label><select id="budget_min">
+<option value="0">指定なし</option><option value="1000">¥1,000〜</option><option value="3000">¥3,000〜</option><option value="5000">¥5,000〜</option><option value="8000">¥8,000〜</option><option value="10000">¥10,000〜</option><option value="15000">¥15,000〜</option><option value="20000">¥20,000〜</option>
+</select></div>
+<div class="form-group"><label for="budget_max">予算（上限）</label><select id="budget_max">
+<option value="0">指定なし</option><option value="3000">〜¥3,000</option><option value="5000">〜¥5,000</option><option value="8000">〜¥8,000</option><option value="10000">〜¥10,000</option><option value="15000">〜¥15,000</option><option value="20000">〜¥20,000</option><option value="30000">〜¥30,000</option><option value="50000">〜¥50,000</option>
+</select></div>
+<div class="form-group"><label for="reservation">予約状況</label><select id="reservation">
+<option value="">すべて</option><option value="available">予約可能</option><option value="few">残りわずか</option>
+</select></div>
+<div class="form-group checkbox-group"><label><input type="checkbox" id="private_room"> 個室あり</label></div>
+</div>
+<div class="search-actions">
+<div class="sort-group"><label for="sort_by">並び替え:</label><select id="sort_by">
+<option value="score">総合スコア順（おすすめ）</option><option value="review_count">口コミ件数順</option><option value="price_low">価格が安い順</option><option value="price_high">価格が高い順</option>
+</select></div>
+<button class="btn-search" onclick="searchRestaurants()">検索する</button>
+</div>
+</section>
+<section class="score-explanation"><details>
+<summary>総合スコアの算出方法</summary>
+<p>各サイト（食べログ・ホットペッパー・Google）の評価を<strong>ベイズ平均</strong>で信頼性スコアに変換し、サイトごとの重み付け（食べログ40%、Google 35%、ホットペッパー25%）で統合。口コミが少ない店舗は全体平均に近づくため、<strong>口コミ件数が多く評価も高い店舗</strong>が上位に表示されます。</p>
+</details></section>
+<div id="result-count" class="result-count" style="display:none"></div>
+<div id="results" class="results-grid"></div>
+<div id="modal" class="modal" style="display:none">
+<div class="modal-overlay" onclick="closeModal()"></div>
+<div class="modal-content">
+<button class="modal-close" onclick="closeModal()">&times;</button>
+<div id="modal-body"></div>
+</div>
+</div>
+</main>
+<footer class="footer"><p>BestBite - レストラン総合比較ツール | デモ版</p></footer>
+
+<script>
+var RESTAURANTS = [
+{id:"r001",name:"鮨 さいとう",genre:"寿司",sub_genre:"江戸前寿司",area:"六本木",address:"東京都港区六本木1-4-5",price_min:15000,price_max:30000,price_label:"¥15,000〜¥30,000",atmosphere_tags:["高級感","落ち着いた","カウンター"],reviews:[{source:"tabelog",source_label:"食べログ",rating:4.70,review_count:892},{source:"google",source_label:"Google",rating:4.6,review_count:1243},{source:"hotpepper",source_label:"ホットペッパー",rating:4.5,review_count:210}],reservation_status:"few",reservation_label:"残りわずか",open_hours:"17:00〜23:00",closed_days:"日曜・祝日",capacity:12,has_private_room:false,smoking:"禁煙",description:"ミシュラン三つ星の名店。厳選されたネタと匠の技が織りなす至高の江戸前寿司。",features:["ミシュラン三つ星","要予約","カウンター席のみ"]},
+{id:"r002",name:"焼肉ジャンボ 篠崎本店",genre:"焼肉",sub_genre:"黒毛和牛",area:"渋谷",address:"東京都渋谷区渋谷3-15-2",price_min:8000,price_max:15000,price_label:"¥8,000〜¥15,000",atmosphere_tags:["にぎやか","大人数OK","カジュアル"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.85,review_count:1567},{source:"google",source_label:"Google",rating:4.3,review_count:3421},{source:"hotpepper",source_label:"ホットペッパー",rating:4.1,review_count:876}],reservation_status:"available",reservation_label:"予約可能",open_hours:"17:00〜24:00",closed_days:"不定休",capacity:80,has_private_room:true,smoking:"分煙",description:"A5ランク黒毛和牛を豪快に。特製タレと厳選肉のハーモニーが人気の実力店。",features:["A5和牛","個室あり","飲み放題あり"]},
+{id:"r003",name:"リストランテ アクアパッツァ",genre:"イタリアン",sub_genre:"南イタリア料理",area:"表参道",address:"東京都港区南青山3-18-1",price_min:10000,price_max:20000,price_label:"¥10,000〜¥20,000",atmosphere_tags:["おしゃれ","デート向き","モダン"],reviews:[{source:"tabelog",source_label:"食べログ",rating:4.12,review_count:634},{source:"google",source_label:"Google",rating:4.4,review_count:987},{source:"hotpepper",source_label:"ホットペッパー",rating:4.3,review_count:445}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:30〜14:30 / 18:00〜22:00",closed_days:"月曜",capacity:45,has_private_room:true,smoking:"禁煙",description:"南イタリアの太陽を感じる本格派。自家製パスタと魚介料理が絶品。",features:["テラス席","コース料理","記念日対応"]},
+{id:"r004",name:"龍天門",genre:"中華",sub_genre:"広東料理",area:"赤坂",address:"東京都港区赤坂2-14-3",price_min:6000,price_max:12000,price_label:"¥6,000〜¥12,000",atmosphere_tags:["高級感","落ち着いた","個室あり"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.92,review_count:478},{source:"google",source_label:"Google",rating:4.2,review_count:1876},{source:"hotpepper",source_label:"ホットペッパー",rating:4.0,review_count:321}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:30〜14:30 / 17:30〜21:30",closed_days:"無休",capacity:120,has_private_room:true,smoking:"禁煙",description:"ホテル内の本格広東料理。点心から大皿まで、熟練の技が光る。",features:["ホテルレストラン","個室多数","コース充実"]},
+{id:"r005",name:"ビストロ エガリテ",genre:"フレンチ",sub_genre:"ビストロ",area:"代官山",address:"東京都渋谷区猿楽町10-1",price_min:5000,price_max:10000,price_label:"¥5,000〜¥10,000",atmosphere_tags:["カジュアル","おしゃれ","デート向き","アットホーム"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.78,review_count:312},{source:"google",source_label:"Google",rating:4.5,review_count:654},{source:"hotpepper",source_label:"ホットペッパー",rating:4.2,review_count:189}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:30〜14:00 / 18:00〜22:30",closed_days:"水曜",capacity:32,has_private_room:false,smoking:"禁煙",description:"気軽に楽しめる本格フレンチビストロ。ワインとの相性抜群の季節の料理。",features:["ワイン充実","テラス席","ランチコースあり"]},
+{id:"r006",name:"韓国料理 ハヌリ 新宿店",genre:"韓国料理",sub_genre:"サムギョプサル",area:"新宿",address:"東京都新宿区歌舞伎町1-23-5",price_min:3000,price_max:5000,price_label:"¥3,000〜¥5,000",atmosphere_tags:["にぎやか","カジュアル","大人数OK"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.55,review_count:723},{source:"google",source_label:"Google",rating:4.1,review_count:2345},{source:"hotpepper",source_label:"ホットペッパー",rating:3.9,review_count:1567}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:00〜24:00",closed_days:"無休",capacity:100,has_private_room:true,smoking:"分煙",description:"本場韓国の味をそのままに。厚切りサムギョプサルと豊富な一品料理が人気。",features:["食べ放題あり","飲み放題あり","深夜営業"]},
+{id:"r007",name:"天ぷら 近藤",genre:"和食",sub_genre:"天ぷら",area:"銀座",address:"東京都中央区銀座5-5-13",price_min:12000,price_max:25000,price_label:"¥12,000〜¥25,000",atmosphere_tags:["高級感","落ち着いた","静か"],reviews:[{source:"tabelog",source_label:"食べログ",rating:4.45,review_count:567},{source:"google",source_label:"Google",rating:4.5,review_count:1432},{source:"hotpepper",source_label:"ホットペッパー",rating:4.3,review_count:178}],reservation_status:"few",reservation_label:"残りわずか",open_hours:"12:00〜13:30 / 17:00〜21:00",closed_days:"日曜",capacity:20,has_private_room:true,smoking:"禁煙",description:"銀座の名店。野菜天ぷらの概念を変える、素材の旨みを引き出す匠の技。",features:["ミシュラン二つ星","カウンター","おまかせコース"]},
+{id:"r008",name:"NARISAWA",genre:"フレンチ",sub_genre:"イノベーティブ",area:"青山",address:"東京都港区南青山2-6-15",price_min:20000,price_max:40000,price_label:"¥20,000〜¥40,000",atmosphere_tags:["高級感","モダン","デート向き","静か"],reviews:[{source:"tabelog",source_label:"食べログ",rating:4.55,review_count:743},{source:"google",source_label:"Google",rating:4.7,review_count:2100},{source:"hotpepper",source_label:"ホットペッパー",rating:4.4,review_count:156}],reservation_status:"full",reservation_label:"満席",open_hours:"12:00〜13:00 / 18:00〜21:00",closed_days:"日曜・月曜",capacity:28,has_private_room:true,smoking:"禁煙",description:"世界のベストレストラン50常連。自然と革新が融合するイノベーティブフレンチ。",features:["世界ランキング入り","完全予約制","ペアリングコース"]},
+{id:"r009",name:"麺屋 翔 新宿本店",genre:"ラーメン",sub_genre:"塩ラーメン",area:"新宿",address:"東京都新宿区西新宿7-22-34",price_min:800,price_max:1500,price_label:"¥800〜¥1,500",atmosphere_tags:["カジュアル","にぎやか"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.72,review_count:1234},{source:"google",source_label:"Google",rating:4.2,review_count:4567},{source:"hotpepper",source_label:"ホットペッパー",rating:3.8,review_count:432}],reservation_status:"available",reservation_label:"予約不要",open_hours:"11:00〜23:00",closed_days:"無休",capacity:18,has_private_room:false,smoking:"禁煙",description:"鶏と魚介のWスープが絶品。ミシュランビブグルマンにも選出された塩ラーメンの名店。",features:["ミシュランビブグルマン","行列必至","カウンターのみ"]},
+{id:"r010",name:"炭火焼鳥 よし鳥",genre:"居酒屋",sub_genre:"焼鳥",area:"恵比寿",address:"東京都渋谷区恵比寿1-8-11",price_min:4000,price_max:7000,price_label:"¥4,000〜¥7,000",atmosphere_tags:["アットホーム","落ち着いた","隠れ家"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.68,review_count:445},{source:"google",source_label:"Google",rating:4.3,review_count:876},{source:"hotpepper",source_label:"ホットペッパー",rating:4.0,review_count:234}],reservation_status:"available",reservation_label:"予約可能",open_hours:"17:00〜23:30",closed_days:"日曜",capacity:30,has_private_room:false,smoking:"分煙",description:"備長炭で丁寧に焼き上げる地鶏焼鳥。日本酒との相性も抜群。",features:["地鶏使用","日本酒充実","炭火焼き"]},
+{id:"r011",name:"バンコクキッチン 池袋店",genre:"タイ料理",sub_genre:"タイ家庭料理",area:"池袋",address:"東京都豊島区西池袋3-27-3",price_min:2000,price_max:4000,price_label:"¥2,000〜¥4,000",atmosphere_tags:["カジュアル","にぎやか","アットホーム"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.52,review_count:389},{source:"google",source_label:"Google",rating:4.0,review_count:1567},{source:"hotpepper",source_label:"ホットペッパー",rating:3.7,review_count:678}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:00〜23:00",closed_days:"無休",capacity:60,has_private_room:false,smoking:"禁煙",description:"本場タイ人シェフが作る本格タイ料理。パッタイとグリーンカレーが大人気。",features:["ランチセットあり","テイクアウト可","辛さ調節可"]},
+{id:"r012",name:"スパイスラボ トーキョー",genre:"インド料理",sub_genre:"モダンインディアン",area:"銀座",address:"東京都中央区銀座6-10-1",price_min:8000,price_max:15000,price_label:"¥8,000〜¥15,000",atmosphere_tags:["おしゃれ","モダン","デート向き"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.95,review_count:287},{source:"google",source_label:"Google",rating:4.3,review_count:743},{source:"hotpepper",source_label:"ホットペッパー",rating:4.1,review_count:156}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:30〜14:00 / 17:30〜22:00",closed_days:"月曜",capacity:40,has_private_room:true,smoking:"禁煙",description:"伝統スパイスとモダンな技法が融合。今までにないインド料理体験。",features:["コース料理","ワインペアリング","ベジタリアン対応"]},
+{id:"r013",name:"鉄板焼き 銀明翠 銀座",genre:"鉄板焼き",sub_genre:"黒毛和牛鉄板焼き",area:"銀座",address:"東京都中央区銀座8-9-15",price_min:15000,price_max:30000,price_label:"¥15,000〜¥30,000",atmosphere_tags:["高級感","デート向き","夜景が見える","静か"],reviews:[{source:"tabelog",source_label:"食べログ",rating:4.22,review_count:398},{source:"google",source_label:"Google",rating:4.4,review_count:876},{source:"hotpepper",source_label:"ホットペッパー",rating:4.2,review_count:210}],reservation_status:"few",reservation_label:"残りわずか",open_hours:"17:00〜22:00",closed_days:"日曜",capacity:24,has_private_room:true,smoking:"禁煙",description:"目の前で焼き上げる極上の黒毛和牛。銀座の夜景と共に特別なひとときを。",features:["目の前調理","記念日対応","夜景"]},
+{id:"r014",name:"カフェ ランバン",genre:"カフェ",sub_genre:"自家焙煎カフェ",area:"中目黒",address:"東京都目黒区上目黒2-9-1",price_min:1000,price_max:2500,price_label:"¥1,000〜¥2,500",atmosphere_tags:["おしゃれ","落ち着いた","テラス席あり"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.60,review_count:256},{source:"google",source_label:"Google",rating:4.4,review_count:1234},{source:"hotpepper",source_label:"ホットペッパー",rating:4.0,review_count:345}],reservation_status:"available",reservation_label:"予約不要",open_hours:"9:00〜21:00",closed_days:"火曜",capacity:35,has_private_room:false,smoking:"禁煙",description:"自家焙煎のスペシャルティコーヒーと手作りスイーツ。川沿いの開放的な空間。",features:["自家焙煎","スイーツ充実","Wi-Fi完備"]},
+{id:"r015",name:"バル エスパニョール",genre:"スペイン料理",sub_genre:"タパス・バル",area:"恵比寿",address:"東京都渋谷区恵比寿4-3-1",price_min:4000,price_max:7000,price_label:"¥4,000〜¥7,000",atmosphere_tags:["にぎやか","カジュアル","おしゃれ","テラス席あり"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.65,review_count:534},{source:"google",source_label:"Google",rating:4.2,review_count:1678},{source:"hotpepper",source_label:"ホットペッパー",rating:4.0,review_count:789}],reservation_status:"available",reservation_label:"予約可能",open_hours:"17:00〜翌1:00",closed_days:"無休",capacity:55,has_private_room:false,smoking:"分煙",description:"本場スペインのタパスとワインが楽しめる陽気なバル。パエリアは必食。",features:["ワイン100種以上","深夜営業","パエリア"]},
+{id:"r016",name:"割烹 青華こばやし",genre:"和食",sub_genre:"割烹",area:"麻布十番",address:"東京都港区麻布十番2-7-14",price_min:10000,price_max:18000,price_label:"¥10,000〜¥18,000",atmosphere_tags:["和モダン","落ち着いた","隠れ家","静か"],reviews:[{source:"tabelog",source_label:"食べログ",rating:4.30,review_count:523},{source:"google",source_label:"Google",rating:4.5,review_count:678},{source:"hotpepper",source_label:"ホットペッパー",rating:4.3,review_count:145}],reservation_status:"few",reservation_label:"残りわずか",open_hours:"17:30〜22:00",closed_days:"日曜・祝日",capacity:18,has_private_room:true,smoking:"禁煙",description:"季節の素材を活かした繊細な割烹料理。一品一品に匠の技が光る隠れ家的名店。",features:["おまかせコース","日本酒厳選","カウンター席"]},
+{id:"r017",name:"焼肉 うしごろ 渋谷店",genre:"焼肉",sub_genre:"黒毛和牛",area:"渋谷",address:"東京都渋谷区道玄坂1-5-2",price_min:10000,price_max:18000,price_label:"¥10,000〜¥18,000",atmosphere_tags:["おしゃれ","デート向き","モダン"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.90,review_count:876},{source:"google",source_label:"Google",rating:4.4,review_count:2345},{source:"hotpepper",source_label:"ホットペッパー",rating:4.2,review_count:567}],reservation_status:"few",reservation_label:"残りわずか",open_hours:"17:00〜23:00",closed_days:"不定休",capacity:50,has_private_room:true,smoking:"禁煙",description:"上質な黒毛和牛をおしゃれな空間で。コース仕立ての焼肉で特別な夜を。",features:["コース焼肉","ワイン充実","デート向き"]},
+{id:"r018",name:"中華蕎麦 とみ田",genre:"ラーメン",sub_genre:"つけ麺",area:"新宿",address:"東京都新宿区新宿3-14-20",price_min:1000,price_max:2000,price_label:"¥1,000〜¥2,000",atmosphere_tags:["カジュアル","にぎやか"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.82,review_count:2134},{source:"google",source_label:"Google",rating:4.3,review_count:5678},{source:"hotpepper",source_label:"ホットペッパー",rating:4.0,review_count:345}],reservation_status:"available",reservation_label:"予約不要",open_hours:"11:00〜21:00",closed_days:"水曜",capacity:20,has_private_room:false,smoking:"禁煙",description:"超濃厚魚介豚骨つけ麺の王者。行列ができてでも食べたい一杯。",features:["行列必至","大盛り無料","限定メニューあり"]},
+{id:"r019",name:"トラットリア ダル・ビルバンテ・ジョコンド",genre:"イタリアン",sub_genre:"トラットリア",area:"目黒",address:"東京都目黒区目黒3-1-4",price_min:5000,price_max:8000,price_label:"¥5,000〜¥8,000",atmosphere_tags:["アットホーム","カジュアル","おしゃれ"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.75,review_count:412},{source:"google",source_label:"Google",rating:4.3,review_count:987},{source:"hotpepper",source_label:"ホットペッパー",rating:4.1,review_count:234}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:30〜14:00 / 18:00〜22:00",closed_days:"火曜",capacity:38,has_private_room:false,smoking:"禁煙",description:"地元に愛されるイタリアン。手打ちパスタと季節の食材を使った温かい料理。",features:["手打ちパスタ","ワイン充実","アットホーム"]},
+{id:"r020",name:"赤坂 菊乃井",genre:"和食",sub_genre:"懐石料理",area:"赤坂",address:"東京都港区赤坂6-13-8",price_min:15000,price_max:35000,price_label:"¥15,000〜¥35,000",atmosphere_tags:["高級感","和モダン","静か","個室あり"],reviews:[{source:"tabelog",source_label:"食べログ",rating:4.48,review_count:612},{source:"google",source_label:"Google",rating:4.6,review_count:1543},{source:"hotpepper",source_label:"ホットペッパー",rating:4.4,review_count:198}],reservation_status:"full",reservation_label:"満席",open_hours:"12:00〜13:00 / 17:00〜21:00",closed_days:"日曜",capacity:50,has_private_room:true,smoking:"禁煙",description:"京都の名店が赤坂に。四季折々の懐石料理を洗練された空間で。ミシュラン二つ星。",features:["ミシュラン二つ星","懐石コース","個室完備"]},
+{id:"r021",name:"大衆酒場 ホルモンまさる",genre:"居酒屋",sub_genre:"ホルモン・もつ焼き",area:"池袋",address:"東京都豊島区東池袋1-34-5",price_min:2000,price_max:4000,price_label:"¥2,000〜¥4,000",atmosphere_tags:["にぎやか","カジュアル","アットホーム"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.58,review_count:678},{source:"google",source_label:"Google",rating:4.1,review_count:2345},{source:"hotpepper",source_label:"ホットペッパー",rating:3.8,review_count:1234}],reservation_status:"available",reservation_label:"予約可能",open_hours:"16:00〜24:00",closed_days:"無休",capacity:45,has_private_room:false,smoking:"喫煙可",description:"新鮮ホルモンとレモンサワーで乾杯！コスパ最強の大衆酒場。",features:["コスパ抜群","飲み放題あり","深夜営業"]},
+{id:"r022",name:"エリゼ光",genre:"フレンチ",sub_genre:"クラシックフレンチ",area:"白金",address:"東京都港区白金台5-4-7",price_min:12000,price_max:25000,price_label:"¥12,000〜¥25,000",atmosphere_tags:["高級感","落ち着いた","デート向き"],reviews:[{source:"tabelog",source_label:"食べログ",rating:4.08,review_count:345},{source:"google",source_label:"Google",rating:4.4,review_count:567},{source:"hotpepper",source_label:"ホットペッパー",rating:4.2,review_count:123}],reservation_status:"available",reservation_label:"予約可能",open_hours:"12:00〜14:00 / 18:00〜21:30",closed_days:"水曜",capacity:30,has_private_room:true,smoking:"禁煙",description:"白金の閑静な住宅街に佇むクラシックフレンチ。正統派の味わいを。",features:["ソムリエ常駐","記念日対応","庭園あり"]},
+{id:"r023",name:"四川飯店 赤坂",genre:"中華",sub_genre:"四川料理",area:"赤坂",address:"東京都港区赤坂1-12-33",price_min:5000,price_max:10000,price_label:"¥5,000〜¥10,000",atmosphere_tags:["落ち着いた","個室あり","高級感"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.88,review_count:789},{source:"google",source_label:"Google",rating:4.2,review_count:2456},{source:"hotpepper",source_label:"ホットペッパー",rating:4.0,review_count:567}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:30〜14:00 / 17:00〜22:00",closed_days:"無休",capacity:80,has_private_room:true,smoking:"禁煙",description:"陳建民の流れを汲む本格四川料理。麻婆豆腐は必食の看板メニュー。",features:["麻婆豆腐","個室あり","ランチコース"]},
+{id:"r024",name:"ソウルフードバンコク 表参道",genre:"タイ料理",sub_genre:"モダンタイ",area:"表参道",address:"東京都渋谷区神宮前5-10-1",price_min:3000,price_max:6000,price_label:"¥3,000〜¥6,000",atmosphere_tags:["おしゃれ","モダン","テラス席あり"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.62,review_count:298},{source:"google",source_label:"Google",rating:4.2,review_count:876},{source:"hotpepper",source_label:"ホットペッパー",rating:3.9,review_count:345}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:30〜22:00",closed_days:"無休",capacity:50,has_private_room:false,smoking:"禁煙",description:"おしゃれな空間で楽しむモダンタイ料理。SNS映えするプレゼンテーションも人気。",features:["テラス席","ランチあり","SNS映え"]},
+{id:"r025",name:"銀座 久兵衛 本店",genre:"寿司",sub_genre:"江戸前寿司",area:"銀座",address:"東京都中央区銀座8-7-6",price_min:12000,price_max:25000,price_label:"¥12,000〜¥25,000",atmosphere_tags:["高級感","落ち着いた","静か"],reviews:[{source:"tabelog",source_label:"食べログ",rating:4.35,review_count:1234},{source:"google",source_label:"Google",rating:4.5,review_count:3456},{source:"hotpepper",source_label:"ホットペッパー",rating:4.3,review_count:456}],reservation_status:"few",reservation_label:"残りわずか",open_hours:"11:30〜14:00 / 17:00〜22:00",closed_days:"無休",capacity:55,has_private_room:true,smoking:"禁煙",description:"銀座を代表する老舗寿司店。80年以上の歴史が紡ぐ至高の江戸前寿司。",features:["老舗","個室あり","ランチ営業"]},
+{id:"r026",name:"居酒屋 てっぺん 渋谷店",genre:"居酒屋",sub_genre:"創作居酒屋",area:"渋谷",address:"東京都渋谷区宇田川町31-1",price_min:3000,price_max:5000,price_label:"¥3,000〜¥5,000",atmosphere_tags:["にぎやか","カジュアル","大人数OK"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.45,review_count:567},{source:"google",source_label:"Google",rating:3.9,review_count:1987},{source:"hotpepper",source_label:"ホットペッパー",rating:3.7,review_count:2345}],reservation_status:"available",reservation_label:"予約可能",open_hours:"17:00〜翌5:00",closed_days:"無休",capacity:120,has_private_room:true,smoking:"分煙",description:"朝5時まで営業！豊富なメニューと飲み放題で盛り上がる定番居酒屋。",features:["朝まで営業","飲み放題","大人数対応"]},
+{id:"r027",name:"焼肉 TORAJI 恵比寿本店",genre:"焼肉",sub_genre:"韓国式焼肉",area:"恵比寿",address:"東京都渋谷区恵比寿1-29-16",price_min:6000,price_max:12000,price_label:"¥6,000〜¥12,000",atmosphere_tags:["おしゃれ","デート向き","モダン","個室あり"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.70,review_count:934},{source:"google",source_label:"Google",rating:4.2,review_count:3456},{source:"hotpepper",source_label:"ホットペッパー",rating:4.0,review_count:1876}],reservation_status:"available",reservation_label:"予約可能",open_hours:"17:00〜23:30",closed_days:"無休",capacity:90,has_private_room:true,smoking:"禁煙",description:"洗練された空間で楽しむ上質焼肉。特選カルビとユッケは絶品。",features:["個室充実","コース料理","記念日対応"]},
+{id:"r028",name:"ピッツェリア エ トラットリア ダ イーサ",genre:"イタリアン",sub_genre:"ナポリピッツァ",area:"中目黒",address:"東京都目黒区青葉台1-28-9",price_min:2000,price_max:5000,price_label:"¥2,000〜¥5,000",atmosphere_tags:["カジュアル","にぎやか","アットホーム"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.80,review_count:1456},{source:"google",source_label:"Google",rating:4.4,review_count:4321},{source:"hotpepper",source_label:"ホットペッパー",rating:4.1,review_count:678}],reservation_status:"available",reservation_label:"予約不要",open_hours:"11:30〜15:00 / 18:00〜22:30",closed_days:"火曜",capacity:40,has_private_room:false,smoking:"禁煙",description:"世界大会優勝のピッツァイオーロが焼く本場ナポリピッツァ。もちもち生地が絶品。",features:["世界大会優勝","薪窯焼き","行列人気店"]},
+{id:"r029",name:"丸の内 TOKIA ダイニング",genre:"ビストロ",sub_genre:"モダンビストロ",area:"丸の内",address:"東京都千代田区丸の内2-7-3",price_min:5000,price_max:10000,price_label:"¥5,000〜¥10,000",atmosphere_tags:["おしゃれ","モダン","夜景が見える","デート向き"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.72,review_count:456},{source:"google",source_label:"Google",rating:4.1,review_count:1234},{source:"hotpepper",source_label:"ホットペッパー",rating:4.0,review_count:567}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:30〜14:30 / 17:30〜23:00",closed_days:"無休",capacity:65,has_private_room:true,smoking:"禁煙",description:"丸の内の夜景を一望できるモダンビストロ。洗練された料理とワインのマリアージュ。",features:["夜景","ワイン充実","ランチ営業"]},
+{id:"r030",name:"韓国料理 プロカンジャンケジャン",genre:"韓国料理",sub_genre:"カンジャンケジャン",area:"新宿",address:"東京都新宿区大久保1-7-1",price_min:5000,price_max:8000,price_label:"¥5,000〜¥8,000",atmosphere_tags:["カジュアル","にぎやか","アットホーム"],reviews:[{source:"tabelog",source_label:"食べログ",rating:3.72,review_count:567},{source:"google",source_label:"Google",rating:4.3,review_count:2345},{source:"hotpepper",source_label:"ホットペッパー",rating:4.1,review_count:876}],reservation_status:"available",reservation_label:"予約可能",open_hours:"11:30〜22:00",closed_days:"無休",capacity:70,has_private_room:true,smoking:"禁煙",description:"韓国で大人気のカンジャンケジャン専門店が東京に。ご飯泥棒と呼ばれる絶品蟹料理。",features:["カンジャンケジャン","コース料理","個室あり"]}
+];
+var GENRES=["和食","寿司","焼肉","イタリアン","フレンチ","中華","韓国料理","居酒屋","ラーメン","カフェ","タイ料理","インド料理","スペイン料理","ビストロ","鉄板焼き"];
+var ATMOSPHERES=["おしゃれ","落ち着いた","にぎやか","デート向き","隠れ家","カジュアル","高級感","アットホーム","モダン","和モダン","テラス席あり","夜景が見える","個室あり","大人数OK","静か"];
+var AREAS=["渋谷","新宿","恵比寿","表参道","六本木","銀座","池袋","目黒","中目黒","代官山","青山","赤坂","麻布十番","白金","丸の内"];
+var allResults=[];
+
+// ベイズ平均スコア
+function bayesScore(rating,count){var m=30,c=3.3;if(count===0)return c;return(count/(count+m))*rating+(m/(count+m))*c;}
+var WEIGHTS={tabelog:0.40,hotpepper:0.25,google:0.35};
+function overallScore(reviews){if(!reviews||!reviews.length)return 0;var tw=0,ws=0;for(var i=0;i<reviews.length;i++){var r=reviews[i];var w=WEIGHTS[r.source]||0.2;ws+=bayesScore(r.rating,r.review_count)*w;tw+=w;}return tw?Math.round(ws/tw*100)/100:0;}
+// 初期化
+document.addEventListener("DOMContentLoaded",function(){
+populateSel("area",AREAS);populateSel("genre",GENRES);populateSel("atmosphere",ATMOSPHERES);
+searchRestaurants();
+});
+function populateSel(id,items){var el=document.getElementById(id);for(var i=0;i<items.length;i++){var o=document.createElement("option");o.value=items[i];o.textContent=items[i];el.appendChild(o);}}
+
+// 検索
+function searchRestaurants(){
+var area=document.getElementById("area").value;
+var genre=document.getElementById("genre").value;
+var atm=document.getElementById("atmosphere").value;
+var ps=parseInt(document.getElementById("party_size").value)||0;
+var bmin=parseInt(document.getElementById("budget_min").value)||0;
+var bmax=parseInt(document.getElementById("budget_max").value)||0;
+var rs=document.getElementById("reservation").value;
+var pr=document.getElementById("private_room").checked;
+var sort=document.getElementById("sort_by").value;
+var res=[];
+for(var i=0;i<RESTAURANTS.length;i++){
+var r=RESTAURANTS[i];
+if(area&&r.area!==area)continue;
+if(genre&&r.genre!==genre)continue;
+if(atm&&r.atmosphere_tags.indexOf(atm)<0)continue;
+if(bmin&&r.price_max<bmin)continue;
+if(bmax&&r.price_min>bmax)continue;
+if(ps&&r.capacity<ps)continue;
+if(rs&&r.reservation_status!==rs)continue;
+if(pr&&!r.has_private_room)continue;
+var item=Object.assign({},r);
+item.overall_score=overallScore(r.reviews);
+res.push(item);
+}
+if(sort==="price_low")res.sort(function(a,b){return a.price_min-b.price_min;});
+else if(sort==="price_high")res.sort(function(a,b){return b.price_max-a.price_max;});
+else if(sort==="review_count")res.sort(function(a,b){var sa=0,sb=0;for(var j=0;j<a.reviews.length;j++)sa+=a.reviews[j].review_count;for(var k=0;k<b.reviews.length;k++)sb+=b.reviews[k].review_count;return sb-sa;});
+else res.sort(function(a,b){return b.overall_score-a.overall_score;});
+allResults=res;
+renderResults(res);
+}
+function esc(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function scCls(s){return s>=4?"score-high":s>=3.5?"score-mid":"score-low";}
+function rvCls(s){return s==="available"?"reserve-available":s==="few"?"reserve-few":"reserve-full";}
+function barCls(s){return s==="tabelog"?"bar-tabelog":s==="hotpepper"?"bar-hotpepper":"bar-google";}
+
+function renderResults(list){
+var el=document.getElementById("results"),ct=document.getElementById("result-count");
+if(!list.length){el.innerHTML='<div class="no-results"><h3>条件に合うレストランが見つかりません</h3><p>条件を変更して再検索してみてください</p></div>';ct.style.display="none";return;}
+ct.innerHTML="<strong>"+list.length+"</strong> 件のレストランが見つかりました";ct.style.display="block";
+var h="";for(var i=0;i<list.length;i++)h+=buildCard(list[i],i);
+el.innerHTML=h;
+}
+
+function buildCard(r,idx){
+var sc=r.overall_score?r.overall_score.toFixed(2):"-.--";
+var rv="";
+for(var j=0;j<r.reviews.length;j++){var v=r.reviews[j];rv+='<div class="review-row"><span class="review-source">'+esc(v.source_label)+'</span><div class="review-bar-bg"><div class="review-bar '+barCls(v.source)+'" style="width:'+(v.rating/5*100)+'%"></div></div><span class="review-rating">'+v.rating.toFixed(1)+'</span><span class="review-count">'+v.review_count.toLocaleString()+'件</span></div>';}
+var tg="";for(var k=0;k<r.atmosphere_tags.length&&k<3;k++)tg+='<span class="tag tag-atmosphere">'+esc(r.atmosphere_tags[k])+'</span>';
+return '<div class="restaurant-card" onclick="openModal('+idx+')"><div class="card-header"><div class="card-info"><div class="card-name">'+esc(r.name)+'</div><div class="card-meta"><span>'+esc(r.genre)+'</span><span>|</span><span>'+esc(r.area)+'</span></div></div><div class="score-badge '+scCls(r.overall_score)+'"><span class="score-num">'+sc+'</span><span class="score-label">SCORE</span></div></div><div class="card-reviews">'+rv+'</div><div class="card-footer"><span class="card-price">'+esc(r.price_label)+'</span><div class="card-tags"><span class="reservation-badge '+rvCls(r.reservation_status)+'">'+esc(r.reservation_label)+'</span>'+tg+'</div></div></div>';
+}
+function openModal(idx){
+var r=allResults[idx];if(!r)return;
+var sc=r.overall_score?r.overall_score.toFixed(2):"-.--";
+var rv="";for(var j=0;j<r.reviews.length;j++){var v=r.reviews[j];rv+='<div class="detail-review-row"><span class="detail-review-source">'+esc(v.source_label)+'</span><span class="detail-review-rating">'+v.rating.toFixed(1)+'</span><div class="detail-review-bar-bg"><div class="detail-review-bar '+barCls(v.source)+'" style="width:'+(v.rating/5*100)+'%"></div></div><span class="detail-review-count">'+v.review_count.toLocaleString()+'件</span></div>';}
+var tg="";var tags=(r.atmosphere_tags||[]).concat(r.features||[]);for(var k=0;k<tags.length;k++)tg+='<span class="detail-tag">'+esc(tags[k])+'</span>';
+function inf(l,v){return '<div class="detail-info-item"><span class="info-label">'+esc(l)+'</span><span class="info-value">'+esc(v||"-")+'</span></div>';}
+var html='<div class="detail-header"><div><div class="detail-name">'+esc(r.name)+'</div><div class="detail-sub">'+esc(r.genre)+" / "+esc(r.sub_genre||"")+" - "+esc(r.area)+'</div></div><div class="score-badge '+scCls(r.overall_score)+'" style="width:64px;height:64px"><span class="score-num" style="font-size:22px">'+sc+'</span><span class="score-label">SCORE</span></div></div>';
+html+='<div class="detail-section"><h3>説明</h3><p class="detail-description">'+esc(r.description)+'</p></div>';
+html+='<div class="detail-section"><h3>各サイトの評価</h3><div class="detail-reviews">'+rv+'</div></div>';
+html+='<div class="detail-section"><h3>店舗情報</h3><div class="detail-info-grid">'+inf("住所",r.address)+inf("価格帯",r.price_label)+inf("営業時間",r.open_hours)+inf("定休日",r.closed_days)+inf("席数",r.capacity+"席")+inf("個室",r.has_private_room?"あり":"なし")+inf("喫煙",r.smoking)+'<div class="detail-info-item"><span class="info-label">予約状況</span><span class="info-value"><span class="reservation-badge '+rvCls(r.reservation_status)+'">'+esc(r.reservation_label)+'</span></span></div></div></div>';
+html+='<div class="detail-section"><h3>雰囲気・特徴</h3><div class="detail-tags">'+tg+'</div></div>';
+document.getElementById("modal-body").innerHTML=html;
+document.getElementById("modal").style.display="flex";
+document.body.style.overflow="hidden";
+}
+function closeModal(){document.getElementById("modal").style.display="none";document.body.style.overflow="";}
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeModal();});
+</script>
+</body>
+</html>
