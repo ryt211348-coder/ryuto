@@ -5,9 +5,6 @@ Googleスプレッドシート書き込み
 
 import os
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -51,6 +48,9 @@ VIDEO_STYLE_MAP = {
 
 def get_sheets_service(credentials_path: str = None):
     """Google Sheets APIサービスを取得"""
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
     creds_path = credentials_path or os.getenv(
         "GOOGLE_SERVICE_ACCOUNT_JSON", "./credentials.json"
     )

@@ -7,8 +7,6 @@ import os
 import json
 import base64
 
-import anthropic
-
 
 EVALUATION_PROMPT = """
 この画像を以下の基準で評価してください。
@@ -82,6 +80,8 @@ def evaluate_image(image_path: str, scene: dict, api_key: str = None) -> dict:
     Returns:
         評価結果辞書
     """
+    import anthropic
+
     key = api_key or os.getenv("ANTHROPIC_API_KEY")
     if not key:
         raise ValueError("ANTHROPIC_API_KEY が設定されていません")

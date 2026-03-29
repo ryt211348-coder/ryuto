@@ -4,8 +4,6 @@ Googleドキュメント読み込み・台本パース
 
 import re
 import json
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 
 
 ROLE_PATTERNS = {
@@ -29,6 +27,9 @@ EMOTION_KEYWORDS = {
 
 def get_docs_service(credentials_path: str):
     """Google Docs APIサービスを取得"""
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
     scopes = ["https://www.googleapis.com/auth/documents.readonly"]
     creds = service_account.Credentials.from_service_account_file(
         credentials_path, scopes=scopes

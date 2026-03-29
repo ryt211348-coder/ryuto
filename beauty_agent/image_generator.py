@@ -4,15 +4,14 @@ Gemini API画像生成
 
 import os
 import time
-from pathlib import Path
-
-import google.generativeai as genai
-from PIL import Image
 import io
+from pathlib import Path
 
 
 def configure_gemini(api_key: str = None):
     """Gemini APIの設定"""
+    import google.generativeai as genai
+
     key = api_key or os.getenv("GEMINI_API_KEY")
     if not key:
         raise ValueError("GEMINI_API_KEY が設定されていません")
@@ -37,6 +36,9 @@ def generate_image(
     Returns:
         {"success": bool, "path": str, "error": str or None}
     """
+    import google.generativeai as genai
+    from PIL import Image
+
     configure_gemini()
 
     model = genai.ImageGenerationModel("imagen-3.0-generate-002")

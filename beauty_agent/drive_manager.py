@@ -6,10 +6,6 @@ Googleドライブ管理
 import os
 import io
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
-
 
 SCOPES = [
     "https://www.googleapis.com/auth/drive",
@@ -19,6 +15,9 @@ SCOPES = [
 
 def get_drive_service(credentials_path: str = None):
     """Google Drive APIサービスを取得"""
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
     creds_path = credentials_path or os.getenv(
         "GOOGLE_SERVICE_ACCOUNT_JSON", "./credentials.json"
     )
@@ -64,6 +63,8 @@ def upload_image(
     folder_id: str,
     filename: str = None,
 ) -> dict:
+    from googleapiclient.http import MediaFileUpload
+
     """
     画像をGoogleドライブにアップロード
 
