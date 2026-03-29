@@ -106,15 +106,36 @@ def search_tiktok_keyword(keyword, period="1m", count=10, sort_by="relevance"):
                 timeout=30,
             )
             if resp.status_code != 200:
+                print(f"ScrapeCreators API status: {resp.status_code} - {resp.text[:200]}")
                 break
 
             data = resp.json()
-            items = data.get("search_item_list") or data.get("data", {}).get("search_item_list") or []
 
-            for item in items:
-                info = item.get("aweme_info") or item
-                stats = info.get("statistics") or info.get("stats") or {}
-                author = info.get("author") or {}
+            # レスポンス形式を柔軟に解析
+            items = (data.get("search_item_list")
+                     or data.get("data", {}).get("search_item_list")
+                     or data.get("item_list")
+                     or data.get("data", {}).get("item_list")
+                     or data.get("videos")
+                     or data.get("data", {}).get("videos")
+                     or [])
+
+            # itemsが空の場合、dataそのものがリストの可能性
+            if not items and isinstance(data.get("data"), list):
+                items = data["data"]
+
+            print(f"ScrapeCreators: keyword='{keyword}', items={len(items)}, keys={list(data.keys())[:5]}")
+
+            for idx, item in enumerate(items):
+                info = item.get("aweme_info") or item.get("item") or item
+                stats = info.get("statistics") or info.get("stats") or info.get("video", {}).get("stats") or {}
+                author = info.get("author") or info.get("user") or {}
+
+                # デバッグ: 最初のアイテムの構造を出力
+                if idx == 0:
+                    print(f"  First item keys: {list(info.keys())[:10]}")
+                    if stats: print(f"  Stats keys: {list(stats.keys())[:10]}")
+                    if author: print(f"  Author keys: {list(author.keys())[:10]}")
 
                 create_time = info.get("create_time", "")
                 if isinstance(create_time, (int, float)):
@@ -138,16 +159,21 @@ def search_tiktok_keyword(keyword, period="1m", count=10, sort_by="relevance"):
                 if not cover:
                     cover = video_obj.get("dynamic_cover", {}).get("url_list", [""])[0] if isinstance(video_obj.get("dynamic_cover"), dict) else ""
 
+                views = int(stats.get("play_count") or stats.get("playCount") or stats.get("views") or info.get("play_count") or 0)
+                likes = int(stats.get("digg_count") or stats.get("diggCount") or stats.get("likes") or info.get("digg_count") or 0)
+                comments = int(stats.get("comment_count") or stats.get("commentCount") or stats.get("comments") or info.get("comment_count") or 0)
+                shares = int(stats.get("share_count") or stats.get("shareCount") or stats.get("shares") or info.get("share_count") or 0)
+
                 all_videos.append({
                     "id": video_id,
-                    "title": (info.get("desc") or "")[:120],
-                    "description": info.get("desc") or "",
-                    "url": f"https://www.tiktok.com/@{author_id}/video/{video_id}",
+                    "title": (info.get("desc") or info.get("description") or info.get("title") or "")[:120],
+                    "description": info.get("desc") or info.get("description") or "",
+                    "url": info.get("url") or f"https://www.tiktok.com/@{author_id}/video/{video_id}",
                     "platform": "tiktok",
-                    "views": int(stats.get("play_count", 0) or 0),
-                    "likes": int(stats.get("digg_count", 0) or 0),
-                    "comments": int(stats.get("comment_count", 0) or 0),
-                    "shares": int(stats.get("share_count", 0) or 0),
+                    "views": views,
+                    "likes": likes,
+                    "comments": comments,
+                    "shares": shares,
                     "duration": int(video_obj.get("duration", 0) or 0),
                     "upload_date": create_time,
                     "thumbnail": cover,
@@ -178,6 +204,20 @@ def search_tiktok_keyword(keyword, period="1m", count=10, sort_by="relevance"):
         _cache_set("search", keyword, "tiktok", period, result)
 
     return result
+
+
+def search_tiktok_keyword_raw(keyword, period="1m"):
+    """デバッグ用: APIの生レスポンスを返す."""
+    api_key = _get_api_key()
+    if not api_key:
+        return {"error": "API key not set"}
+    headers = {"x-api-key": api_key, "Content-Type": "application/json"}
+    params = {"query": keyword, "date_posted": _period_to_date_posted(period), "sort_by": "relevance", "region": "JP"}
+    try:
+        resp = requests.get(f"{API_BASE}/v1/tiktok/search/keyword", headers=headers, params=params, timeout=30)
+        return {"status": resp.status_code, "response": resp.json() if resp.status_code == 200 else resp.text[:500]}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 def search_videos(keyword, platform="both", period="1m", count=10):

@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, jsonify, request
 
 from .keywords_food import FOOD_TAXONOMY
 from .keywords_beauty import BEAUTY_TAXONOMY
-from .searcher import search_videos, get_keyword_volume, get_bulk_volumes
+from .searcher import search_videos, get_keyword_volume, get_bulk_volumes, search_tiktok_keyword_raw
 
 research_bp = Blueprint("research", __name__)
 
@@ -260,3 +260,12 @@ def get_volumes():
         return jsonify({"results": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@research_bp.route("/api/research/debug")
+def debug_api():
+    """デバッグ: ScrapeCreators APIの生レスポンスを確認."""
+    keyword = request.args.get("keyword", "冷凍食品")
+    period = request.args.get("period", "1m")
+    result = search_tiktok_keyword_raw(keyword, period)
+    return jsonify(result)
