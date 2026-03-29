@@ -120,41 +120,40 @@ async function fetchVolume(keyword){
 }
 // Lv1ノードにリアルボリュームを非同期で上書き、ソートも変更
 let realVolumes={};
+let updateGen=0; // 世代管理(期間変更時に古い取得を無視)
 async function updateNodeVolumes(){
   const ok=await checkServer();
   if(!ok)return;
+  const gen=++updateGen;
   const l1=G==='food'?FL:BL;
-  let updated=false;
-  // 全Lv1を順番にAPI取得
+  let count=0;
   for(let i=0;i<l1.length;i++){
+    if(gen!==updateGen)return; // 期間変更で中断
     const [name]=l1[i];
+    if(realVolumes[name])continue; // 既に取得済みならスキップ
     const vol=await fetchVolume(name);
+    if(gen!==updateGen)return;
     if(vol&&vol.total_views>0){
       realVolumes[name]=vol.total_views;
-      updated=true;
-      // リアルタイムでノードを更新
-      const el=document.getElementById('n_l1_'+i);
-      if(el){
-        const vSpan=el.querySelector('.vol');
-        if(vSpan) vSpan.textContent=fmt(vol.total_views)+'再生';
+      count++;
+      // 10個ごと、または最初の5個でソート＆再描画
+      if(count<=5||(count%10===0)){
+        rebuildSorted();
       }
     }
   }
-  // 全取得後、リアルボリュームでソートして再描画
-  if(updated){
-    // Lv1の順序をリアルデータで上書き
-    const l1ref=G==='food'?FL:BL;
-    const sorted=[...l1ref].sort((a,b)=>{
-      const va=realVolumes[a[0]]||a[1]*1000;
-      const vb=realVolumes[b[0]]||b[1]*1000;
-      return vb-va;
-    });
-    // 元配列を更新
-    for(let i=0;i<sorted.length;i++){
-      l1ref[i]=sorted[i];
-    }
-    build(); // ソート後に再描画
-  }
+  // 全取得完了後に最終再描画
+  rebuildSorted();
+}
+function rebuildSorted(){
+  const l1ref=G==='food'?FL:BL;
+  const sorted=[...l1ref].sort((a,b)=>{
+    const va=realVolumes[a[0]]||a[1]*1000;
+    const vb=realVolumes[b[0]]||b[1]*1000;
+    return vb-va;
+  });
+  for(let i=0;i<sorted.length;i++) l1ref[i]=sorted[i];
+  build();
 }
 async function fetchRealVideos(keyword){
   const plat=document.querySelector('#pT .on')?.dataset.v||'both';
