@@ -1637,12 +1637,25 @@ ${JSON.stringify(task, null, 2)}
 
     // ===== GooglePanel =====
     function GooglePanel() {
-      const { state } = useStore();
+      const { state, dispatch } = useStore();
       const [topic, setTopic] = useState('');
       const [platform, setPlatform] = useState('tiktok');
       const [generating, setGenerating] = useState(false);
+      const [newName, setNewName] = useState('');
+      const [newSheetId, setNewSheetId] = useState('');
+      const sheets = state.settings.progressSheets || [];
+      const addSheet = () => {
+        if (!newName.trim() || !newSheetId.trim()) { alert('\u30C1\u30E3\u30F3\u30CD\u30EB\u540D\u3068\u30B7\u30FC\u30C8ID\u3092\u4E21\u65B9\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044'); return; }
+        const updated = [...sheets, { id: genId(), name: newName.trim(), sheetId: newSheetId.trim() }];
+        dispatch({ type: 'UPDATE_SETTINGS', payload: { ...state.settings, progressSheets: updated } });
+        setNewName(''); setNewSheetId('');
+      };
+      const removeSheet = (idx) => {
+        const updated = sheets.filter((_, i) => i !== idx);
+        dispatch({ type: 'UPDATE_SETTINGS', payload: { ...state.settings, progressSheets: updated } });
+      };
       const generate = async () => {
-        if (!state.settings.anthropicApiKey) { alert('Anthropic APIキーを設定してください'); return; }
+        if (!state.settings.anthropicApiKey) { alert('Anthropic API\u30AD\u30FC\u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044'); return; }
         setGenerating(true);
         try {
           const r = await analyzeKPIGap([{platform, metric: 'views', target: 10000, actual: 0, date: new Date().toISOString().split('T')[0]}], state.settings.anthropicApiKey);
@@ -1653,7 +1666,33 @@ ${JSON.stringify(task, null, 2)}
       return (
         <div>
           <div className="page-header"><h2 className="page-title">{'Google\u9023\u643A'}</h2><p className="page-subtitle">{'Drive\u30FBKPI\u30B7\u30FC\u30C8\u30FBDocs\u81EA\u52D5\u751F\u6210'}</p></div>
-          <div className="alert alert-info" style={{marginBottom: '1rem'}}>{'Google Drive / Docs / Sheets API\u306E\u5229\u7528\u306B\u306FOAuth\u8A8D\u8A3C\u304C\u5FC5\u8981\u3067\u3059\u3002\u8A2D\u5B9A\u753B\u9762\u3067Google Client ID\u3068API\u30AD\u30FC\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002\u30D6\u30E9\u30A6\u30B6\u304B\u3089\u76F4\u63A5\u30D5\u30A1\u30A4\u30EB\u3092\u958B\u3044\u3066\u3044\u308B\u5834\u5408\u3001OAuth\u306Fhttp/https\u30B5\u30FC\u30D0\u30FC\u304C\u5FC5\u8981\u3067\u3059\u3002'}</div>
+
+          <div className="card" style={{marginBottom: '1rem'}}>
+            <h3 className="card-title" style={{marginBottom: '0.75rem'}}>{'\uD83D\uDCC4 \u9032\u6357\u30B7\u30FC\u30C8\u7BA1\u7406'}</h3>
+            <p className="text-sm text-muted" style={{marginBottom: '0.75rem'}}>{'URL\u306E d/ \u306E\u5F8C\u306E\u6587\u5B57\u5217\u304C\u30B7\u30FC\u30C8ID\u3067\u3059\u3002\u4F8B: docs.google.com/spreadsheets/d/\u3010\u3053\u3053\u3011/edit'}</p>
+            {sheets.length > 0 && (
+              <div className="table-container" style={{marginBottom: '1rem'}}>
+                <table>
+                  <thead><tr><th>{'\u30C1\u30E3\u30F3\u30CD\u30EB\u540D'}</th><th>{'\u30B7\u30FC\u30C8ID'}</th><th style={{width: 60}}></th></tr></thead>
+                  <tbody>
+                    {sheets.map((s, i) => (
+                      <tr key={s.id || i}>
+                        <td style={{fontWeight: 500}}>{s.name}</td>
+                        <td><code className="text-sm" style={{background: 'var(--bg-input)', padding: '2px 6px', borderRadius: 4, wordBreak: 'break-all'}}>{s.sheetId}</code></td>
+                        <td><button className="btn btn-danger btn-sm" onClick={() => removeSheet(i)}>{'\u524A\u9664'}</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {sheets.length === 0 && <div className="text-sm text-muted" style={{padding: '1rem', textAlign: 'center', background: 'var(--bg-input)', borderRadius: 'var(--border-radius)', marginBottom: '1rem'}}>{'\u9032\u6357\u30B7\u30FC\u30C8\u304C\u307E\u3060\u767B\u9332\u3055\u308C\u3066\u3044\u307E\u305B\u3093'}</div>}
+            <div style={{display: 'flex', gap: '0.5rem', alignItems: 'flex-end'}}>
+              <div style={{flex: 1}}><label className="form-label">{'\u30C1\u30E3\u30F3\u30CD\u30EB\u540D'}</label><input className="form-input" value={newName} onChange={e => setNewName(e.target.value)} placeholder={'\u4F8B: AI\u7F8E\u5BB9 \u9032\u884C\u8868'} /></div>
+              <div style={{flex: 1.5}}><label className="form-label">{'\u30B7\u30FC\u30C8ID'}</label><input className="form-input" value={newSheetId} onChange={e => setNewSheetId(e.target.value)} placeholder={'URL\u306Ed/\u306E\u5F8C\u306E\u6587\u5B57\u5217'} /></div>
+              <button className="btn btn-primary" onClick={addSheet}>{'\uFF0B \u8FFD\u52A0'}</button>
+            </div>
+          </div>
 
           <div className="card" style={{marginBottom: '1rem'}}>
             <h3 className="card-title" style={{marginBottom: '0.75rem'}}>{'\uD83D\uDCC1 Drive Explorer'}</h3>
@@ -1663,12 +1702,9 @@ ${JSON.stringify(task, null, 2)}
           </div>
 
           <div className="card" style={{marginBottom: '1rem'}}>
-            <h3 className="card-title" style={{marginBottom: '0.75rem'}}>{'\uD83D\uDCC4 Sheets\u540C\u671F'}</h3>
-            <div className="form-row">
-              <div className="form-group"><label className="form-label">{'KPI\u30B7\u30FC\u30C8ID'}</label><input className="form-input" value={state.settings.kpiSheetId} readOnly placeholder={'\u8A2D\u5B9A\u753B\u9762\u3067\u5165\u529B'} /></div>
-              <div className="form-group"><label className="form-label">{'\u9032\u6357\u30B7\u30FC\u30C8ID'}</label><input className="form-input" value={state.settings.progressSheetId} readOnly placeholder={'\u8A2D\u5B9A\u753B\u9762\u3067\u5165\u529B'} /></div>
-            </div>
-            <div className="flex gap-1"><button className="btn btn-ghost btn-sm">{'KPI\u30B7\u30FC\u30C8\u8AAD\u307F\u8FBC\u307F'}</button><button className="btn btn-ghost btn-sm">{'\u9032\u6357\u30B7\u30FC\u30C8\u8AAD\u307F\u8FBC\u307F'}</button></div>
+            <h3 className="card-title" style={{marginBottom: '0.75rem'}}>{'\uD83D\uDCC4 KPI\u30B7\u30FC\u30C8'}</h3>
+            <div className="form-group"><label className="form-label">{'KPI\u30B7\u30FC\u30C8ID'}</label><input className="form-input" value={state.settings.kpiSheetId} readOnly placeholder={'\u8A2D\u5B9A\u753B\u9762\u3067\u5165\u529B'} /></div>
+            <button className="btn btn-ghost btn-sm">{'KPI\u30B7\u30FC\u30C8\u8AAD\u307F\u8FBC\u307F'}</button>
           </div>
 
           <div className="card">
