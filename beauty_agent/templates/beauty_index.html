@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>美容AI制作エージェント</title>
+  <link rel="stylesheet" href="/static/beauty.css">
+</head>
+<body>
+  <div class="container">
+    <!-- ヘッダー -->
+    <div class="header">
+      <h1>美容AI擬人化動画 制作エージェント</h1>
+      <p>台本URLを渡すだけで画像生成・評価・指示書作成まで全自動</p>
+    </div>
+
+    <!-- タブナビゲーション -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="tab-run" onclick="switchTab('tab-run')">制作実行</button>
+      <button class="tab-btn" data-tab="tab-log" onclick="switchTab('tab-log'); loadLog()">ログ・学習</button>
+      <button class="tab-btn" data-tab="tab-profiles" onclick="switchTab('tab-profiles'); loadLog()">キャラクター</button>
+      <button class="tab-btn" data-tab="tab-feedback" onclick="switchTab('tab-feedback')">フィードバック</button>
+      <button class="tab-btn" data-tab="tab-settings" onclick="switchTab('tab-settings'); checkConfig()">設定</button>
+    </div>
+
+    <!-- ============================== -->
+    <!-- 制作実行タブ -->
+    <!-- ============================== -->
+    <div id="tab-run" class="tab-content active">
+      <div class="card">
+        <h2>台本を読み込む</h2>
+
+        <div class="form-group">
+          <label>GoogleドキュメントURL</label>
+          <input type="text" id="doc-url" class="form-input"
+                 placeholder="https://docs.google.com/document/d/...">
+        </div>
+
+        <details style="margin-bottom:16px">
+          <summary style="cursor:pointer;color:var(--text-secondary);font-size:0.85rem">
+            または台本テキストを直接貼り付け（Google API不要）
+          </summary>
+          <div class="form-group" style="margin-top:8px">
+            <textarea id="script-text" class="form-input"
+                      placeholder="ここに台本テキストを貼り付け&#10;&#10;---&#10;台本&#10;（皮脂）&#10;もう洗顔やめて！&#10;私は皮脂..."></textarea>
+          </div>
+        </details>
+
+        <div class="btn-group">
+          <button class="btn btn-secondary" onclick="previewScript()">
+            台本をプレビュー
+          </button>
+          <button class="btn btn-primary" id="btn-run" onclick="startPipeline()">
+            全工程を実行
+          </button>
+        </div>
+      </div>
+
+      <!-- プレビューエリア -->
+      <div id="preview-area"></div>
+
+      <!-- 進捗エリア -->
+      <div id="progress-area" class="progress-area">
+        <div class="card">
+          <h2>実行状況</h2>
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+          <div class="progress-message" id="progress-message"></div>
+          <div id="scene-results"></div>
+        </div>
+      </div>
+
+      <!-- 最終結果 -->
+      <div id="final-result"></div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- ログ・学習タブ -->
+    <!-- ============================== -->
+    <div id="tab-log" class="tab-content">
+      <div class="card">
+        <h2>実行ログ</h2>
+        <div id="log-entries" style="max-height:500px;overflow-y:auto">
+          <p style="color:var(--text-secondary)">読み込み中...</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>学習済みルール</h2>
+        <ul id="learned-rules" style="padding-left:20px;font-size:0.85rem;color:var(--text-secondary);line-height:1.8">
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- キャラクタータブ -->
+    <!-- ============================== -->
+    <div id="tab-profiles" class="tab-content">
+      <div class="card">
+        <h2>キャラクタープロファイル</h2>
+        <div id="profile-cards" class="profile-grid">
+          <p style="color:var(--text-secondary)">読み込み中...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- フィードバックタブ -->
+    <!-- ============================== -->
+    <div id="tab-feedback" class="tab-content">
+      <div class="card">
+        <h2>手動フィードバック</h2>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px">
+          自動評価の結果を手動で修正・追記できます
+        </p>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>プロジェクト名</label>
+            <input type="text" id="fb-project" class="form-input"
+                   placeholder="美容AI企画_20260329_1430">
+          </div>
+          <div class="form-group">
+            <label>シーン番号</label>
+            <input type="number" id="fb-scene" class="form-input"
+                   placeholder="1" min="1">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>結果</label>
+            <select id="fb-result" class="form-input">
+              <option value="OK">OK（問題なし）</option>
+              <option value="NG">NG（修正が必要）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>メモ（NG理由や改善ポイント）</label>
+          <input type="text" id="fb-memo" class="form-input"
+                 placeholder="例: 洞窟になってる / キャラが違う / 文字が入ってる">
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="sendFeedback()">記録する</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- 設定タブ -->
+    <!-- ============================== -->
+    <div id="tab-settings" class="tab-content">
+      <div class="card">
+        <h2>API設定状態</h2>
+        <div id="config-grid" class="config-grid">
+          <p style="color:var(--text-secondary)">読み込み中...</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>APIキー設定</h2>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px">
+          未設定のキーをここで入力できます（ブラウザリロードで消えます。恒久的には.envファイルを使用）
+        </p>
+
+        <div class="form-group">
+          <label>Gemini API Key</label>
+          <input type="password" id="cfg-gemini" class="form-input"
+                 placeholder="AIzaSy...">
+        </div>
+
+        <div class="form-group">
+          <label>Anthropic API Key</label>
+          <input type="password" id="cfg-anthropic" class="form-input"
+                 placeholder="sk-ant-...">
+        </div>
+
+        <div class="form-group">
+          <label>Google Drive Folder ID</label>
+          <input type="text" id="cfg-drive" class="form-input"
+                 placeholder="1a2b3c4d5e...">
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="saveConfig()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/beauty.js"></script>
+</body>
+</html>
