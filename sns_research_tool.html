@@ -49,7 +49,7 @@ svg.lines path{fill:none;stroke:#b0b8c4;stroke-width:1.5}
 .vcard4 .vaccinfo b{color:#4a6cf7}
 .vcard4 .vtranscript{padding:6px 8px;font-size:10px;color:#555;line-height:1.5;max-height:60px;overflow-y:auto;border-bottom:1px solid #eee;background:#fafbfc}
 .vcard4 .vlink{display:block;padding:4px 8px;text-align:center;color:#4a6cf7;font-weight:600;font-size:11px;text-decoration:none;background:#f0f4ff}
-.vcard4 .vlink:hover{background:#dce3ff}
+.vcard4 a:hover{filter:brightness(0.95)}
 </style>
 </head>
 <body>
@@ -87,45 +87,16 @@ function getL3(p,n){
   return ms.map((w,i)=>[n+" "+w,Math.floor(rng(p+n+w+'3')*40+2)]);
 }
 
-/* === Lv4: 上位10動画生成 === */
-const FOOD_HOOKS=["これ知らない人損してる","マジで神すぎた","全人類に届け","もっと早く知りたかった","今すぐ買って","毎日食べてる","100万回作った","コスパ最強すぎ","プロが教える本気","バズりすぎ注意"];
-const BEAUTY_HOOKS=["整形級に変わる","垢抜け確定","マジで人生変わった","全女子に届け","これ以外使えない","プロ直伝テク","1000円以下で神","一生リピ確定","毎朝これだけでOK","ガチで最強だった"];
-const TRANSCRIPTS_F=["今日紹介するのはこれ！マジでこれ知らない人損してます。まず材料はたったの3つだけ。鶏むね肉を一口大に切って、片栗粉まぶして...仕上げにこの特製ダレをかけたら完成！このタレが本当に万能で、焼肉のタレとマヨネーズを1:1で混ぜるだけ。子供もパクパク食べてくれます。","はい、今回は業務スーパーの購入品紹介です。まずこの冷凍ブロッコリー、500gで158円。信じられないコスパ。解凍してそのままサラダに使えます。次にこのチーズ、1kgで598円。普通のスーパーの半額以下。ピザトーストにしたら最高です。","これ1食100円以下で作れるんですよ。もやし1袋と卵2個だけ。フライパンにごま油引いて、もやし炒めて、溶き卵回し入れて...味付けは鶏ガラスープの素と醤油だけ。簡単すぎるのにめっちゃ美味い。節約してる感ゼロです。","オートミールの米化、やり方間違ってる人多すぎます。ポイントは水の量と加熱時間。オートミール30gに水50ml、レンジ500Wで1分30秒。これでお米そっくりの食感になります。カロリーは白米の半分以下。","コンビニで買える高たんぱく商品TOP5。第1位はサラダチキン、たんぱく質24g。第2位はゆで卵、手軽にたんぱく質6g。第3位はギリシャヨーグルト、たんぱく質10g。筋トレしてる人もダイエット中の人も必見。","冷凍餃子の食べ比べしてみた。味の素、大阪王将、セブンプレミアム。結論から言うと、コスパ最強は味の素。1個あたり約20円で味も文句なし。大阪王将は肉感が強くてジューシー。セブンは皮がもちもちで上品な味わい。","作り置き5品を30分で！まず鶏むねの南蛮漬け、きんぴらごぼう、ほうれん草のおひたし、味玉、そしてツナとキャベツのサラダ。コツは同時進行。お湯沸かしてる間に野菜切って、鶏むね焼いてる間に和え物作る。","ダイエット中でも食べていいスイーツ教えます。まずSUNAOのアイス、1個80kcal。シャトレーゼの糖質オフケーキ、糖質5g以下。ローソンのブランパン、糖質2.2g。我慢しなくていいんです。","5分で作れる最強パスタ。茹で時間3分のパスタに、ツナ缶とめんつゆとバターだけ。パスタ茹でてる間にソース準備して、混ぜるだけ。洗い物はフライパン1つ。一人暮らしの味方すぎる。","スーパーで絶対買うべき調味料3選。1つ目は創味シャンタン、これ1つで中華味決まります。2つ目は白だし、和食全般これでOK。3つ目はオイスターソース、炒め物が一気にプロの味に。"];
-const TRANSCRIPTS_B=["今日はプチプラだけで垢抜けメイクやっていきます。まずベースは、セザンヌの皮脂テカリ防止下地。600円なのにデパコス超え。次にキャンメイクのマシュマロフィニッシュパウダー。毛穴が消えます。","この美容液で毛穴が消えた話。タカミスキンピール、使い始めて2週間で明らかに毛穴が小さくなりました。朝洗顔後に3滴、肌に馴染ませるだけ。角質ケアが大事って本当だった。","韓国コスメの購入品紹介！まずロムアンドのティント、ジューシーラスティングティント。発色が神すぎる。次にクリオのアイシャドウパレット、ラメが本当に綺麗。最後にティルティルのクッションファンデ、カバー力最強。","スキンケアの順番間違ってる人多すぎます。正しい順番はクレンジング→洗顔→導入美容液→化粧水→美容液→乳液→クリーム。この順番守るだけで肌変わります。特に導入美容液は化粧水の浸透が全然違う。","ニキビ跡を消した方法。まず皮膚科でディフェリンゲルを処方してもらいました。それと併用してメラノCCの美容液。ビタミンCが色素沈着に効くんです。3ヶ月でかなり薄くなりました。","日焼け止め塗り直しの正解教えます。メイクの上からはスプレータイプかパウダータイプがおすすめ。2〜3時間おきに塗り直すのが理想。特にスキンアクアのトーンアップUVスプレーが優秀。","シャンプー変えたら髪質変わった。&honeyのディープモイスト、3日で効果実感。パサパサだった髪がツルツルに。ポイントは泡立てネットで泡立ててから頭に乗せること。直接つけると洗い残しの原因に。","整形級の涙袋の作り方。キャンメイクのライティングリキッドアイズを涙袋の中央に。その上からセザンヌの単色アイシャドウを薄く重ねる。最後にケイトのダブルラインエキスパートで影を描く。","敏感肌の私が使えたスキンケア全部紹介します。クレンジングはカウブランド、洗顔はロゼットの無添加。化粧水はミノンのアミノモイスト。美容液はキュレルの美白ケア。全部ドラッグストアで買えます。","朝のスキンケアルーティン。洗顔はぬるま湯だけ。化粧水はハトムギ化粧水をたっぷり。美容液はメラノCC。日焼け止めはスキンアクアのトーンアップ。これで5分で完了。時短だけど肌の調子めちゃくちゃいい。"];
-
-function genL4(keyword){
-  const r=s=>rng(keyword+s);
-  const hooks=G==='food'?FOOD_HOOKS:BEAUTY_HOOKS;
-  const trans=G==='food'?TRANSCRIPTS_F:TRANSCRIPTS_B;
-  const vids=[];
-  for(let i=0;i<10;i++){
-    const views=Math.floor(r('v'+i)*90000000)+1000000;
-    const likes=Math.floor(views*(r('l'+i)*0.12+0.02));
-    const comments=Math.floor(likes*(r('c'+i)*0.06+0.005));
-    const days=Math.floor(r('d'+i)*180)+1;
-    const dt=new Date();dt.setDate(dt.getDate()-days);
-    const uid=Math.floor(r('u'+i)*999999)+100000;
-    const vid=Math.floor(r('vid'+i)*9e12)+1e12;
-    const plat=r('p'+i)>0.5?'tiktok':'instagram';
-    const url=plat==='tiktok'?'https://www.tiktok.com/@creator'+uid+'/video/'+vid:'https://www.instagram.com/reel/'+btoa(String(vid)).slice(0,11)+'/';
-    const profUrl=plat==='tiktok'?'https://www.tiktok.com/@creator'+uid:'https://www.instagram.com/creator'+uid+'/';
-    const followers=Math.floor(r('f'+i)*2000000)+1000;
-    const posts=Math.floor(r('posts'+i)*800)+10;
-    const firstPost=new Date();firstPost.setDate(firstPost.getDate()-Math.floor(r('fp'+i)*1500)-30);
-    const thumbColors=['#ff6b6b','#ffa502','#2ed573','#1e90ff','#5352ed','#ff4757','#eccc68','#7bed9f','#70a1ff','#a29bfe'];
-    vids.push({
-      rank:i+1,title:'【'+keyword+'】'+hooks[i],platform:plat,
-      views,likes,comments,
-      date:dt.toISOString().slice(0,10),
-      url,profUrl,
-      account:'@creator'+uid,
-      followers,posts,
-      firstPost:firstPost.toISOString().slice(0,10),
-      transcript:trans[i],
-      thumbColor:thumbColors[i]
-    });
-  }
-  return vids.sort((a,b)=>b.views-a.views);
+/* === Lv4: 実際のTikTok/Instagram検索リンク生成 === */
+function genL4Links(keyword){
+  const encoded=encodeURIComponent(keyword);
+  const tag=keyword.replace(/[\s×・]/g,'');
+  return {
+    tiktokSearch:'https://www.tiktok.com/search?q='+encoded,
+    tiktokTag:'https://www.tiktok.com/tag/'+encodeURIComponent(tag),
+    instaTag:'https://www.instagram.com/explore/tags/'+encodeURIComponent(tag)+'/',
+    instaSearch:'https://www.instagram.com/explore/search/keyword/?q='+encoded,
+  };
 }
 function fmt(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n+''}
 
@@ -199,19 +170,35 @@ function build(){
             drawLine(col2X+NW,ky+NH/2,col3X,gy+NH/2);
             nodeCount++;
             if(opened[l3id]){
-              const vids=genL4(gn);
+              const links=genL4Links(gn);
               const col4X=col3X+NW+COL_GAP;
-              const startY4=Math.max(0,gy-vids.length*(VCARD_H+VGAP)/4);
-              vids.forEach((v,vi)=>{
-                const vy=startY4+vi*(VCARD_H+VGAP);
-                const card=document.createElement('div');
-                card.className='vcard4';
-                card.style.left=col4X+'px';card.style.top=vy+'px';
-                card.innerHTML=`<div class="vhead"><div class="vthumb" style="background:${v.thumbColor}"><span class="rank">#${v.rank}</span><span style="font-size:24px">${G==='food'?'🍽️':'💄'}</span></div><div class="vright"><div class="vtitle4"><a href="${v.url}" target="_blank">${v.title}</a></div><div class="vstat"><span>👁 <b>${fmt(v.views)}</b></span><span>❤️ <b>${fmt(v.likes)}</b></span><span>💬 <b>${fmt(v.comments)}</b></span></div><div class="vstat"><span class="pbadge" style="background:${v.platform==='tiktok'?'#1a1a2e':'#2a1a2e'};color:${v.platform==='tiktok'?'#69c9d0':'#e1306c'}">${v.platform==='tiktok'?'TikTok':'Instagram'}</span><span>${v.date}</span></div></div></div><div class="vaccinfo"><span>👤 <b>${v.account}</b></span><span>フォロワー <b>${fmt(v.followers)}</b></span><span>投稿 <b>${v.posts}</b>件</span><span>初投稿 <b>${v.firstPost}</b></span></div><div class="vtranscript">📝 ${v.transcript}</div><a class="vlink" href="${v.url}" target="_blank">▶ 動画を見る</a>`;
-                canvas.appendChild(card);
-                drawLine(col3X+NW,gy+NH/2,col4X,vy+VCARD_H/2);
-                nodeCount++;
-              });
+              const CARD_H=160;
+              const card=document.createElement('div');
+              card.className='vcard4';
+              card.style.left=col4X+'px';card.style.top=(gy-30)+'px';card.style.width='300px';
+              card.innerHTML=`
+                <div style="padding:10px;border-bottom:1px solid #eee">
+                  <div style="font-weight:700;font-size:13px;color:#333;margin-bottom:6px">🔍「${gn}」のリアル動画を検索</div>
+                  <div style="font-size:11px;color:#888;margin-bottom:8px">クリックするとTikTok/Instagramの実際の動画一覧が表示されます</div>
+                </div>
+                <a href="${links.tiktokSearch}" target="_blank" class="vlink" style="display:flex;align-items:center;gap:8px;padding:10px;border-bottom:1px solid #eee;background:#f0fffe;color:#333;text-decoration:none">
+                  <span style="font-size:22px">🎵</span>
+                  <div><div style="font-weight:600;color:#333">TikTokで検索</div><div style="font-size:10px;color:#69c9d0">「${gn}」の人気動画を見る →</div></div>
+                </a>
+                <a href="${links.tiktokTag}" target="_blank" class="vlink" style="display:flex;align-items:center;gap:8px;padding:10px;border-bottom:1px solid #eee;background:#f8f8ff;color:#333;text-decoration:none">
+                  <span style="font-size:22px">#️⃣</span>
+                  <div><div style="font-weight:600;color:#333">TikTok ハッシュタグ</div><div style="font-size:10px;color:#69c9d0">#${gn.replace(/[\s×・]/g,'')} の動画一覧 →</div></div>
+                </a>
+                <a href="${links.instaTag}" target="_blank" class="vlink" style="display:flex;align-items:center;gap:8px;padding:10px;border-bottom:1px solid #eee;background:#fff5f8;color:#333;text-decoration:none">
+                  <span style="font-size:22px">📸</span>
+                  <div><div style="font-weight:600;color:#333">Instagram ハッシュタグ</div><div style="font-size:10px;color:#e1306c">#${gn.replace(/[\s×・]/g,'')} の投稿一覧 →</div></div>
+                </a>
+                <div style="padding:8px 10px;background:#f8f9fa;font-size:10px;color:#888;text-align:center">
+                  ※ 各プラットフォームの実際の検索結果が表示されます
+                </div>`;
+              canvas.appendChild(card);
+              drawLine(col3X+NW,gy+NH/2,col4X,gy-30+CARD_H/2);
+              nodeCount++;
             }
           });
         }
