@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: beauty-content-planner
+    runtime: python
+    buildCommand: pip install -r requirements-beauty.txt
+    startCommand: gunicorn beauty_app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APIFY_API_TOKEN
+        sync: false

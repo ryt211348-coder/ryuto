@@ -13,10 +13,14 @@ from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 
-CONFIG_PATH = Path(__file__).parent / ".beauty_config.json"
-CHANNELS_PATH = Path(__file__).parent / ".beauty_channels.json"
-TRENDS_PATH = Path(__file__).parent / ".beauty_trends.json"
-PLANS_PATH = Path(__file__).parent / ".beauty_plans.json"
+# Render対応: 書き込み可能なディレクトリを使用
+DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+CONFIG_PATH = DATA_DIR / ".beauty_config.json"
+CHANNELS_PATH = DATA_DIR / ".beauty_channels.json"
+TRENDS_PATH = DATA_DIR / ".beauty_trends.json"
+PLANS_PATH = DATA_DIR / ".beauty_plans.json"
 
 
 def load_json(path, default=None):
@@ -259,7 +263,7 @@ JSON形式で回答:
 
 
 # === Apifyデータ収集 ===
-COLLECTED_DATA_PATH = Path(__file__).parent / ".beauty_collected.json"
+COLLECTED_DATA_PATH = DATA_DIR / ".beauty_collected.json"
 
 
 @app.route("/api/collect-data", methods=["POST"])
@@ -815,4 +819,6 @@ def get_categories():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    port = int(os.environ.get("PORT", 5001))
+    debug = os.environ.get("RENDER") is None  # Render上ではdebug無効
+    app.run(host="0.0.0.0", port=port, debug=debug)
