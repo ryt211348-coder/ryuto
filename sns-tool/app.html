@@ -115,33 +115,34 @@
       overflow-y: auto;
     }
 
-    .nav-item {
+    .nav-item, .nav-link {
       display: flex;
       align-items: center;
       gap: 12px;
       padding: 10px 14px;
       border-radius: var(--border-radius);
-      color: var(--text-secondary);
+      color: #c8cbd4;
       cursor: pointer;
       transition: all var(--transition);
       font-size: 0.93rem;
-      font-weight: 400;
+      font-weight: 500;
       user-select: none;
       border: none;
       background: none;
       width: 100%;
       text-align: left;
+      text-decoration: none;
     }
 
-    .nav-item:hover {
+    .nav-item:hover, .nav-link:hover {
       background: var(--bg-card);
       color: var(--text-primary);
     }
 
-    .nav-item.active {
+    .nav-item.active, .nav-link.active {
       background: var(--color-primary-light);
       color: var(--color-primary);
-      font-weight: 500;
+      font-weight: 600;
     }
 
     .nav-item-icon {
@@ -1876,6 +1877,7 @@ ${JSON.stringify(task, null, 2)}
       const [form, setForm] = useState({...state.settings});
       const [saved, setSaved] = useState(false);
       const [testRes, setTestRes] = useState({});
+      const [showGoogle, setShowGoogle] = useState(false);
       const save = () => {
         dispatch({ type: 'UPDATE_SETTINGS', payload: form });
         setSaved(true); setTimeout(() => setSaved(false), 3000);
@@ -1886,40 +1888,70 @@ ${JSON.stringify(task, null, 2)}
         setTestRes(p => ({...p, claude: '\u30C6\u30B9\u30C8\u4E2D...'}));
         try {
           const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': form.anthropicApiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 10, messages: [{ role: 'user', content: 'ping' }] }) });
-          setTestRes(p => ({...p, claude: r.ok ? '\u2705 \u63A5\u7D9A\u6210\u529F' : '\u274C \u30A8\u30E9\u30FC: ' + r.status}));
+          if (r.ok) { setTestRes(p => ({...p, claude: '\u2705 \u63A5\u7D9A\u6210\u529F'})); }
+          else { const body = await r.text(); setTestRes(p => ({...p, claude: '\u274C \u30A8\u30E9\u30FC(' + r.status + '): ' + body.slice(0, 200)})); }
         } catch(e) { setTestRes(p => ({...p, claude: '\u274C ' + e.message})); }
       };
       const testGemini = async () => {
         if (!form.geminiApiKey) { setTestRes(p => ({...p, gemini: '\u30AD\u30FC\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044'})); return; }
+        if (form.geminiApiKey.startsWith('gen-lang')) { setTestRes(p => ({...p, gemini: '\u274C \u3053\u308C\u306F\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8ID\u3067\u3059\u3002Google AI Studio\u306EAIzaSy...\u3067\u59CB\u307E\u308B\u30AD\u30FC\u3092\u4F7F\u3063\u3066\u304F\u3060\u3055\u3044'})); return; }
         setTestRes(p => ({...p, gemini: '\u30C6\u30B9\u30C8\u4E2D...'}));
         try {
           const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + form.geminiApiKey, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }] }) });
-          setTestRes(p => ({...p, gemini: r.ok ? '\u2705 \u63A5\u7D9A\u6210\u529F' : '\u274C \u30A8\u30E9\u30FC: ' + r.status}));
+          if (r.ok) { setTestRes(p => ({...p, gemini: '\u2705 \u63A5\u7D9A\u6210\u529F'})); }
+          else { const body = await r.text(); setTestRes(p => ({...p, gemini: '\u274C \u30A8\u30E9\u30FC(' + r.status + '): ' + body.slice(0, 200)})); }
         } catch(e) { setTestRes(p => ({...p, gemini: '\u274C ' + e.message})); }
       };
-      const FIELDS = [
-        { key: 'anthropicApiKey', label: 'Anthropic API Key', type: 'password', test: testClaude, testKey: 'claude' },
-        { key: 'geminiApiKey', label: 'Gemini API Key', type: 'password', test: testGemini, testKey: 'gemini' },
-        { key: 'googleClientId', label: 'Google Client ID', type: 'text' },
-        { key: 'googleApiKey', label: 'Google API Key', type: 'password' },
-        { key: 'driveRootFolderId', label: 'Drive \u30EB\u30FC\u30C8\u30D5\u30A9\u30EB\u30C0 ID', type: 'text' },
-        { key: 'kpiSheetId', label: 'KPI\u30B7\u30FC\u30C8 ID', type: 'text' },
-        { key: 'progressSheetId', label: '\u9032\u6357\u30B7\u30FC\u30C8 ID', type: 'text' },
-      ];
       return (
         <div>
-          <div className="page-header"><h2 className="page-title">{'\u8A2D\u5B9A'}</h2><p className="page-subtitle">{'API\u30AD\u30FC\u30FBGoogle\u9023\u643A\u306E\u8A2D\u5B9A'}</p></div>
-          <div className="settings-grid">
-            {FIELDS.map(f => (
-              <div key={f.key} className="form-group">
-                <label className="form-label">{f.label}</label>
+          <div className="page-header"><h2 className="page-title">{'\u8A2D\u5B9A'}</h2><p className="page-subtitle">{'API\u30AD\u30FC\u306E\u8A2D\u5B9A'}</p></div>
+          <div style={{maxWidth: 640}}>
+            <div className="card" style={{marginBottom: '1rem', padding: '1.25rem'}}>
+              <h3 style={{marginBottom: '1rem', fontSize: '1.1rem'}}>{'AI API\u30AD\u30FC\uFF08\u5FC5\u9808\uFF09'}</h3>
+              <div className="form-group">
+                <label className="form-label">{'Anthropic API\u30AD\u30FC'}</label>
+                <p className="text-sm text-muted" style={{marginBottom: '0.35rem'}}>{'Discord\u306E#api\u30AD\u30FC\u30C1\u30E3\u30F3\u30CD\u30EB\u306E\u300C\u30AF\u30ED\u30FC\u30C9\u300D\u306E\u30AD\u30FC\uFF08sk-ant-api03-...\u3067\u59CB\u307E\u308B\uFF09'}</p>
                 <div className="form-inline">
-                  <input className="form-input" type={f.type} value={form[f.key] || ''} onChange={e => { setForm(p => ({...p, [f.key]: e.target.value})); setSaved(false); }} />
-                  {f.test && <button className="btn btn-ghost btn-sm" onClick={f.test}>{'\u30C6\u30B9\u30C8'}</button>}
+                  <input className="form-input" type="password" value={form.anthropicApiKey || ''} onChange={e => { setForm(p => ({...p, anthropicApiKey: e.target.value})); setSaved(false); }} placeholder="sk-ant-api03-..." />
+                  <button className="btn btn-ghost btn-sm" onClick={testClaude}>{'\u30C6\u30B9\u30C8'}</button>
                 </div>
-                {f.testKey && testRes[f.testKey] && <p className={'text-sm mt-1 ' + (testRes[f.testKey].includes('\u6210\u529F') ? 'text-success' : 'text-danger')}>{testRes[f.testKey]}</p>}
+                {testRes.claude && <p className={'text-sm mt-1 ' + (testRes.claude.includes('\u6210\u529F') ? 'text-success' : 'text-danger')}>{testRes.claude}</p>}
               </div>
-            ))}
+              <div className="form-group">
+                <label className="form-label">{'Gemini API\u30AD\u30FC'}</label>
+                <p className="text-sm text-muted" style={{marginBottom: '0.35rem'}}>{'Discord\u306E#api\u30AD\u30FC\u30C1\u30E3\u30F3\u30CD\u30EB\u306E\u300CGoogle AI Studio\u300D\u306E\u30AD\u30FC\uFF08AIzaSy...\u3067\u59CB\u307E\u308B\uFF09'}<br/>{'gen-lang-client-...\u306F\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8ID\u306A\u306E\u3067\u4F7F\u3048\u307E\u305B\u3093'}</p>
+                <div className="form-inline">
+                  <input className="form-input" type="password" value={form.geminiApiKey || ''} onChange={e => { setForm(p => ({...p, geminiApiKey: e.target.value})); setSaved(false); }} placeholder="AIzaSy..." />
+                  <button className="btn btn-ghost btn-sm" onClick={testGemini}>{'\u30C6\u30B9\u30C8'}</button>
+                </div>
+                {testRes.gemini && <p className={'text-sm mt-1 ' + (testRes.gemini.includes('\u6210\u529F') ? 'text-success' : 'text-danger')}>{testRes.gemini}</p>}
+              </div>
+            </div>
+
+            <div className="card" style={{marginBottom: '1rem', padding: '1.25rem'}}>
+              <div className="flex justify-between items-center" style={{cursor:'pointer'}} onClick={() => setShowGoogle(!showGoogle)}>
+                <h3 style={{fontSize: '1.1rem'}}>{'Google\u9023\u643A\uFF08\u4EFB\u610F\u30FB\u5F8C\u304B\u3089\u3067OK\uFF09'}</h3>
+                <span>{showGoogle ? '\u25BC' : '\u25B6'}</span>
+              </div>
+              {showGoogle && (
+                <div style={{marginTop: '1rem'}}>
+                  <div className="alert alert-info" style={{marginBottom: '1rem'}}>{'Google Drive/Docs/Sheets\u3068\u306E\u9023\u643A\u306F\u5F8C\u304B\u3089\u8A2D\u5B9A\u3067\u304D\u307E\u3059\u3002AI\u5206\u6790\u3084\u30BF\u30B9\u30AF\u7BA1\u7406\u306F\u4E0A\u306EAPI\u30AD\u30FC\u3060\u3051\u3067\u4F7F\u3048\u307E\u3059\u3002'}</div>
+                  {[
+                    { key: 'googleClientId', label: 'Google Client ID', placeholder: 'xxxx.apps.googleusercontent.com' },
+                    { key: 'googleApiKey', label: 'Google API Key', placeholder: 'AIzaSy...' },
+                    { key: 'driveRootFolderId', label: 'Drive\u30EB\u30FC\u30C8\u30D5\u30A9\u30EB\u30C0ID', placeholder: 'Google Drive\u306EURL\u306Ed/\u306E\u5F8C\u306E\u6587\u5B57\u5217' },
+                    { key: 'kpiSheetId', label: 'KPI\u30B7\u30FC\u30C8ID', placeholder: '\u30B9\u30D7\u30EC\u30C3\u30C9\u30B7\u30FC\u30C8URL\u306Ed/\u306E\u5F8C\u306E\u6587\u5B57\u5217' },
+                    { key: 'progressSheetId', label: '\u9032\u6357\u30B7\u30FC\u30C8ID', placeholder: '\u30B9\u30D7\u30EC\u30C3\u30C9\u30B7\u30FC\u30C8URL\u306Ed/\u306E\u5F8C\u306E\u6587\u5B57\u5217' },
+                  ].map(f => (
+                    <div key={f.key} className="form-group">
+                      <label className="form-label">{f.label}</label>
+                      <input className="form-input" value={form[f.key] || ''} onChange={e => { setForm(p => ({...p, [f.key]: e.target.value})); setSaved(false); }} placeholder={f.placeholder} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-1 items-center">
               <button className="btn btn-primary" onClick={save}>{'\u8A2D\u5B9A\u3092\u4FDD\u5B58'}</button>
               {saved && <span className="text-success text-sm">{'\u4FDD\u5B58\u3057\u307E\u3057\u305F'}</span>}
