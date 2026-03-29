@@ -1571,15 +1571,61 @@ ${JSON.stringify(task, null, 2)}
     }
 
     // ===== TaskBoard =====
+    const CATEGORIES = [
+      { value: '', label: '\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044' },
+      { value: '\u4F01\u753B', label: '\u4F01\u753B' },
+      { value: '\u53F0\u672C\u30FB\u30B9\u30AF\u30EA\u30D7\u30C8', label: '\u53F0\u672C\u30FB\u30B9\u30AF\u30EA\u30D7\u30C8' },
+      { value: '\u64AE\u5F71\u624B\u914D', label: '\u64AE\u5F71\u624B\u914D' },
+      { value: '\u7DE8\u96C6\u78BA\u8A8D', label: '\u7DE8\u96C6\u78BA\u8A8D' },
+      { value: '\u7D0D\u54C1\u78BA\u8A8D', label: '\u7D0D\u54C1\u78BA\u8A8D' },
+      { value: '\u6295\u7A3F', label: '\u6295\u7A3F' },
+      { value: '\u6570\u5024\u5206\u6790', label: '\u6570\u5024\u5206\u6790' },
+      { value: '\u30AF\u30EA\u30A8\u30A4\u30BF\u30FC\u7BA1\u7406', label: '\u30AF\u30EA\u30A8\u30A4\u30BF\u30FC\u7BA1\u7406' },
+      { value: 'CW\u78BA\u8A8D\u30FB\u8FD4\u4FE1', label: 'CW\u78BA\u8A8D\u30FB\u8FD4\u4FE1' },
+      { value: 'Discord\u9023\u7D61', label: 'Discord\u9023\u7D61' },
+      { value: '\u30EA\u30B5\u30FC\u30C1', label: '\u30EA\u30B5\u30FC\u30C1' },
+      { value: '\u30DF\u30FC\u30C6\u30A3\u30F3\u30B0', label: '\u30DF\u30FC\u30C6\u30A3\u30F3\u30B0' },
+      { value: '\u305D\u306E\u4ED6', label: '\u305D\u306E\u4ED6' },
+    ];
     function TaskBoard() {
       const { state, dispatch } = useStore();
       const [tab, setTab] = useState('all');
       const [form, setForm] = useState({ title: '', description: '', category: '', deadline: '', urgency: '3', importance: '3', delegation: 'ai_draft', aiProvider: 'claude' });
+      const [aiLoading, setAiLoading] = useState(false);
       const calcScore = (f) => {
         let s = Number(f.urgency) * 2 + Number(f.importance) * 2;
         s += f.delegation === 'ai_full' ? 1 : f.delegation === 'ai_draft' ? 2 : 3;
         if (f.deadline) { const days = Math.floor((new Date(f.deadline) - Date.now()) / 86400000); s += Math.max(0, 5 - days); }
         return s;
+      };
+      const aiAutoFill = async () => {
+        if (!form.title.trim()) { alert('\u30BF\u30A4\u30C8\u30EB\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044'); return; }
+        if (!state.settings.anthropicApiKey) { alert('\u8A2D\u5B9A\u753B\u9762\u3067Anthropic API\u30AD\u30FC\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044'); return; }
+        setAiLoading(true);
+        try {
+          const catList = CATEGORIES.filter(c => c.value).map(c => c.value).join(', ');
+          const prompt = 'SNS\u30A2\u30AB\u30A6\u30F3\u30C8\u904B\u55B6\uFF08\u7F8E\u5BB9\u7CFB TikTok/Instagram/YouTube\uFF09\u306E\u30BF\u30B9\u30AF\u3067\u3059\u3002\u4EE5\u4E0B\u306E\u30BF\u30B9\u30AF\u3092\u5206\u6790\u3057\u3066JSON\u3067\u8FD4\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u30BF\u30B9\u30AF: ' + form.title + (form.description ? '\n\u8AAC\u660E: ' + form.description : '') + '\n\n\u30AB\u30C6\u30B4\u30EA\u9078\u629E\u80A2: ' + catList + '\n\n\u51FA\u529BJSON:\n{"category": "\u4E0A\u8A18\u304B\u30891\u3064", "urgency": 1-5, "importance": 1-5, "delegation": "ai_full" or "ai_draft" or "human_only", "aiProvider": "claude" or "gemini" or "none", "description": "\u30BF\u30B9\u30AF\u306E\u8A73\u7D30\u8AAC\u660E\u30921-2\u6587\u3067"}';
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': state.settings.anthropicApiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+            body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
+          });
+          const data = await res.json();
+          const text = data.content?.[0]?.text || '';
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const r = JSON.parse(jsonMatch[0]);
+            setForm(f => ({
+              ...f,
+              category: CATEGORIES.some(c => c.value === r.category) ? r.category : f.category,
+              urgency: String(Math.min(5, Math.max(1, r.urgency || 3))),
+              importance: String(Math.min(5, Math.max(1, r.importance || 3))),
+              delegation: ['ai_full','ai_draft','human_only'].includes(r.delegation) ? r.delegation : f.delegation,
+              aiProvider: ['claude','gemini','none'].includes(r.aiProvider) ? r.aiProvider : f.aiProvider,
+              description: r.description || f.description,
+            }));
+          }
+        } catch(e) { alert('AI\u5206\u6790\u30A8\u30E9\u30FC: ' + e.message); }
+        setAiLoading(false);
       };
       const addTask = e => {
         e.preventDefault();
@@ -1600,16 +1646,28 @@ ${JSON.stringify(task, null, 2)}
       };
       return (
         <div>
-          <div className="page-header"><h2 className="page-title">{'\u30BF\u30B9\u30AF\u30DC\u30FC\u30C9'}</h2><p className="page-subtitle">{'\u512A\u5148\u5EA6\u81EA\u52D5\u30B9\u30B3\u30A2\u30EA\u30F3\u30B0\u30FBAI\u59D4\u8B72\u5EA6\u5206\u985E'}</p></div>
+          <div className="page-header"><h2 className="page-title">{'\u30BF\u30B9\u30AF\u30DC\u30FC\u30C9'}</h2><p className="page-subtitle">{'\u30BF\u30A4\u30C8\u30EB\u3092\u5165\u529B\u2192AI\u304C\u81EA\u52D5\u5206\u985E'}</p></div>
           <div className="card" style={{marginBottom: '1rem'}}>
             <h3 className="card-title" style={{marginBottom: '0.75rem'}}>{'\u30BF\u30B9\u30AF\u3092\u8FFD\u52A0'}</h3>
             <form onSubmit={addTask}>
+              <div className="form-group">
+                <label className="form-label">{'\u30BF\u30A4\u30C8\u30EB'}</label>
+                <div style={{display:'flex',gap:'0.5rem'}}>
+                  <input className="form-input" style={{flex:1}} value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))} placeholder={'\u4F8B: CW\u78BA\u8A8D\u30FB\u8FD4\u4FE1\u3001\u64AE\u5F71\u624B\u914D\u3001\u7D0D\u54C1\u30C1\u30A7\u30C3\u30AF...'} required />
+                  <button type="button" className="btn btn-success" onClick={aiAutoFill} disabled={aiLoading} style={{whiteSpace:'nowrap'}}>
+                    {aiLoading ? <span className="loading-text"><span className="loading-spinner" /> {'AI\u5206\u6790\u4E2D'}</span> : '\u{1F916} AI\u81EA\u52D5\u5165\u529B'}
+                  </button>
+                </div>
+                <p className="text-sm text-muted" style={{marginTop:'0.3rem'}}>{'\u30BF\u30A4\u30C8\u30EB\u3092\u5165\u529B\u3057\u3066\u300CAI\u81EA\u52D5\u5165\u529B\u300D\u3092\u62BC\u3059\u3068\u3001\u30AB\u30C6\u30B4\u30EA\u30FB\u7DCA\u6025\u5EA6\u30FB\u91CD\u8981\u5EA6\u30FB\u59D4\u8B72\u5EA6\u3092AI\u304C\u81EA\u52D5\u5224\u5B9A\u3057\u307E\u3059'}</p>
+              </div>
               <div className="form-row">
-                <div className="form-group" style={{flex: 2}}><label className="form-label">{'\u30BF\u30A4\u30C8\u30EB'}</label><input className="form-input" value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))} required /></div>
-                <div className="form-group"><label className="form-label">{'\u30AB\u30C6\u30B4\u30EA'}</label><input className="form-input" value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))} placeholder={'\u4F8B: \u4F01\u753B'} /></div>
+                <div className="form-group"><label className="form-label">{'\u30AB\u30C6\u30B4\u30EA'}</label>
+                  <select className="form-select" value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))}>
+                    {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select></div>
                 <div className="form-group"><label className="form-label">{'\u7DE0\u5207'}</label><input className="form-input" type="date" value={form.deadline} onChange={e => setForm(f => ({...f, deadline: e.target.value}))} /></div>
               </div>
-              <div className="form-group"><label className="form-label">{'\u8AAC\u660E'}</label><textarea className="form-textarea" rows="2" value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} /></div>
+              <div className="form-group"><label className="form-label">{'\u8AAC\u660E'}</label><textarea className="form-textarea" rows="2" value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} placeholder={'AI\u81EA\u52D5\u5165\u529B\u3067\u81EA\u52D5\u751F\u6210\u3055\u308C\u307E\u3059'} /></div>
               <div className="form-row">
                 <div className="form-group"><label className="form-label">{'\u7DCA\u6025\u5EA6 (1-5)'}</label><select className="form-select" value={form.urgency} onChange={e => setForm(f => ({...f, urgency: e.target.value}))}>{[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
                 <div className="form-group"><label className="form-label">{'\u91CD\u8981\u5EA6 (1-5)'}</label><select className="form-select" value={form.importance} onChange={e => setForm(f => ({...f, importance: e.target.value}))}>{[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
