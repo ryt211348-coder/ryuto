@@ -6,7 +6,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, send_file
 
 from tiktok_analyzer.extractor import (
     extract_account_videos,
@@ -186,6 +186,11 @@ def build_result(videos, transcripts, analysis):
 
 @app.route("/")
 def index():
+    return send_file("sns_research_tool.html")
+
+
+@app.route("/old")
+def old_index():
     return render_template("index.html")
 
 
