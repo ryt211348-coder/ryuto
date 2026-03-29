@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, jsonify, request
 
 from .keywords_food import FOOD_TAXONOMY
 from .keywords_beauty import BEAUTY_TAXONOMY
+from .searcher import search_videos
 
 research_bp = Blueprint("research", __name__)
 
@@ -201,3 +202,23 @@ def get_accounts():
 
     accounts = _generate_sample_accounts(keyword, period, platform, count)
     return jsonify({"keyword": keyword, "accounts": accounts})
+
+
+@research_bp.route("/api/research/search")
+def search_real_videos():
+    """キーワードで実際のTikTok/Instagram動画を検索する."""
+    keyword = request.args.get("keyword", "")
+    period = request.args.get("period", "1m")
+    platform = request.args.get("platform", "both")
+    count = min(int(request.args.get("count", 10)), 20)
+
+    if not keyword:
+        return jsonify({"error": "キーワードを指定してください"}), 400
+
+    try:
+        results = search_videos(keyword, platform, period, count)
+        return jsonify({"keyword": keyword, "period": period,
+                        "platform": platform, "count": len(results),
+                        "videos": results})
+    except Exception as e:
+        return jsonify({"error": str(e), "videos": []}), 500
