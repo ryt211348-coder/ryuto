@@ -186,7 +186,8 @@ def build_result(videos, transcripts, analysis):
 
 @app.route("/")
 def index():
-    return send_file("sns_research_tool.html")
+    html_path = Path(__file__).parent / "sns_research_tool.html"
+    return send_file(html_path)
 
 
 @app.route("/old")
