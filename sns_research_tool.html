@@ -222,8 +222,14 @@ function build(){
   const col1X=rootX+NW+COL_GAP;
   let nodeCount=1;
   const mult=pm();
-  l1.forEach(([name,vol],i)=>{
-    const adjVol=Math.floor(vol*mult);
+  // ボリューム順にソート（リアルデータがあればそれを使用）
+  const sortedL1=l1.map(([name,vol],origIdx)=>{
+    const adjVol=realVolumes[name]||Math.floor(vol*mult);
+    return {name,vol:adjVol,origIdx};
+  }).sort((a,b)=>b.vol-a.vol);
+
+  sortedL1.forEach((item,i)=>{
+    const {name,vol:adjVol}=item;
     const y=i*(NH+GAP)+20;
     const id='l1_'+i;
     addNode(id,name,adjVol,col1X,y,1,null);
@@ -231,7 +237,7 @@ function build(){
     nodeCount++;
 
     if(opened[id]){
-      const kids=getL2(name);
+      const kids=getL2(name).sort((a,b)=>b[1]-a[1]);
       const col2X=col1X+NW+COL_GAP;
       const startY2=Math.max(0,y-kids.length*(NH+GAP)/4);
       kids.forEach(([kn,kv],j)=>{
@@ -242,7 +248,7 @@ function build(){
         nodeCount++;
 
         if(opened[kid]){
-          const gkids=getL3(name,kn);
+          const gkids=getL3(name,kn).sort((a,b)=>b[1]-a[1]);
           const col3X=col2X+NW+COL_GAP;
           const startY3=Math.max(0,ky-gkids.length*(NH+GAP)/4);
           const VCARD_H=220,VCARD_W=280,VGAP=8;
