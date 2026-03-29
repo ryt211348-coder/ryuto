@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, jsonify, request
 
 from .keywords_food import FOOD_TAXONOMY
 from .keywords_beauty import BEAUTY_TAXONOMY
-from .searcher import search_videos
+from .searcher import search_videos, get_keyword_volume, get_bulk_volumes
 
 research_bp = Blueprint("research", __name__)
 
@@ -222,3 +222,41 @@ def search_real_videos():
                         "videos": results})
     except Exception as e:
         return jsonify({"error": str(e), "videos": []}), 500
+
+
+@research_bp.route("/api/research/volume")
+def get_volume():
+    """キーワードのリアルボリューム(動画数・総再生数)を取得."""
+    keyword = request.args.get("keyword", "")
+    period = request.args.get("period", "1m")
+    platform = request.args.get("platform", "both")
+
+    if not keyword:
+        return jsonify({"error": "キーワードを指定してください"}), 400
+
+    try:
+        result = get_keyword_volume(keyword, platform, period)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@research_bp.route("/api/research/volumes", methods=["POST"])
+def get_volumes():
+    """複数キーワードのボリュームを一括取得."""
+    data = request.get_json()
+    keywords = data.get("keywords", [])
+    period = data.get("period", "1m")
+    platform = data.get("platform", "both")
+
+    if not keywords:
+        return jsonify({"error": "キーワードを指定してください"}), 400
+
+    # 最大10件に制限（負荷軽減）
+    keywords = keywords[:10]
+
+    try:
+        results = get_bulk_volumes(keywords, platform, period)
+        return jsonify({"results": results})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

@@ -90,8 +90,41 @@ function getL3(p,n){
   return ms.map((w,i)=>[n+" "+w,Math.floor(rng(p+n+w+'3')*40*mult+1)]);
 }
 
-/* === Lv4: サーバーAPIからリアルデータ取得 === */
-const API_BASE=location.hostname==='localhost'||location.hostname==='127.0.0.1'?'':'';
+/* === サーバーAPIからリアルデータ取得 === */
+let serverAvailable=null;
+async function checkServer(){
+  if(serverAvailable!==null)return serverAvailable;
+  try{
+    const r=await fetch('/api/research/volume?keyword=test&period=1m&platform=tiktok',{signal:AbortSignal.timeout(5000)});
+    serverAvailable=r.ok;
+  }catch(e){serverAvailable=false}
+  return serverAvailable;
+}
+async function fetchVolume(keyword){
+  const plat=document.querySelector('#pT .on')?.dataset.v||'both';
+  try{
+    const r=await fetch(`/api/research/volume?keyword=${encodeURIComponent(keyword)}&platform=${plat}&period=${P}`);
+    if(!r.ok)return null;
+    return await r.json();
+  }catch(e){return null}
+}
+// Lv1ノードにリアルボリュームを非同期で上書き
+async function updateNodeVolumes(){
+  const ok=await checkServer();
+  if(!ok)return;
+  const l1=G==='food'?FL:BL;
+  // 全Lv1を順番にAPI取得(負荷軽減のため少しずつ)
+  for(let i=0;i<l1.length;i++){
+    const [name]=l1[i];
+    const el=document.getElementById('n_l1_'+i);
+    if(!el)continue;
+    const vol=await fetchVolume(name);
+    if(vol&&vol.total_views>0){
+      const vSpan=el.querySelector('.vol');
+      if(vSpan)vSpan.textContent=fmt(vol.total_views)+'再生/'+vol.video_count+'本';
+    }
+  }
+}
 async function fetchRealVideos(keyword){
   const plat=document.querySelector('#pT .on')?.dataset.v||'both';
   const per=document.querySelector('#dT .on')?.dataset.v||'1m';
@@ -251,6 +284,8 @@ function build(){
   svg.setAttribute('width',canvas.style.minWidth);
   svg.setAttribute('height',canvas.style.minHeight);
   document.getElementById('info').innerHTML='ノード: <b>'+nodeCount+'</b>';
+  // サーバー接続時はリアルボリュームで上書き
+  updateNodeVolumes();
 }
 
 function toggle(id,lv,name){
@@ -291,8 +326,8 @@ function setupTg(id,cb){
   });
 }
 setupTg('gT',v=>{G=v;opened={};build()});
-setupTg('pT',v=>{});
-setupTg('dT',v=>{P=v;opened={};build()});
+setupTg('pT',v=>{serverAvailable=null;opened={};build()});
+setupTg('dT',v=>{P=v;serverAvailable=null;opened={};build()});
 
 build()
 </script>

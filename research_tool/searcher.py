@@ -241,3 +241,104 @@ def search_videos(keyword, platform="both", period="1m", count=10):
 
     results.sort(key=lambda x: x["views"], reverse=True)
     return results[:count]
+
+
+def get_keyword_volume(keyword, platform="both", period="1m"):
+    """キーワードのリアルボリューム(動画数・総再生数)を取得する.
+
+    yt-dlpでTikTok検索を行い、指定期間内の動画数と総再生数を集計。
+    """
+    cache_key_str = f"vol:{keyword}:{platform}:{period}"
+    cached = _cache_get(cache_key_str, platform, period)
+    if cached:
+        return cached
+
+    max_days = _period_to_days(period)
+    cutoff = datetime.now() - timedelta(days=max_days)
+    total_views = 0
+    total_likes = 0
+    video_count = 0
+    top_views = 0
+
+    def _parse_results(stdout):
+        nonlocal total_views, total_likes, video_count, top_views
+        for line in stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            try:
+                d = json.loads(line)
+                upload_date = d.get("upload_date", "")
+                if upload_date:
+                    try:
+                        dt = datetime.strptime(upload_date, "%Y%m%d")
+                        if dt < cutoff:
+                            continue
+                    except ValueError:
+                        pass
+                views = int(d.get("view_count", 0) or 0)
+                likes = int(d.get("like_count", 0) or 0)
+                total_views += views
+                total_likes += likes
+                video_count += 1
+                if views > top_views:
+                    top_views = views
+            except (json.JSONDecodeError, ValueError):
+                continue
+
+    if platform in ("both", "tiktok"):
+        search_url = f"https://www.tiktok.com/search/video?q={keyword}"
+        cmd = [
+            sys.executable, "-m", "yt_dlp",
+            "--dump-json", "--flat-playlist",
+            "--no-download", "--no-warnings",
+            "--playlist-end", "50",
+            search_url,
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+            if result.stdout:
+                _parse_results(result.stdout)
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+    if platform in ("both", "instagram"):
+        tag = keyword.replace(" ", "").replace("　", "")
+        search_url = f"https://www.instagram.com/explore/tags/{tag}/"
+        cmd = [
+            sys.executable, "-m", "yt_dlp",
+            "--dump-json", "--flat-playlist",
+            "--no-download", "--no-warnings",
+            "--playlist-end", "50",
+            search_url,
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+            if result.stdout:
+                _parse_results(result.stdout)
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+    result_data = {
+        "keyword": keyword,
+        "period": period,
+        "platform": platform,
+        "video_count": video_count,
+        "total_views": total_views,
+        "total_likes": total_likes,
+        "top_views": top_views,
+        "avg_views": total_views // video_count if video_count > 0 else 0,
+    }
+
+    if video_count > 0:
+        _cache_set(cache_key_str, platform, period, result_data)
+
+    return result_data
+
+
+def get_bulk_volumes(keywords, platform="both", period="1m"):
+    """複数キーワードのボリュームを一括取得する."""
+    results = []
+    for kw in keywords:
+        vol = get_keyword_volume(kw, platform, period)
+        results.append(vol)
+    return results
