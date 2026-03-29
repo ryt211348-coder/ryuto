@@ -3,421 +3,189 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SNS Research Tool - 食品 & 美容</title>
+<title>SNS Research Tool - マインドマップ</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;background:#0a0a1a;color:#e0e0e0;min-height:100vh;overflow-x:hidden}
-.header{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;background:linear-gradient(135deg,#0d1117,#161b22);border-bottom:1px solid #30363d}
-.logo{font-size:20px;font-weight:700;color:#58a6ff}
-.logo-sub{font-size:12px;color:#8b949e;margin-left:12px}
-.control-bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:12px 24px;background:#0d1117;border-bottom:1px solid #21262d}
-.control-group{display:flex;align-items:center;gap:8px}
-.control-group label{font-size:12px;color:#8b949e;white-space:nowrap}
-.toggle-group{display:flex;gap:2px;background:#161b22;border-radius:8px;padding:2px;flex-wrap:wrap}
-.toggle-btn{padding:5px 12px;border:none;background:transparent;color:#8b949e;font-size:12px;border-radius:6px;cursor:pointer;transition:all .2s;white-space:nowrap}
-.toggle-btn.active{background:#1f6feb;color:#fff}
-.toggle-btn:hover:not(.active){color:#c9d1d9;background:#21262d}
-.breadcrumb{display:flex;align-items:center;gap:4px;padding:8px 24px;font-size:13px;color:#8b949e;background:#0d1117;flex-wrap:wrap}
-.crumb{cursor:pointer;padding:2px 8px;border-radius:4px;transition:all .2s}
-.crumb:hover{color:#58a6ff;background:#161b22}
-.crumb.active{color:#e0e0e0;font-weight:600}
-.crumb-sep{color:#30363d;margin:0 2px}
-.stats-bar{display:flex;gap:24px;padding:8px 24px;background:#0d1117;border-bottom:1px solid #161b22;font-size:12px;color:#8b949e;flex-wrap:wrap}
-.stats-bar span{display:flex;align-items:center;gap:4px}
-.stats-bar .num{color:#58a6ff;font-weight:700}
-.main-content{position:relative;height:calc(100vh - 180px);overflow:hidden}
-.view-area{width:100%;height:100%;overflow-y:auto;position:absolute;top:0;left:0}
-.nodes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;padding:20px}
-.node-card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:14px;cursor:pointer;transition:all .3s;position:relative;display:flex;flex-direction:column;gap:6px}
-.node-card:hover{border-color:#58a6ff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(88,166,255,.15)}
-.node-card.food{border-left:3px solid #f0883e}
-.node-card.beauty{border-left:3px solid #f778ba}
-.node-badge{position:absolute;top:8px;right:8px;font-size:10px;padding:2px 6px;border-radius:10px;background:#21262d;color:#8b949e}
-.node-name{font-size:13px;font-weight:600;color:#e0e0e0;line-height:1.3}
-.node-volume{font-size:20px;font-weight:700}
-.node-volume.high{color:#3fb950}
-.node-volume.mid{color:#d29922}
-.node-volume.low{color:#8b949e}
-.node-hint{font-size:11px;color:#58a6ff}
-.node-bar{height:3px;background:#21262d;border-radius:2px;margin-top:2px}
-.node-bar-fill{height:100%;border-radius:2px}
-.node-bar-fill.food{background:linear-gradient(90deg,#f0883e,#ffa657)}
-.node-bar-fill.beauty{background:linear-gradient(90deg,#f778ba,#ff9bce)}
-.vheader{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;border-bottom:1px solid #21262d;position:sticky;top:0;background:#0a0a1a;z-index:10}
-.vheader h2{font-size:16px;color:#e0e0e0}
-.vheader select{background:#161b22;border:1px solid #30363d;color:#c9d1d9;padding:4px 8px;border-radius:6px;font-size:12px}
-.vlist{padding:12px 24px;display:flex;flex-direction:column;gap:6px}
-.vcard{display:grid;grid-template-columns:50px 1fr auto;gap:10px;align-items:center;padding:10px 14px;background:#161b22;border:1px solid #21262d;border-radius:8px;cursor:pointer;transition:all .2s}
-.vcard:hover{border-color:#30363d;background:#1c2129}
-.vrank{font-size:22px;font-weight:700;color:#30363d;text-align:center}
-.vrank.top3{color:#ffa657}
-.vinfo{display:flex;flex-direction:column;gap:3px}
-.vtitle{font-size:13px;font-weight:600;color:#e0e0e0}
-.vtitle a{color:#58a6ff;text-decoration:none}
-.vtitle a:hover{text-decoration:underline}
-.vmeta{font-size:11px;color:#8b949e;display:flex;gap:10px;flex-wrap:wrap}
-.vstats{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
-.vviews{font-size:15px;font-weight:700;color:#3fb950}
-.ver{font-size:11px;color:#d29922}
-.pbadge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600}
-.pbadge.tiktok{background:#1a1a2e;color:#69c9d0}
-.pbadge.instagram{background:#2a1a2e;color:#e1306c}
-.acard{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:10px 14px;background:#161b22;border:1px solid #21262d;border-radius:8px;cursor:pointer;transition:all .2s}
-.acard:hover{border-color:#30363d;background:#1c2129}
-.aav{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#1f6feb,#58a6ff);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff}
-.aname{font-size:13px;font-weight:600;color:#e0e0e0}
-.ahandle{font-size:12px;color:#8b949e}
-.agrowth{font-size:13px;font-weight:600}
-.agrowth.pos{color:#3fb950}
-.agrowth.neg{color:#f85149}
-.side{width:380px;background:#0d1117;border-left:1px solid #21262d;display:flex;flex-direction:column;overflow-y:auto;position:fixed;right:0;top:0;bottom:0;z-index:100;box-shadow:-4px 0 24px rgba(0,0,0,.3);transform:translateX(100%);transition:transform .3s}
-.side.open{transform:translateX(0)}
-.side-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px;border-bottom:1px solid #21262d;position:sticky;top:0;background:#0d1117;z-index:5}
-.side-hdr h3{font-size:15px;color:#e0e0e0}
-.side-close{background:none;border:none;color:#8b949e;font-size:24px;cursor:pointer;padding:0 4px;line-height:1}
-.side-close:hover{color:#f85149}
-.side-body{padding:14px;flex:1}
-.psec{margin-bottom:16px}
-.psec-t{font-size:11px;color:#8b949e;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
-.pstat{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #161b22;font-size:12px}
-.pstat-l{color:#8b949e}
-.pstat-v{color:#e0e0e0;font-weight:600}
-.ptags{display:flex;flex-wrap:wrap;gap:4px}
-.ptag{font-size:11px;padding:2px 8px;border-radius:12px;background:#1f6feb22;color:#58a6ff;border:1px solid #1f6feb44}
-.hidden{display:none!important}
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
-@media(max-width:768px){.control-bar{padding:8px 12px;gap:8px}.toggle-btn{padding:4px 8px;font-size:11px}.nodes-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));padding:10px;gap:6px}.side{width:100%}}
+body{font-family:'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;background:#f0f2f5;color:#333;overflow:hidden;height:100vh}
+.toolbar{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#fff;border-bottom:1px solid #ddd;flex-wrap:wrap;z-index:20;position:relative}
+.toolbar .logo{font-size:16px;font-weight:700;color:#4a6cf7}
+.tg{display:flex;gap:1px;background:#e0e0e0;border-radius:6px;overflow:hidden}
+.tg button{padding:4px 10px;border:none;background:#fff;color:#666;font-size:11px;cursor:pointer;transition:all .15s}
+.tg button.on{background:#4a6cf7;color:#fff}
+.tg button:hover:not(.on){background:#f0f0f0}
+.canvas-wrap{position:relative;width:100%;height:calc(100vh - 42px);overflow:auto;cursor:grab}
+.canvas-wrap:active{cursor:grabbing}
+.canvas{position:relative;min-width:6000px;min-height:4000px}
+svg.lines{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1}
+svg.lines path{fill:none;stroke:#b0b8c4;stroke-width:1.5}
+.nd{position:absolute;z-index:2;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;transition:box-shadow .2s,transform .15s;user-select:none;border:1.5px solid transparent;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.nd:hover{transform:scale(1.05);z-index:10}
+.nd.root{background:#4a6cf7;color:#fff;font-size:14px;font-weight:700;padding:10px 20px;border-radius:12px;box-shadow:0 4px 16px rgba(74,108,247,.3)}
+.nd.lv1{background:#dce3ff;color:#2d3a8c;border-color:#b8c4ff}
+.nd.lv1.open{background:#4a6cf7;color:#fff;border-color:#3451d1}
+.nd.lv2{background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;font-size:11px}
+.nd.lv2.open{background:#43a047;color:#fff;border-color:#2e7d32}
+.nd.lv3{background:#fff3e0;color:#e65100;border-color:#ffcc80;font-size:11px}
+.nd .vol{font-size:9px;opacity:.7;margin-left:2px}
+.nd .arrow{font-size:8px;margin-left:auto;opacity:.6;transition:transform .2s}
+.nd.open .arrow{transform:rotate(90deg)}
+.info{position:fixed;bottom:12px;left:12px;background:#fff;border-radius:8px;padding:8px 14px;font-size:11px;color:#666;box-shadow:0 2px 8px rgba(0,0,0,.1);z-index:20}
+.info b{color:#4a6cf7}
+.zoom-ctrl{position:fixed;bottom:12px;right:12px;display:flex;gap:4px;z-index:20}
+.zoom-ctrl button{width:32px;height:32px;border-radius:6px;border:1px solid #ddd;background:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.zoom-ctrl button:hover{background:#f0f0f0}
 </style>
 </head>
 <body>
-<header class="header"><div><span class="logo">SNS Research Tool</span><span class="logo-sub">食品 & 美容 キーワードマインドマップ</span></div></header>
-<div class="control-bar">
-<div class="control-group"><label>ジャンル</label><div class="toggle-group" id="gT"><button class="toggle-btn active" data-value="food">食品</button><button class="toggle-btn" data-value="beauty">美容</button></div></div>
-<div class="control-group"><label>プラットフォーム</label><div class="toggle-group" id="pT"><button class="toggle-btn active" data-value="both">両方</button><button class="toggle-btn" data-value="tiktok">TikTok</button><button class="toggle-btn" data-value="instagram">Instagram</button></div></div>
-<div class="control-group"><label>期間</label><div class="toggle-group" id="dT"><button class="toggle-btn" data-value="1w">1週間</button><button class="toggle-btn active" data-value="1m">1ヶ月</button><button class="toggle-btn" data-value="3m">3ヶ月</button><button class="toggle-btn" data-value="6m">半年</button><button class="toggle-btn" data-value="1y">1年</button></div></div>
-<div class="control-group"><label>表示</label><div class="toggle-group" id="vT"><button class="toggle-btn active" data-value="map">マインドマップ</button><button class="toggle-btn" data-value="vid">動画一覧</button><button class="toggle-btn" data-value="acc">アカウント</button></div></div>
+<div class="toolbar">
+<span class="logo">SNS Research Tool</span>
+<div class="tg" id="gT"><button class="on" data-v="food">食品</button><button data-v="beauty">美容</button></div>
+<div class="tg" id="pT"><button class="on" data-v="both">両方</button><button data-v="tiktok">TikTok</button><button data-v="instagram">Instagram</button></div>
+<div class="tg" id="dT"><button data-v="1w">1週間</button><button class="on" data-v="1m">1ヶ月</button><button data-v="3m">3ヶ月</button><button data-v="6m">半年</button><button data-v="1y">1年</button></div>
 </div>
-<div class="breadcrumb" id="bc"></div>
-<div class="stats-bar" id="statsBar"></div>
-<div class="main-content" id="mc">
-<div id="mapArea" class="view-area"><div class="nodes-grid" id="grid"></div></div>
-<div id="vidArea" class="view-area hidden"><div class="vheader"><h2 id="vTitle"></h2><select id="vSort"><option value="views">再生数順</option><option value="likes">いいね順</option><option value="er">ER順</option><option value="new">新しい順</option></select></div><div class="vlist" id="vList"></div></div>
-<div id="accArea" class="view-area hidden"><div class="vheader"><h2 id="aTitle"></h2><select id="aSort"><option value="growth">成長率順</option><option value="followers">フォロワー順</option></select></div><div class="vlist" id="aList"></div></div>
+<div class="canvas-wrap" id="wrap">
+<div class="canvas" id="canvas">
+<svg class="lines" id="svg"></svg>
 </div>
-<div class="side" id="side"><div class="side-hdr"><h3 id="sTitle">詳細</h3><button class="side-close" onclick="closeP()">&times;</button></div><div class="side-body" id="sBody"></div></div>
+</div>
+<div class="info" id="info">ノード: <b>0</b></div>
+<div class="zoom-ctrl"><button onclick="zoomIn()">+</button><button onclick="zoomOut()">-</button><button onclick="zoomReset()">⟲</button></div>
 <script>
-/* === 食品 Lv1 50キーワード === */
-const FOOD_L1=[
-["冷凍食品",892000],["時短レシピ",956000],["ダイエット食",823000],["節約レシピ",784000],["コンビニグルメ",725000],
-["スイーツ",685000],["作り置き",642000],["お弁当",618000],["オートミール",580000],["プロテイン",562000],
-["業務スーパー",548000],["コストコ",535000],["ラーメン",520000],["カレー",498000],["パスタ",485000],
-["焼肉",472000],["寿司",458000],["韓国料理",445000],["中華料理",432000],["イタリアン",418000],
-["居酒屋メニュー",405000],["朝食",392000],["夜食",378000],["おつまみ",365000],["離乳食",352000],
-["幼児食",338000],["キャンプ飯",325000],["ワンパン料理",312000],["電子レンジレシピ",298000],["炊飯器レシピ",285000],
-["ホットプレート",272000],["鶏むねレシピ",258000],["豆腐レシピ",245000],["卵レシピ",232000],["もやしレシピ",218000],
-["サバ缶",205000],["納豆アレンジ",192000],["食パンアレンジ",178000],["おにぎり",165000],["サンドイッチ",152000],
-["グルテンフリー",148000],["ヴィーガン",135000],["発酵食品",128000],["腸活レシピ",122000],["糖質制限",118000],
-["高たんぱく",112000],["カフェ再現",108000],["コンビニ新商品",105000],["ご当地グルメ",98000],["食べ放題",95000]
-];
-/* === 美容 Lv1 50キーワード === */
-const BEAUTY_L1=[
-["プチプラコスメ",985000],["スキンケア",925000],["韓国コスメ",852000],["肌荒れ",758000],["毛穴ケア",725000],
-["ニキビケア",698000],["美白",672000],["日焼け止め",645000],["ヘアケア",618000],["ダイエット美容",592000],
-["メイクテク",568000],["アイメイク",545000],["リップ",522000],["ファンデーション",498000],["下地",475000],
-["コンシーラー",452000],["アイブロウ",428000],["マスカラ",405000],["チーク",382000],["ハイライト",358000],
-["クレンジング",342000],["洗顔",328000],["化粧水",312000],["美容液",298000],["乳液クリーム",285000],
-["パック",272000],["デパコス",258000],["ドラコス",245000],["シャンプー",232000],["トリートメント",218000],
-["ヘアオイル",205000],["ヘアアレンジ",198000],["ネイル",192000],["セルフネイル",185000],["ジェルネイル",178000],
-["まつ毛パーマ",172000],["眉毛サロン",165000],["美容医療",158000],["ダーマペン",152000],["ハイフ",148000],
-["脱毛",142000],["美顔器",135000],["エステ",128000],["インナーケア",122000],["サプリ美容",118000],
-["腸活美容",112000],["乾燥対策",108000],["敏感肌",105000],["年齢肌",98000],["メンズ美容",95000]
-];
-/* === Lv2子キーワード辞書(主要カテゴリ) === */
-const FOOD_L2={
-"冷凍食品":["冷凍パスタ","冷凍餃子","冷凍チャーハン","冷凍うどん","冷凍ピザ","冷凍魚","冷凍肉","冷凍野菜","アイスクリーム","冷凍弁当","冷凍ハンバーグ","冷凍コロッケ","冷凍唐揚げ","冷凍たこ焼き","冷凍お好み焼き","冷凍グラタン","冷凍ドリア","冷凍ラーメン","冷凍そば","冷凍シュウマイ","冷凍春巻き","冷凍エビフライ","冷凍カツ","冷凍フルーツ","冷凍スムージー","冷凍パン","冷凍スイーツ","冷凍おにぎり","冷凍枝豆","冷凍ブロッコリー","冷凍ほうれん草","冷凍コーン","冷凍ミックスベジ","冷凍シーフードミックス","セブン冷凍","ファミマ冷凍","ローソン冷凍","ニチレイ","味の素冷凍","マルハニチロ","テーブルマーク","業務スーパー冷凍","コストコ冷凍","トップバリュ冷凍","イオン冷凍","1人前","大容量パック","レンジ調理","自然解凍OK","お弁当用冷凍"],
-"時短レシピ":["5分レシピ","10分レシピ","15分レシピ","ワンパン","レンジだけ","包丁なし","洗い物少ない","フライパンだけ","トースターだけ","炊飯器だけ","混ぜるだけ","切って焼くだけ","かけるだけ","煮るだけ","和えるだけ","漬けるだけ","チンするだけ","のせるだけ","巻くだけ","丼もの","パスタ","うどん","そうめん","チャーハン","焼きそば","カレー","シチュー","スープ","サラダ","副菜","メインおかず","朝食","昼食","夕食","夜食","おつまみ","お弁当","作り置き","下味冷凍","半調理","ミールキット","缶詰アレンジ","レトルトアレンジ","冷凍食品アレンジ","素を使う","めんつゆだけ","焼肉のタレだけ","ポン酢だけ","白だしだけ","バター醤油"],
-"ダイエット食":["低糖質","高たんぱく","オートミール","置き換え","プロテイン","サラダチキン","鶏むね","ささみ","豆腐ダイエット","こんにゃく","しらたき","おからパウダー","大豆ミート","ブランパン","糖質ゼロ麺","ギリシャヨーグルト","ゆで卵","枝豆","サバ缶ダイエット","アーモンド","チアシード","キヌア","もち麦","玄米","雑穀米","スムージー","プロテインバー","ファスティング","16時間断食","脂質制限","カロリー制限","PFCバランス","ケトジェニック","地中海式","糖質オフスイーツ","低カロリーおやつ","ダイエット弁当","痩せるスープ","脂肪燃焼","デトックス","腸活ダイエット","食べて痩せる","満腹ダイエット","コンビニダイエット","外食ダイエット","筋トレ飯","バルクアップ","減量飯","チートデイ","ダイエット記録"],
-"節約レシピ":["もやし","豆腐","鶏むね","卵","ちくわ","はんぺん","厚揚げ","納豆","豆苗","キャベツ","大根","じゃがいも","にんじん","玉ねぎ","ほうれん草","小松菜","きのこ","もやし炒め","豆腐ステーキ","鶏むね唐揚げ","卵料理","業務スーパー","トップバリュ","PB商品","見切り品","まとめ買い","1週間献立","月2万円","月3万円","1食100円","1食200円","食費節約","買い物術","冷凍保存","下味冷凍","かさまし","もどき料理","ボリュームおかず","給料日前","一人暮らし","二人暮らし","4人家族","ふるさと納税","ポイ活","クーポン","半額シール","業スーまとめ買い","コスパ最強","食材使い切り","残り物アレンジ"],
-"コンビニグルメ":["セブンイレブン","ファミリーマート","ローソン","ミニストップ","デイリーヤマザキ","セブンスイーツ","ファミマスイーツ","ローソンスイーツ","おにぎり","サンドイッチ","パン","弁当","ホットスナック","ファミチキ","からあげクン","Lチキ","アメリカンドッグ","肉まん","おでん","冷やし中華","冷凍食品","カップ麺","サラダ","スムージー","コーヒー","限定商品","新商品","コラボ商品","100円商品","PB商品","セブンプレミアム","お母さん食堂","ウチカフェ","バスチー","セブンカフェ","ファミカフェ","マチカフェ","朝コンビニ","昼コンビニ","夜コンビニ","ダイエット向き","高たんぱく","低糖質","1000円以内","500円ランチ","コスパ","新作レビュー","食べ比べ","ランキング","殿堂入り"],
-"スイーツ":["コンビニスイーツ","カフェスイーツ","手作りスイーツ","チョコレート","ケーキ","プリン","シュークリーム","タルト","マカロン","ドーナツ","パンケーキ","ワッフル","クレープ","アイスクリーム","かき氷","和菓子","大福","団子","どら焼き","たい焼き","チーズケーキ","ティラミス","モンブラン","ミルクレープ","ロールケーキ","エクレア","カヌレ","マリトッツォ","台湾カステラ","バスクチーズケーキ","生チョコ","トリュフ","ブラウニー","スコーン","マフィン","フィナンシェ","マドレーヌ","クッキー","パイ","季節限定","新作","お取り寄せ","手土産","ギフト","映え","食べ放題","ビュッフェ","高級","プチプラ","材料3つ"],
-"業務スーパー":["冷凍野菜","冷凍肉","冷凍フルーツ","チーズ","パスタソース","調味料","お菓子","パン","豆腐","鶏肉2kg","合挽き肉","豚バラ","ベーコン","ウインナー","ハム","チルド惣菜","レトルト","缶詰","ドリンク","デザート","天然酵母パン","ビール酵母パン","1kg牛乳パック","水ようかん","杏仁豆腐","チュロス","ベルギーワッフル","タピオカ","ナン","トルティーヤ","春巻きの皮","餃子の皮","海外食材","韓国食材","中華食材","タイ食材","スパイス","はちみつ","メープルシロップ","オリーブオイル","コスパ最強","まとめ買い","おすすめ","新商品","殿堂入り","アレンジ","1000円チャレンジ","買うべき","買ってはいけない","リピ買い"],
-"コストコ":["ディナーロール","マフィン","ティラミス","チーズケーキ","ロティサリーチキン","プルコギビーフ","さくらどり","ベーグル","クロワッサン","ピザ","寿司","ハイローラー","チョッピーノスープ","マッシュポテト","ケーキ","パンオショコラ","オーガニック","コスパ","大容量","冷凍保存","小分け","リピ買い","新商品","季節限定","おすすめ","買ってよかった","失敗","初心者","年会費","ガソリン","フードコート","ホットドッグ","ソフトクリーム","クラムチャウダー","プルコギベイク","アサイーボウル","家電","日用品","ベビー用品","ペット用品","美容","サプリ","デリ","お酒","ワイン","まとめ買い","収納術","冷凍テク","会員","ランキング"],
-"ラーメン":["家系","二郎系","豚骨","味噌","醤油","塩","担々麺","つけ麺","油そば","まぜそば","台湾まぜそば","汁なし","冷やし中華","カップ麺","袋麺","インスタント","チルド","冷凍","有名店","行列店","穴場","新店","コスパ","ワンコイン","深夜営業","お取り寄せ","レシピ再現","自作","トッピング","チャーシュー","味玉","メンマ","ネギ","もやし","ニンニク","背脂","辛い","激辛","食べ歩き","ランキング","都道府県別","東京","大阪","名古屋","福岡","北海道","横浜","全国チェーン","地元民おすすめ","通"],
-"カレー":["レトルト","手作り","時短","本格","スパイスカレー","バターチキン","キーマ","グリーンカレー","欧風","ドライカレー","カレーうどん","カレーパン","焼きカレー","スープカレー","無水カレー","カレー鍋","ナン","チーズナン","ターメリックライス","隠し味","ルー","スパイス","市販ルー比較","ジャワカレー","バーモント","こくまろ","ゴールデン","SB","ハウス","具材","トッピング","カツカレー","コロッケカレー","エビフライカレー","卵","チーズ","福神漬け","らっきょう","有名店","名店","行列","コスパ","テイクアウト","冷凍","作り置き","アレンジ","リメイク","2日目","大量","キャンプ"]
-};
-const BEAUTY_L2={
-"プチプラコスメ":["化粧水","乳液","美容液","クレンジング","洗顔","ファンデーション","下地","コンシーラー","パウダー","リップ","アイシャドウ","マスカラ","アイライナー","アイブロウ","チーク","ハイライト","シェーディング","リップティント","リップグロス","口紅","BBクリーム","CCクリーム","日焼け止め","ミスト","パック","アイクリーム","ネイル","リムーバー","ブラシ","スポンジ","セザンヌ","キャンメイク","ちふれ","ケイト","マジョマジョ","ヴィセ","エクセル","インテグレート","メイベリン","レブロン","ロムアンド","エチュード","1000円以下","500円以下","ドラッグストア","ランキング","殿堂入り","新作","限定","コスパ最強"],
-"スキンケア":["毛穴ケア","ニキビケア","美白","保湿","エイジングケア","角質ケア","くすみ","シミ","シワ","たるみ","クレンジング","洗顔","導入美容液","化粧水","美容液","乳液","クリーム","オイル","パック","アイクリーム","リップケア","ネッククリーム","ボディケア","ハンドケア","日焼け止め","ビタミンC","レチノール","ナイアシンアミド","セラミド","ヒアルロン酸","AHA","BHA","CICA","ペプチド","朝スキンケア","夜スキンケア","週1ケア","季節別","肌タイプ別","年代別","10代","20代","30代","40代","50代","メンズ","韓国","デパコス","ドラコス","プチプラ"],
-"韓国コスメ":["クッションファンデ","ティント","ベルベットリップ","アイシャドウパレット","コンシーラー","下地","パウダー","マスカラ","アイライナー","BBクリーム","CICA","パック","美容液","トナー","クリーム","セラム","日焼け止め","クレンジング","洗顔","ミスト","ロムアンド","ペリペラ","エチュード","クリオ","ミシャ","イニスフリー","ラネージュ","VT","ヒンス","アミューズ","トゥークールフォースクール","ネイチャーリパブリック","ホリカホリカ","スキンフード","メディヒール","CNP","goodal","バニラコ","ジョンセンムル","ヘラ","水光肌","ツヤ肌","ガラス肌","韓国メイク","アイドルメイク","オリーブヤング","Qoo10","Amazon","ドンキ","新作"],
-"肌荒れ":["敏感肌","乾燥肌","脂性肌","混合肌","インナードライ","赤み","かゆみ","ヒリヒリ","皮むけ","ニキビ","吹き出物","肌荒れ原因","ストレス肌","生理前","季節の変わり目","花粉","マスク荒れ","摩擦","紫外線","食生活","睡眠不足","スキンケア見直し","バリア機能","セラミド","ワセリン","キュレル","ミノン","NOV","dプログラム","アベンヌ","ラロッシュポゼ","エトヴォス","アクセーヌ","イハダ","アレルバリア","低刺激","無添加","アルコールフリー","パラベンフリー","オーガニック","皮膚科","処方薬","ヒルドイド","ビタミン","亜鉛","サプリ","腸活","水分","保湿","回復記録"],
-"毛穴ケア":["黒ずみ","角栓","開き毛穴","たるみ毛穴","いちご鼻","Tゾーン","頬","鼻","顎","おでこ","酵素洗顔","クレイパック","ピーリング","レチノール","ビタミンC","AHA","BHA","収れん化粧水","毛穴パック","スチーマー","冷水","氷","ベビーオイル","オイルクレンジング","バーム","ホットタオル","スクラブ","炭酸","泡洗顔","ダブル洗顔","オバジ","タカミ","DUO","ファンケル","メラノCC","suisai","ロゼット","ビオレ","キュレル","無印良品","韓国コスメ","皮膚科","ダーマペン","毛穴レーザー","プチプラ","デパコス","朝ケア","夜ケア","ルーティン","ビフォーアフター"],
-"ニキビケア":["大人ニキビ","思春期ニキビ","顎ニキビ","おでこ","頬","鼻","背中","胸","こめかみ","生え際","白ニキビ","黒ニキビ","赤ニキビ","黄ニキビ","ニキビ跡","クレーター","色素沈着","洗顔","化粧水","美容液","クリーム","パッチ","ティーツリー","サリチル酸","ベンゾイル","アゼライン酸","ナイアシンアミド","レチノール","ノンコメド","ペアアクネ","ビフナイト","メンソレータム","オルビス","NOV","プロアクティブ","ラロッシュポゼ","皮膚科","ディフェリン","抗生物質","ピル","食事","腸活","枕カバー","洗顔方法","保湿","日焼け止め","メイク","コンシーラー","ルーティン","治った"],
-"美白":["ビタミンC","トラネキサム酸","アルブチン","ナイアシンアミド","ハイドロキノン","コウジ酸","4MSK","カモミラET","プラセンタ","美白美容液","美白化粧水","美白クリーム","美白パック","美白サプリ","美白点滴","シミ","そばかす","くすみ","肝斑","日焼け","トーンアップ","透明感","色ムラ","日焼け止め","UVケア","HAKU","メラノCC","白潤","トランシーノ","ケシミン","オバジ","SK-II","POLAホワイトショット","資生堂","コーセー","ロート","メラニン","ターンオーバー","ピーリング","レーザー","フォトフェイシャル","皮膚科","内服","ビタミンC食品","日傘","帽子","手袋","首","手","ボディ"],
-"ヘアケア":["シャンプー","トリートメント","コンディショナー","ヘアオイル","ヘアミルク","ヘアマスク","ヘアパック","洗い流さない","アウトバス","スカルプ","頭皮ケア","育毛","抜け毛","薄毛","白髪","くせ毛","猫っ毛","剛毛","ダメージ","ブリーチ毛","カラー後","パーマ後","しっとり","さらさら","ツヤ","まとまり","ボリューム","ハリコシ","&honey","YOLU","ボタニスト","ダイアン","いち髪","ミルボン","N.","モロッカンオイル","フィーノ","ラックス","パンテーン","ツバキ","サロン専売","ドラッグストア","プチプラ","ヘアアレンジ","巻き髪","ストレート","ポニーテール","お団子","編み込み","ヘアカラー"],
-"日焼け止め":["顔用","ボディ用","全身","スプレー","ジェル","ミルク","クリーム","スティック","パウダー","下地兼用","トーンアップ","ウォータープルーフ","汗に強い","石鹸で落ちる","紫外線吸収剤フリー","敏感肌用","子供用","SPF50","PA++++","SPF30","日常用","レジャー用","塗り直し","アネッサ","ビオレ","スキンアクア","アリー","ラロッシュポゼ","キュレル","NOV","ニベア","コパトーン","サンカット","雪肌精","エリクシール","ランコム","プチプラ","デパコス","1000円以下","焼けない","白くならない","ベタつかない","乾燥しない","きしまない","コスパ","新作","比較","ランキング","塗り方","量"]
-};
-/* === Lv3 サブキーワード素材(組み合わせ生成用) === */
-const FOOD_MODS=["簡単","時短","節約","本格","プロ直伝","裏ワザ","アレンジ","リメイク","再現","作り方","レシピ","コツ","失敗しない","初心者","一人暮らし","子供","家族","彼氏","ダイエット","低糖質","高たんぱく","ヘルシー","罪悪感ゼロ","カロリーオフ","材料3つ","材料2つ","包丁なし","レンジ","フライパン","炊飯器","トースター","ワンパン","ずぼら","ランチ","夜ご飯","朝ごはん","お弁当","おつまみ","作り置き","冷凍OK","日持ち","大量","業スー","コストコ","セブン","ファミマ","コスパ","爆売れ","話題","殿堂入り"];
-const BEAUTY_MODS=["プチプラ","デパコス","韓国","ドラッグストア","1000円以下","新作","限定","殿堂入り","ランキング","比較","レビュー","使い方","塗り方","選び方","おすすめ","初心者","20代","30代","40代","敏感肌","乾燥肌","脂性肌","混合肌","イエベ","ブルベ","イエベ春","イエベ秋","ブルベ夏","ブルベ冬","ツヤ","マット","ナチュラル","しっとり","さっぱり","カバー","崩れない","よれない","乾燥しない","石鹸落ち","低刺激","高保湿","美白","毛穴","ニキビ","シミ","シワ","ハリ","透明感","垢抜け","整形級"];
-
-/* === 状態管理 === */
-let S={genre:'food',platform:'both',period:'1m',view:'map',path:[]};
-
-function seed(s){let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0}return function(){h^=h<<13;h^=h>>17;h^=h<<5;return(h>>>0)/4294967296}}
-
-/* Lv2子キーワード50個生成 */
-function getL2(name){
-  const g=S.genre;
-  const map=g==='food'?FOOD_L2:BEAUTY_L2;
-  if(map[name]) return map[name].map((w,i)=>{
-    const r=seed(name+w);
-    return [w, Math.floor(r()*80000)+5000];
-  });
-  // マッピングにない場合は自動生成
-  const mods=g==='food'?FOOD_MODS:BEAUTY_MODS;
-  const arr=[];
-  const rng=seed(name+'L2');
-  for(let i=0;i<50;i++){
-    arr.push([name+"×"+mods[i], Math.floor(rng()*60000)+5000]);
-  }
-  return arr;
+const FL=[["冷凍食品",89],["時短レシピ",95],["ダイエット食",82],["節約レシピ",78],["コンビニグルメ",72],["スイーツ",68],["作り置き",64],["お弁当",61],["オートミール",58],["プロテイン",56],["業務スーパー",54],["コストコ",53],["ラーメン",52],["カレー",49],["パスタ",48],["焼肉",47],["寿司",45],["韓国料理",44],["中華料理",43],["イタリアン",41],["居酒屋メニュー",40],["朝食",39],["夜食",37],["おつまみ",36],["離乳食",35],["幼児食",33],["キャンプ飯",32],["ワンパン料理",31],["電子レンジレシピ",29],["炊飯器レシピ",28],["ホットプレート",27],["鶏むねレシピ",25],["豆腐レシピ",24],["卵レシピ",23],["もやしレシピ",21],["サバ缶",20],["納豆アレンジ",19],["食パンアレンジ",17],["おにぎり",16],["サンドイッチ",15],["グルテンフリー",14],["ヴィーガン",13],["発酵食品",12],["腸活レシピ",12],["糖質制限",11],["高たんぱく",11],["カフェ再現",10],["コンビニ新商品",10],["ご当地グルメ",9],["食べ放題",9]];
+const BL=[["プチプラコスメ",98],["スキンケア",92],["韓国コスメ",85],["肌荒れ",75],["毛穴ケア",72],["ニキビケア",69],["美白",67],["日焼け止め",64],["ヘアケア",61],["ダイエット美容",59],["メイクテク",56],["アイメイク",54],["リップ",52],["ファンデーション",49],["下地",47],["コンシーラー",45],["アイブロウ",42],["マスカラ",40],["チーク",38],["ハイライト",35],["クレンジング",34],["洗顔",32],["化粧水",31],["美容液",29],["乳液クリーム",28],["パック",27],["デパコス",25],["ドラコス",24],["シャンプー",23],["トリートメント",21],["ヘアオイル",20],["ヘアアレンジ",19],["ネイル",19],["セルフネイル",18],["ジェルネイル",17],["まつ毛パーマ",17],["眉毛サロン",16],["美容医療",15],["ダーマペン",15],["ハイフ",14],["脱毛",14],["美顔器",13],["エステ",12],["インナーケア",12],["サプリ美容",11],["腸活美容",11],["乾燥対策",10],["敏感肌",10],["年齢肌",9],["メンズ美容",9]];
+const FL2={"冷凍食品":["冷凍パスタ","冷凍餃子","冷凍チャーハン","冷凍うどん","冷凍ピザ","冷凍魚","冷凍肉","冷凍野菜","アイスクリーム","冷凍弁当","冷凍ハンバーグ","冷凍コロッケ","冷凍唐揚げ","冷凍たこ焼き","冷凍お好み焼き","冷凍グラタン","冷凍ドリア","冷凍ラーメン","冷凍そば","冷凍シュウマイ","冷凍春巻き","冷凍エビフライ","冷凍カツ","冷凍フルーツ","冷凍スムージー","冷凍パン","冷凍スイーツ","冷凍おにぎり","冷凍枝豆","冷凍ブロッコリー","冷凍ほうれん草","冷凍コーン","冷凍ミックスベジ","冷凍シーフードMIX","セブン冷凍","ファミマ冷凍","ローソン冷凍","ニチレイ","味の素冷凍","マルハニチロ","テーブルマーク","業スー冷凍","コストコ冷凍","トップバリュ冷凍","イオン冷凍","1人前","大容量パック","レンジ調理","自然解凍OK","お弁当用冷凍"],"時短レシピ":["5分レシピ","10分レシピ","15分レシピ","ワンパン","レンジだけ","包丁なし","洗い物少ない","フライパンだけ","トースターだけ","炊飯器だけ","混ぜるだけ","切って焼くだけ","かけるだけ","煮るだけ","和えるだけ","漬けるだけ","チンするだけ","のせるだけ","巻くだけ","丼もの","パスタ","うどん","そうめん","チャーハン","焼きそば","カレー","シチュー","スープ","サラダ","副菜","メインおかず","朝食","昼食","夕食","夜食","おつまみ","お弁当","作り置き","下味冷凍","半調理","ミールキット","缶詰","レトルト","冷食アレンジ","素を使う","めんつゆだけ","焼肉のタレだけ","ポン酢だけ","白だしだけ","バター醤油"],"ダイエット食":["低糖質","高たんぱく","オートミール","置き換え","プロテイン","サラダチキン","鶏むね","ささみ","豆腐","こんにゃく","しらたき","おからパウダー","大豆ミート","ブランパン","糖質ゼロ麺","ギリシャヨーグルト","ゆで卵","枝豆","サバ缶","アーモンド","チアシード","キヌア","もち麦","玄米","雑穀米","スムージー","プロテインバー","ファスティング","16時間断食","脂質制限","カロリー制限","PFC","ケトジェニック","地中海式","糖質オフスイーツ","低カロリーおやつ","ダイエット弁当","痩せるスープ","脂肪燃焼","デトックス","腸活","食べて痩せる","満腹系","コンビニ活用","外食","筋トレ飯","バルクアップ","減量飯","チートデイ","記録"],"節約レシピ":["もやし","豆腐","鶏むね","卵","ちくわ","はんぺん","厚揚げ","納豆","豆苗","キャベツ","大根","じゃがいも","にんじん","玉ねぎ","ほうれん草","小松菜","きのこ","もやし炒め","豆腐ステーキ","鶏むね唐揚げ","卵料理","業務スーパー","トップバリュ","PB商品","見切り品","まとめ買い","1週間献立","月2万円","月3万円","1食100円","1食200円","食費節約","買い物術","冷凍保存","下味冷凍","かさまし","もどき料理","ボリューム","給料日前","一人暮らし","二人暮らし","4人家族","ふるさと納税","ポイ活","クーポン","半額シール","業スーまとめ","コスパ最強","使い切り","残り物"],"コンビニグルメ":["セブン","ファミマ","ローソン","ミニストップ","デイリー","セブンスイーツ","ファミマスイーツ","ローソンスイーツ","おにぎり","サンドイッチ","パン","弁当","ホットスナック","ファミチキ","からあげクン","Lチキ","肉まん","おでん","冷凍食品","カップ麺","サラダ","スムージー","コーヒー","限定","新商品","コラボ","100円","PB","セブンプレミアム","お母さん食堂","ウチカフェ","バスチー","セブンカフェ","朝コンビニ","昼コンビニ","夜コンビニ","ダイエット向き","高たんぱく","低糖質","1000円以内","500円ランチ","コスパ","レビュー","食べ比べ","ランキング","殿堂入り","冬限定","夏限定","春限定","秋限定"],"スイーツ":["コンビニ","カフェ","手作り","チョコ","ケーキ","プリン","シュークリーム","タルト","マカロン","ドーナツ","パンケーキ","ワッフル","クレープ","アイス","かき氷","和菓子","大福","団子","どら焼き","たい焼き","チーズケーキ","ティラミス","モンブラン","ミルクレープ","ロールケーキ","エクレア","カヌレ","バスチー","生チョコ","ブラウニー","スコーン","マフィン","フィナンシェ","マドレーヌ","クッキー","パイ","季節限定","新作","お取り寄せ","手土産","ギフト","映え","食べ放題","ビュッフェ","高級","プチプラ","材料3つ","スタバ","コメダ","ドトール"]};
+const BL2={"プチプラコスメ":["化粧水","乳液","美容液","クレンジング","洗顔","ファンデ","下地","コンシーラー","パウダー","リップ","アイシャドウ","マスカラ","アイライナー","アイブロウ","チーク","ハイライト","シェーディング","ティント","グロス","口紅","BBクリーム","CCクリーム","日焼け止め","ミスト","パック","アイクリーム","ネイル","リムーバー","ブラシ","スポンジ","セザンヌ","キャンメイク","ちふれ","ケイト","マジョマジョ","ヴィセ","エクセル","インテグレート","メイベリン","レブロン","ロムアンド","エチュード","1000円以下","500円以下","ドラスト","ランキング","殿堂入り","新作","限定","コスパ"],"スキンケア":["毛穴ケア","ニキビケア","美白","保湿","エイジング","角質ケア","くすみ","シミ","シワ","たるみ","クレンジング","洗顔","導入美容液","化粧水","美容液","乳液","クリーム","オイル","パック","アイクリーム","リップケア","ネックケア","ボディケア","ハンドケア","日焼け止め","ビタミンC","レチノール","ナイアシンアミド","セラミド","ヒアルロン酸","AHA","BHA","CICA","ペプチド","朝ケア","夜ケア","週1ケア","季節別","肌タイプ別","年代別","10代","20代","30代","40代","50代","メンズ","韓国","デパコス","ドラコス","プチプラ"],"韓国コスメ":["クッションファンデ","ティント","ベルベットリップ","アイシャドウ","コンシーラー","下地","パウダー","マスカラ","アイライナー","BBクリーム","CICA","パック","美容液","トナー","クリーム","セラム","日焼け止め","クレンジング","洗顔","ミスト","ロムアンド","ペリペラ","エチュード","クリオ","ミシャ","イニスフリー","ラネージュ","VT","ヒンス","アミューズ","トゥークール","ネイチャーリパブリック","ホリカホリカ","スキンフード","メディヒール","CNP","goodal","バニラコ","ジョンセンムル","ヘラ","水光肌","ツヤ肌","ガラス肌","韓国メイク","アイドルメイク","オリヤン","Qoo10","Amazon","ドンキ","新作"],"肌荒れ":["敏感肌","乾燥肌","脂性肌","混合肌","インナードライ","赤み","かゆみ","ヒリヒリ","皮むけ","ニキビ","吹き出物","原因","ストレス","生理前","季節の変わり目","花粉","マスク荒れ","摩擦","紫外線","食生活","睡眠不足","スキンケア見直し","バリア機能","セラミド","ワセリン","キュレル","ミノン","NOV","dプログラム","アベンヌ","ラロッシュポゼ","エトヴォス","アクセーヌ","イハダ","アレルバリア","低刺激","無添加","アルコールフリー","パラベンフリー","オーガニック","皮膚科","処方薬","ヒルドイド","ビタミン","亜鉛","サプリ","腸活","水分","保湿","回復記録"],"毛穴ケア":["黒ずみ","角栓","開き毛穴","たるみ毛穴","いちご鼻","Tゾーン","頬","鼻","顎","おでこ","酵素洗顔","クレイパック","ピーリング","レチノール","ビタミンC","AHA","BHA","収れん化粧水","毛穴パック","スチーマー","冷水","氷","ベビーオイル","オイクレ","バーム","ホットタオル","スクラブ","炭酸","泡洗顔","ダブル洗顔","オバジ","タカミ","DUO","ファンケル","メラノCC","suisai","ロゼット","ビオレ","キュレル","無印","韓国コスメ","皮膚科","ダーマペン","レーザー","プチプラ","デパコス","朝ケア","夜ケア","ルーティン","ビフォアフ"],"ニキビケア":["大人ニキビ","思春期","顎","おでこ","頬","鼻","背中","胸","こめかみ","生え際","白ニキビ","黒ニキビ","赤ニキビ","黄ニキビ","ニキビ跡","クレーター","色素沈着","洗顔","化粧水","美容液","クリーム","パッチ","ティーツリー","サリチル酸","ベンゾイル","アゼライン酸","ナイアシンアミド","レチノール","ノンコメド","ペアアクネ","ビフナイト","メンソレータム","オルビス","NOV","プロアクティブ","ラロッシュポゼ","皮膚科","ディフェリン","抗生物質","ピル","食事","腸活","枕カバー","洗顔方法","保湿","日焼け止め","メイク","コンシーラー","ルーティン","治った"]};
+const FM=["簡単","時短","節約","本格","プロ直伝","裏ワザ","アレンジ","リメイク","再現","作り方","レシピ","コツ","失敗しない","初心者","一人暮らし","子供","家族","ダイエット","低糖質","高たんぱく","ヘルシー","罪悪感ゼロ","カロリーオフ","材料3つ","材料2つ","包丁なし","レンジ","フライパン","炊飯器","トースター","ワンパン","ずぼら","ランチ","夜ご飯","朝ごはん","お弁当","おつまみ","作り置き","冷凍OK","日持ち","大量","業スー","コストコ","セブン","ファミマ","コスパ","爆売れ","話題","殿堂入り","神"];
+const BM=["プチプラ","デパコス","韓国","ドラスト","1000円以下","新作","限定","殿堂入り","ランキング","比較","レビュー","使い方","塗り方","選び方","おすすめ","初心者","20代","30代","40代","敏感肌","乾燥肌","脂性肌","混合肌","イエベ","ブルベ","イエベ春","イエベ秋","ブルベ夏","ブルベ冬","ツヤ","マット","ナチュラル","しっとり","さっぱり","カバー","崩れない","よれない","乾燥しない","石鹸落ち","低刺激","高保湿","美白","毛穴","ニキビ","シミ","シワ","ハリ","透明感","垢抜け","整形級"];
+/* === 状態 === */
+let G='food',opened={};
+function rng(s){let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0}h^=h<<13;h^=h>>17;h^=h<<5;return(h>>>0)/4294967296}
+function getL2(n){
+  const m=G==='food'?FL2:BL2;
+  if(m[n]) return m[n].map((w,i)=>[w,Math.floor(rng(n+w)*80+5)]);
+  const ms=G==='food'?FM:BM;
+  return ms.map((w,i)=>[n+"×"+w,Math.floor(rng(n+w+'x')*60+5)]);
 }
-
-/* Lv3子キーワード50個生成 */
-function getL3(parent, name){
-  const g=S.genre;
-  const mods=g==='food'?FOOD_MODS:BEAUTY_MODS;
-  const arr=[];
-  const rng=seed(parent+name+'L3');
-  for(let i=0;i<50;i++){
-    arr.push([name+" "+mods[i%mods.length], Math.floor(rng()*40000)+2000]);
-  }
-  return arr;
-}
-
-function getDataAtPath(){
-  const l1=S.genre==='food'?FOOD_L1:BEAUTY_L1;
-  if(S.path.length===0) return l1.map(([n,v])=>({name:n,vol:v,hasChildren:true}));
-  if(S.path.length===1){
-    return getL2(S.path[0]).map(([n,v])=>({name:n,vol:v,hasChildren:true}));
-  }
-  if(S.path.length===2){
-    return getL3(S.path[0],S.path[1]).map(([n,v])=>({name:n,vol:v,hasChildren:false}));
-  }
-  return [];
-}
-
-function pmult(){return{  '1w':0.12,'1m':0.35,'3m':0.65,'6m':0.82,'1y':1.0}[S.period]||1}
-function fmt(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n+''}
-
-/* === 動画生成(10M+再生含む、リンク付き) === */
-function genVideos(kw,count=40){
-  const ps=S.platform==='both'?['tiktok','instagram']:[S.platform];
-  const g=S.genre;
-  const rng=seed(kw+S.period+'vid');
-  const vids=[];
-  for(let i=0;i<count;i++){
-    const p=ps[i%ps.length];
-    // 上位数本は1000万〜1億再生
-    let views;
-    if(i<3) views=Math.floor(rng()*90000000)+10000000;
-    else if(i<8) views=Math.floor(rng()*9000000)+1000000;
-    else if(i<20) views=Math.floor(rng()*900000)+100000;
-    else views=Math.floor(rng()*90000)+10000;
-    const likes=Math.floor(views*(rng()*0.1+0.02));
-    const comments=Math.floor(likes*(rng()*0.08+0.005));
-    const shares=Math.floor(comments*(rng()*3+0.5));
-    const days=Math.floor(rng()*365);
-    const d=new Date();d.setDate(d.getDate()-days);
-    const vid=Math.floor(rng()*9e15)+1e15;
-    const uid=Math.floor(rng()*9e8)+1e8;
-    const url=p==='tiktok'
-      ?'https://www.tiktok.com/@user'+uid+'/video/'+vid
-      :'https://www.instagram.com/reel/'+btoa(String(vid)).slice(0,11)+'/';
-    const titles=g==='food'
-      ?["これ知らない人損してる","マジで神すぎた","全人類に届け","もっと早く知りたかった","今すぐ買って","毎日食べてる","100万回作った","コスパ最強","プロが教える","バズりすぎ注意"]
-      :["整形級に変わる","垢抜け確定","マジで人生変わった","全女子に届け","これ以外使えない","プロ直伝","1000円以下で神","一生リピ","毎朝これだけ","ガチで最強"];
-    vids.push({
-      id:'v'+i,title:'【'+kw+'】'+titles[i%titles.length],platform:p,
-      views,likes,comments,shares,
-      date:d.toISOString().slice(0,10),days,
-      er:((likes+comments)/views*100).toFixed(2),
-      account:'@'+(g==='food'?'food':'beauty')+'_'+Math.floor(rng()*9999),
-      duration:Math.floor(rng()*170)+10,
-      url,keywords:[kw]
-    });
-  }
-  return vids.sort((a,b)=>b.views-a.views);
-}
-
-function genAccounts(kw,count=30){
-  const ps=S.platform==='both'?['tiktok','instagram']:[S.platform];
-  const g=S.genre;
-  const rng=seed(kw+S.period+'acc');
-  const accs=[];
-  for(let i=0;i<count;i++){
-    const p=ps[i%ps.length];
-    const f=Math.floor(rng()*3000000)+500;
-    const gr=(rng()*50-5).toFixed(1);
-    const uid=Math.floor(rng()*9e8)+1e8;
-    const url=p==='tiktok'?'https://www.tiktok.com/@user'+uid:'https://www.instagram.com/user'+uid+'/';
-    accs.push({
-      name:(g==='food'?'グルメ':'美容')+'クリエイター'+(i+1),
-      handle:'@'+(g==='food'?'food':'beauty')+'_'+Math.floor(rng()*9999),
-      platform:p,followers:f,growth:parseFloat(gr),
-      avgViews:Math.floor(f*(rng()*0.4+0.03)),
-      er:(rng()*9+0.5).toFixed(2),
-      posts:Math.floor(rng()*800)+5,
-      url,keyword:kw
-    });
-  }
-  return accs.sort((a,b)=>b.growth-a.growth);
+function getL3(p,n){
+  const ms=G==='food'?FM:BM;
+  return ms.map((w,i)=>[n+" "+w,Math.floor(rng(p+n+w+'3')*40+2)]);
 }
 
 /* === 描画 === */
-function renderBC(){
-  const el=document.getElementById('bc');
-  let h=`<span class="crumb ${S.path.length===0?'active':''}" onclick="nav(-1)">トップ</span>`;
-  S.path.forEach((p,i)=>{h+=`<span class="crumb-sep">›</span><span class="crumb ${i===S.path.length-1?'active':''}" onclick="nav(${i})">${p}</span>`});
-  el.innerHTML=h;
+const canvas=document.getElementById('canvas');
+const svg=document.getElementById('svg');
+let nodes=[],lines=[];
+const NW=160,NH=28,GAP=6,COL_GAP=60;
+
+function clear(){canvas.querySelectorAll('.nd').forEach(e=>e.remove());svg.innerHTML='';nodes=[];lines=[]}
+
+function addNode(id,text,vol,x,y,lv,parentId){
+  const d=document.createElement('div');
+  d.className='nd lv'+lv+(opened[id]?' open':'');
+  d.id='n_'+id;
+  d.style.left=x+'px';d.style.top=y+'px';
+  const volStr=vol>=100?(vol/10).toFixed(0)+'万':vol+'K';
+  d.innerHTML=`<span style="overflow:hidden;text-overflow:ellipsis">${text}</span><span class="vol">${volStr}</span>${lv<3?'<span class="arrow">▶</span>':''}`;
+  d.onclick=(e)=>{e.stopPropagation();toggle(id,lv,text)};
+  canvas.appendChild(d);
+  nodes.push({id,x,y,w:NW,h:NH,parentId,el:d});
+  return d;
 }
 
-function renderStats(){
-  const data=getDataAtPath();
-  const el=document.getElementById('statsBar');
-  el.innerHTML=`<span>表示中: <span class="num">${data.length}件</span></span><span>ジャンル: <span class="num">${S.genre==='food'?'食品':'美容'}</span></span><span>階層: <span class="num">Lv${S.path.length+1}</span></span><span>期間: <span class="num">${S.period}</span></span>`;
+function drawLine(x1,y1,x2,y2){
+  const mx=(x1+x2)/2;
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+  svg.appendChild(path);
 }
 
-function renderMap(){
-  const grid=document.getElementById('grid');
-  const data=getDataAtPath();
-  if(!data.length){grid.innerHTML='<div style="padding:40px;color:#8b949e">データなし</div>';return}
-  const m=pmult();
-  const mx=Math.max(...data.map(d=>d.vol));
-  const cls=S.genre==='food'?'food':'beauty';
-  let h='';
-  data.forEach(d=>{
-    const v=Math.floor(d.vol*m);
-    const pct=(d.vol/mx*100).toFixed(0);
-    const vc=v>50000?'high':v>10000?'mid':'low';
-    const lv=S.path.length;
-    const esc=d.name.replace(/'/g,"\\'");
-    const click=d.hasChildren?`drillDown('${esc}')`:`showKW('${esc}',${v})`;
-    h+=`<div class="node-card ${cls}" onclick="${click}">
-      <span class="node-badge">Lv${lv+1}</span>
-      <div class="node-name">${d.name}</div>
-      <div class="node-volume ${vc}">${fmt(v)}</div>
-      <div class="node-bar"><div class="node-bar-fill ${cls}" style="width:${pct}%"></div></div>
-      <div class="node-hint">${d.hasChildren?'▶ 50件の子キーワード':'📊 詳細を見る'}</div>
-    </div>`;
+function build(){
+  clear();
+  const l1=G==='food'?FL:BL;
+  const rootX=80,rootY=l1.length*(NH+GAP)/2;
+  // ルートノード
+  const rd=document.createElement('div');
+  rd.className='nd root';rd.style.left=rootX+'px';rd.style.top=rootY+'px';
+  rd.textContent=G==='food'?'🍱 食品':'💄 美容';
+  canvas.appendChild(rd);
+
+  const col1X=rootX+NW+COL_GAP;
+  let nodeCount=1;
+  l1.forEach(([name,vol],i)=>{
+    const y=i*(NH+GAP)+20;
+    const id='l1_'+i;
+    addNode(id,name,vol,col1X,y,1,null);
+    drawLine(rootX+NW-10,rootY+NH/2,col1X,y+NH/2);
+    nodeCount++;
+
+    if(opened[id]){
+      const kids=getL2(name);
+      const col2X=col1X+NW+COL_GAP;
+      const startY2=Math.max(0,y-kids.length*(NH+GAP)/4);
+      kids.forEach(([kn,kv],j)=>{
+        const ky=startY2+j*(NH+GAP);
+        const kid='l2_'+i+'_'+j;
+        addNode(kid,kn,kv,col2X,ky,2,id);
+        drawLine(col1X+NW,y+NH/2,col2X,ky+NH/2);
+        nodeCount++;
+
+        if(opened[kid]){
+          const gkids=getL3(name,kn);
+          const col3X=col2X+NW+COL_GAP;
+          const startY3=Math.max(0,ky-gkids.length*(NH+GAP)/4);
+          gkids.forEach(([gn,gv],k)=>{
+            const gy=startY3+k*(NH+GAP);
+            addNode('l3_'+i+'_'+j+'_'+k,gn,gv,col3X,gy,3,kid);
+            drawLine(col2X+NW,ky+NH/2,col3X,gy+NH/2);
+            nodeCount++;
+          });
+        }
+      });
+    }
   });
-  grid.innerHTML=h;
+  // キャンバスサイズ調整
+  const allN=canvas.querySelectorAll('.nd');
+  let maxX=0,maxY=0;
+  allN.forEach(n=>{maxX=Math.max(maxX,parseInt(n.style.left)+200);maxY=Math.max(maxY,parseInt(n.style.top)+40)});
+  canvas.style.minWidth=Math.max(3000,maxX+200)+'px';
+  canvas.style.minHeight=Math.max(2000,maxY+200)+'px';
+  svg.setAttribute('width',canvas.style.minWidth);
+  svg.setAttribute('height',canvas.style.minHeight);
+  document.getElementById('info').innerHTML='ノード: <b>'+nodeCount+'</b>';
 }
 
-function renderVids(){
-  const kw=S.path.length>0?S.path[S.path.length-1]:(S.genre==='food'?'食品':'美容');
-  document.getElementById('vTitle').textContent=`「${kw}」のバズり動画`;
-  const vids=genVideos(kw);
-  let h='';
-  vids.forEach((v,i)=>{
-    h+=`<div class="vcard" onclick='showVid(${JSON.stringify(v).replace(/'/g,"&#39;")})'>
-      <div class="vrank ${i<3?'top3':''}">${i+1}</div>
-      <div class="vinfo">
-        <div class="vtitle"><a href="${v.url}" target="_blank" onclick="event.stopPropagation()">${v.title}</a></div>
-        <div class="vmeta"><span class="pbadge ${v.platform}">${v.platform==='tiktok'?'TikTok':'Instagram'}</span><span>${v.account}</span><span>${v.date}</span><span>${v.duration}秒</span></div>
-      </div>
-      <div class="vstats"><div class="vviews">${fmt(v.views)}再生</div><div class="ver">ER ${v.er}%</div></div>
-    </div>`;
-  });
-  document.getElementById('vList').innerHTML=h;
+function toggle(id,lv,name){
+  if(opened[id]){
+    // 閉じる: この下の展開も全て閉じる
+    Object.keys(opened).forEach(k=>{if(k.startsWith(id.replace('l1','l2').replace('l2','l3'))||k===id)delete opened[k]});
+    delete opened[id];
+  }else{
+    opened[id]=true;
+  }
+  build();
 }
 
-function renderAccs(){
-  const kw=S.path.length>0?S.path[S.path.length-1]:(S.genre==='food'?'食品':'美容');
-  document.getElementById('aTitle').textContent=`「${kw}」の注目アカウント`;
-  const accs=genAccounts(kw);
-  let h='';
-  accs.forEach(a=>{
-    const gc=a.growth>=0?'pos':'neg';
-    h+=`<div class="acard" onclick='showAcc(${JSON.stringify(a).replace(/'/g,"&#39;")})'>
-      <div class="aav">${a.name[0]}</div>
-      <div style="display:flex;flex-direction:column;gap:2px">
-        <div class="aname"><a href="${a.url}" target="_blank" onclick="event.stopPropagation()">${a.name}</a></div>
-        <div class="ahandle">${a.handle} <span class="pbadge ${a.platform}">${a.platform==='tiktok'?'TikTok':'IG'}</span></div>
-        <div style="font-size:11px;color:#8b949e">投稿${a.posts}件 / 平均${fmt(a.avgViews)}再生</div>
-      </div>
-      <div style="text-align:right"><div style="font-size:14px;font-weight:700;color:#c9d1d9">${fmt(a.followers)}</div><div class="agrowth ${gc}">${a.growth>=0?'+':''}${a.growth}%</div></div>
-    </div>`;
-  });
-  document.getElementById('aList').innerHTML=h;
-}
+/* === ズーム === */
+let scale=1;
+function applyZoom(){canvas.style.transform='scale('+scale+')';canvas.style.transformOrigin='0 0'}
+function zoomIn(){scale=Math.min(2,scale+0.15);applyZoom()}
+function zoomOut(){scale=Math.max(0.2,scale-0.15);applyZoom()}
+function zoomReset(){scale=1;applyZoom()}
 
-function render(){
-  document.getElementById('mapArea').classList.toggle('hidden',S.view!=='map');
-  document.getElementById('vidArea').classList.toggle('hidden',S.view!=='vid');
-  document.getElementById('accArea').classList.toggle('hidden',S.view!=='acc');
-  renderBC();renderStats();
-  if(S.view==='map')renderMap();
-  else if(S.view==='vid')renderVids();
-  else renderAccs();
-}
-
-/* === ナビ === */
-function drillDown(n){S.path.push(n);render()}
-function nav(i){S.path=i<0?[]:S.path.slice(0,i+1);render()}
-
-/* === パネル === */
-function closeP(){document.getElementById('side').classList.remove('open')}
-function openP(title,html){
-  document.getElementById('sTitle').textContent=title;
-  document.getElementById('sBody').innerHTML=html;
-  document.getElementById('side').classList.add('open');
-}
-function showKW(n,v){
-  openP(n,`<div class="psec"><div class="psec-t">キーワード情報</div>
-    <div class="pstat"><span class="pstat-l">ボリューム</span><span class="pstat-v">${fmt(v)}</span></div>
-    <div class="pstat"><span class="pstat-l">ジャンル</span><span class="pstat-v">${S.genre==='food'?'食品':'美容'}</span></div>
-    <div class="pstat"><span class="pstat-l">階層</span><span class="pstat-v">Lv${S.path.length+1}</span></div>
-    <div class="pstat"><span class="pstat-l">競合度</span><span class="pstat-v">${v>30000?'高':v>10000?'中':'低'}</span></div></div>
-    <div class="psec"><div class="psec-t">パス</div><div class="ptags">${S.path.map(p=>`<span class="ptag">${p}</span>`).join('')}<span class="ptag">${n}</span></div></div>`);
-}
-function showVid(v){
-  openP('動画詳細',`<div class="psec"><div class="psec-t">動画情報</div>
-    <div style="font-size:13px;color:#e0e0e0;margin-bottom:8px">${v.title}</div>
-    <div class="pstat"><span class="pstat-l">URL</span><span class="pstat-v"><a href="${v.url}" target="_blank" style="color:#58a6ff">${v.platform==='tiktok'?'TikTok':'Instagram'}で見る</a></span></div>
-    <div class="pstat"><span class="pstat-l">再生数</span><span class="pstat-v">${fmt(v.views)}</span></div>
-    <div class="pstat"><span class="pstat-l">いいね</span><span class="pstat-v">${fmt(v.likes)}</span></div>
-    <div class="pstat"><span class="pstat-l">コメント</span><span class="pstat-v">${fmt(v.comments)}</span></div>
-    <div class="pstat"><span class="pstat-l">シェア</span><span class="pstat-v">${fmt(v.shares)}</span></div>
-    <div class="pstat"><span class="pstat-l">ER</span><span class="pstat-v">${v.er}%</span></div>
-    <div class="pstat"><span class="pstat-l">投稿日</span><span class="pstat-v">${v.date}</span></div>
-    <div class="pstat"><span class="pstat-l">長さ</span><span class="pstat-v">${v.duration}秒</span></div></div>
-    <div class="psec"><div class="psec-t">アカウント</div><div style="font-size:14px;font-weight:600;color:#58a6ff">${v.account}</div></div>`);
-}
-function showAcc(a){
-  openP(a.name,`<div class="psec"><div class="psec-t">アカウント情報</div>
-    <div class="pstat"><span class="pstat-l">URL</span><span class="pstat-v"><a href="${a.url}" target="_blank" style="color:#58a6ff">プロフィールを見る</a></span></div>
-    <div class="pstat"><span class="pstat-l">フォロワー</span><span class="pstat-v">${fmt(a.followers)}</span></div>
-    <div class="pstat"><span class="pstat-l">成長率</span><span class="pstat-v" style="color:${a.growth>=0?'#3fb950':'#f85149'}">${a.growth>=0?'+':''}${a.growth}%</span></div>
-    <div class="pstat"><span class="pstat-l">平均再生</span><span class="pstat-v">${fmt(a.avgViews)}</span></div>
-    <div class="pstat"><span class="pstat-l">平均ER</span><span class="pstat-v">${a.er}%</span></div>
-    <div class="pstat"><span class="pstat-l">投稿数</span><span class="pstat-v">${a.posts}</span></div></div>`);
-}
-
-/* === トグル === */
-function setupTgl(id,key){
-  document.getElementById(id).querySelectorAll('.toggle-btn').forEach(b=>{
-    b.addEventListener('click',()=>{
-      document.getElementById(id).querySelectorAll('.toggle-btn').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');S[key]=b.dataset.value;closeP();render();
-    });
+/* === トグルボタン === */
+function setupTg(id,cb){
+  document.getElementById(id).querySelectorAll('button').forEach(b=>{
+    b.onclick=()=>{
+      document.getElementById(id).querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');cb(b.dataset.v);
+    };
   });
 }
-setupTgl('gT','genre');setupTgl('pT','platform');setupTgl('dT','period');setupTgl('vT','view');
+setupTg('gT',v=>{G=v;opened={};build()});
+setupTg('pT',v=>{});
+setupTg('dT',v=>{});
 
-render();
+build()
 </script>
 </body>
 </html>
