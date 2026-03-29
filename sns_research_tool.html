@@ -58,6 +58,16 @@ svg.lines path{fill:none;stroke:#b0b8c4;stroke-width:1.5}
 <div class="tg" id="gT"><button class="on" data-v="food">食品</button><button data-v="beauty">美容</button></div>
 <div class="tg" id="pT"><button class="on" data-v="both">両方</button><button data-v="tiktok">TikTok</button><button data-v="instagram">Instagram</button></div>
 <div class="tg" id="dT"><button data-v="1w">1週間</button><button class="on" data-v="1m">1ヶ月</button><button data-v="3m">3ヶ月</button><button data-v="6m">半年</button><button data-v="1y">1年</button></div>
+<button onclick="showApiConfig()" style="padding:4px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;margin-left:auto" id="apiBtn">⚙️ APIキー</button>
+</div>
+<div id="apiModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;display:none;align-items:center;justify-content:center">
+<div style="background:#fff;border-radius:12px;padding:24px;max-width:400px;width:90%">
+<h3 style="margin-bottom:12px;font-size:16px">ScrapeCreators APIキー設定</h3>
+<p style="font-size:12px;color:#666;margin-bottom:12px">リアルデータ取得にはAPIキーが必要です。<br><a href="https://app.scrapecreators.com" target="_blank" style="color:#4a6cf7">app.scrapecreators.com</a>で無料取得できます。</p>
+<input id="apiKeyInput" type="text" placeholder="APIキーを入力" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:12px">
+<div style="display:flex;gap:8px"><button onclick="saveApiKey()" style="flex:1;padding:8px;background:#4a6cf7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">保存</button><button onclick="hideApiConfig()" style="flex:1;padding:8px;background:#eee;border:none;border-radius:6px;cursor:pointer">閉じる</button></div>
+<div id="apiStatus" style="font-size:11px;color:#888;margin-top:8px"></div>
+</div>
 </div>
 <div class="canvas-wrap" id="wrap">
 <div class="canvas" id="canvas">
@@ -108,21 +118,42 @@ async function fetchVolume(keyword){
     return await r.json();
   }catch(e){return null}
 }
-// Lv1ノードにリアルボリュームを非同期で上書き
+// Lv1ノードにリアルボリュームを非同期で上書き、ソートも変更
+let realVolumes={};
 async function updateNodeVolumes(){
   const ok=await checkServer();
   if(!ok)return;
   const l1=G==='food'?FL:BL;
-  // 全Lv1を順番にAPI取得(負荷軽減のため少しずつ)
+  let updated=false;
+  // 全Lv1を順番にAPI取得
   for(let i=0;i<l1.length;i++){
     const [name]=l1[i];
-    const el=document.getElementById('n_l1_'+i);
-    if(!el)continue;
     const vol=await fetchVolume(name);
     if(vol&&vol.total_views>0){
-      const vSpan=el.querySelector('.vol');
-      if(vSpan)vSpan.textContent=fmt(vol.total_views)+'再生/'+vol.video_count+'本';
+      realVolumes[name]=vol.total_views;
+      updated=true;
+      // リアルタイムでノードを更新
+      const el=document.getElementById('n_l1_'+i);
+      if(el){
+        const vSpan=el.querySelector('.vol');
+        if(vSpan) vSpan.textContent=fmt(vol.total_views)+'再生';
+      }
     }
+  }
+  // 全取得後、リアルボリュームでソートして再描画
+  if(updated){
+    // Lv1の順序をリアルデータで上書き
+    const l1ref=G==='food'?FL:BL;
+    const sorted=[...l1ref].sort((a,b)=>{
+      const va=realVolumes[a[0]]||a[1]*1000;
+      const vb=realVolumes[b[0]]||b[1]*1000;
+      return vb-va;
+    });
+    // 元配列を更新
+    for(let i=0;i<sorted.length;i++){
+      l1ref[i]=sorted[i];
+    }
+    build(); // ソート後に再描画
   }
 }
 async function fetchRealVideos(keyword){
@@ -327,8 +358,30 @@ function setupTg(id,cb){
 }
 setupTg('gT',v=>{G=v;opened={};build()});
 setupTg('pT',v=>{serverAvailable=null;opened={};build()});
-setupTg('dT',v=>{P=v;serverAvailable=null;opened={};build()});
+setupTg('dT',v=>{P=v;serverAvailable=null;realVolumes={};opened={};build()});
 
+// APIキー設定
+function showApiConfig(){document.getElementById('apiModal').style.display='flex';checkApiStatus()}
+function hideApiConfig(){document.getElementById('apiModal').style.display='none'}
+async function checkApiStatus(){
+  try{
+    const r=await fetch('/api/config');
+    const d=await r.json();
+    document.getElementById('apiStatus').textContent=d.has_key?'✅ APIキー設定済み ('+d.key_preview+')':'❌ APIキー未設定';
+    document.getElementById('apiBtn').textContent=d.has_key?'🟢 API接続中':'⚙️ APIキー';
+  }catch(e){document.getElementById('apiStatus').textContent='⚠️ サーバー未接続'}
+}
+async function saveApiKey(){
+  const key=document.getElementById('apiKeyInput').value.trim();
+  if(!key){alert('APIキーを入力してください');return}
+  try{
+    const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:key})});
+    const d=await r.json();
+    document.getElementById('apiStatus').textContent=d.success?'✅ 保存しました！':'❌ エラー';
+    if(d.success){serverAvailable=null;realVolumes={};build()}
+  }catch(e){document.getElementById('apiStatus').textContent='⚠️ サーバーエラー'}
+}
+checkApiStatus();
 build()
 </script>
 </body>

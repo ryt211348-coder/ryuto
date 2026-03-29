@@ -1,344 +1,222 @@
-"""TikTok/Instagramキーワード検索 - リアルデータ取得."""
+"""ScrapeCreators APIを使ったTikTokリアルデータ取得."""
 
 import json
-import subprocess
-import sys
+import os
 import hashlib
 import time
+import requests
 from pathlib import Path
 from datetime import datetime, timedelta
 
 
-# キャッシュディレクトリ
 CACHE_DIR = Path(__file__).parent.parent / ".search_cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
+API_BASE = "https://api.scrapecreators.com"
 
-def _cache_key(keyword, platform, period):
-    raw = f"{keyword}:{platform}:{period}"
+
+def _get_api_key():
+    key = os.environ.get("SCRAPECREATORS_API_KEY", "")
+    if not key:
+        config_path = Path(__file__).parent.parent / ".api_config.json"
+        if config_path.exists():
+            try:
+                data = json.loads(config_path.read_text())
+                key = data.get("scrapecreators_api_key", "")
+            except Exception:
+                pass
+    return key
+
+
+def _cache_key(prefix, keyword, platform, period):
+    raw = f"{prefix}:{keyword}:{platform}:{period}"
     return hashlib.md5(raw.encode()).hexdigest()
 
 
-def _cache_get(keyword, platform, period):
-    """キャッシュからデータを取得(1時間有効)."""
-    key = _cache_key(keyword, platform, period)
+def _cache_get(prefix, keyword, platform, period, ttl=3600):
+    key = _cache_key(prefix, keyword, platform, period)
     path = CACHE_DIR / f"{key}.json"
     if path.exists():
         data = json.loads(path.read_text())
-        if time.time() - data.get("ts", 0) < 3600:
+        if time.time() - data.get("ts", 0) < ttl:
             return data.get("results")
     return None
 
 
-def _cache_set(keyword, platform, period, results):
-    key = _cache_key(keyword, platform, period)
+def _cache_set(prefix, keyword, platform, period, results):
+    key = _cache_key(prefix, keyword, platform, period)
     path = CACHE_DIR / f"{key}.json"
     path.write_text(json.dumps({
         "ts": time.time(),
-        "keyword": keyword,
         "results": results
     }, ensure_ascii=False))
+
+
+def _period_to_date_posted(period):
+    """期間をScrapeCreators APIのdate_postedパラメータに変換."""
+    # ScrapeCreators APIはdate_postedでフィルタ
+    mapping = {
+        "1w": "this-week",
+        "1m": "this-month",
+        "3m": "last-three-months",
+        "6m": "last-six-months",
+        "1y": "all-time",
+    }
+    return mapping.get(period, "this-month")
 
 
 def _period_to_days(period):
     return {"1w": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}.get(period, 30)
 
 
-def search_tiktok_videos(keyword, period="1m", count=10):
-    """yt-dlpでTikTokキーワード検索し、実在する動画データを返す."""
-    cached = _cache_get(keyword, "tiktok", period)
+def search_tiktok_keyword(keyword, period="1m", count=10, sort_by="relevance"):
+    """ScrapeCreators APIでTikTokキーワード検索."""
+    cached = _cache_get("search", keyword, "tiktok", period)
     if cached:
         return cached
 
-    # yt-dlpのTikTok検索(直接URLベース)
-    search_url = f"https://www.tiktok.com/search/video?q={keyword}"
-    cmd = [
-        sys.executable, "-m", "yt_dlp",
-        "--dump-json", "--flat-playlist",
-        "--no-download", "--no-warnings",
-        "--playlist-end", str(count * 3),  # 多めに取得してフィルタ
-        search_url,
-    ]
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    api_key = _get_api_key()
+    if not api_key:
         return []
 
-    if not result.stdout:
-        return []
+    headers = {
+        "x-api-key": api_key,
+        "Content-Type": "application/json",
+    }
+    params = {
+        "query": keyword,
+        "date_posted": _period_to_date_posted(period),
+        "sort_by": sort_by,
+        "region": "JP",
+    }
 
-    max_days = _period_to_days(period)
-    cutoff = datetime.now() - timedelta(days=max_days)
-    videos = []
+    all_videos = []
+    cursor = None
 
-    for line in result.stdout.strip().split("\n"):
-        if not line.strip():
-            continue
+    # ページネーションで必要数取得
+    for _ in range(3):  # 最大3ページ
+        if cursor:
+            params["cursor"] = cursor
+
         try:
-            d = json.loads(line)
-            # 日付フィルタ
-            upload_date = d.get("upload_date", "")
-            if upload_date:
-                try:
-                    dt = datetime.strptime(upload_date, "%Y%m%d")
-                    if dt < cutoff:
-                        continue
-                except ValueError:
-                    pass
+            resp = requests.get(
+                f"{API_BASE}/v1/tiktok/search/keyword",
+                headers=headers,
+                params=params,
+                timeout=30,
+            )
+            if resp.status_code != 200:
+                break
 
-            view_count = int(d.get("view_count", 0) or 0)
-            like_count = int(d.get("like_count", 0) or 0)
-            comment_count = int(d.get("comment_count", 0) or 0)
-            share_count = int(d.get("repost_count", 0) or d.get("share_count", 0) or 0)
+            data = resp.json()
+            items = data.get("search_item_list") or data.get("data", {}).get("search_item_list") or []
 
-            # サムネイル取得
-            thumbnail = d.get("thumbnail", "")
-            if not thumbnail and d.get("thumbnails"):
-                thumbnail = d["thumbnails"][0].get("url", "")
+            for item in items:
+                info = item.get("aweme_info") or item
+                stats = info.get("statistics") or info.get("stats") or {}
+                author = info.get("author") or {}
 
-            # アカウント情報
-            uploader = d.get("uploader", "") or d.get("channel", "")
-            uploader_id = d.get("uploader_id", "") or d.get("channel_id", "")
-            uploader_url = d.get("uploader_url", "") or d.get("channel_url", "")
-            follower_count = int(d.get("channel_follower_count", 0) or 0)
+                create_time = info.get("create_time", "")
+                if isinstance(create_time, (int, float)):
+                    create_time = datetime.fromtimestamp(create_time).strftime("%Y-%m-%d")
+                elif isinstance(create_time, str) and "T" in create_time:
+                    create_time = create_time[:10]
 
-            # 動画URL
-            video_url = d.get("webpage_url", "") or d.get("url", "")
-            video_id = d.get("id", "")
+                video_id = str(info.get("id") or info.get("aweme_id", ""))
+                author_id = str(author.get("unique_id") or author.get("uid", ""))
 
-            videos.append({
-                "id": video_id,
-                "title": (d.get("title", "") or d.get("description", ""))[:120],
-                "description": d.get("description", ""),
-                "url": video_url,
-                "platform": "tiktok",
-                "views": view_count,
-                "likes": like_count,
-                "comments": comment_count,
-                "shares": share_count,
-                "duration": int(d.get("duration", 0) or 0),
-                "upload_date": upload_date,
-                "thumbnail": thumbnail,
-                "account": {
-                    "name": uploader,
-                    "id": uploader_id,
-                    "url": uploader_url,
-                    "followers": follower_count,
-                },
-            })
-        except (json.JSONDecodeError, ValueError, KeyError):
-            continue
+                # サムネイル
+                cover = ""
+                video_obj = info.get("video") or {}
+                if video_obj.get("cover"):
+                    cover_data = video_obj["cover"]
+                    if isinstance(cover_data, dict):
+                        urls = cover_data.get("url_list", [])
+                        cover = urls[0] if urls else ""
+                    elif isinstance(cover_data, str):
+                        cover = cover_data
+                if not cover:
+                    cover = video_obj.get("dynamic_cover", {}).get("url_list", [""])[0] if isinstance(video_obj.get("dynamic_cover"), dict) else ""
 
-    # 再生数でソート、上位count件
-    videos.sort(key=lambda x: x["views"], reverse=True)
-    videos = videos[:count]
+                all_videos.append({
+                    "id": video_id,
+                    "title": (info.get("desc") or "")[:120],
+                    "description": info.get("desc") or "",
+                    "url": f"https://www.tiktok.com/@{author_id}/video/{video_id}",
+                    "platform": "tiktok",
+                    "views": int(stats.get("play_count", 0) or 0),
+                    "likes": int(stats.get("digg_count", 0) or 0),
+                    "comments": int(stats.get("comment_count", 0) or 0),
+                    "shares": int(stats.get("share_count", 0) or 0),
+                    "duration": int(video_obj.get("duration", 0) or 0),
+                    "upload_date": create_time,
+                    "thumbnail": cover,
+                    "account": {
+                        "name": author.get("nickname", ""),
+                        "id": author_id,
+                        "url": f"https://www.tiktok.com/@{author_id}",
+                        "followers": int(author.get("follower_count", 0) or 0),
+                        "following": int(author.get("following_count", 0) or 0),
+                        "total_likes": int(author.get("total_favorited", 0) or 0),
+                        "avatar": (author.get("avatar_thumb", {}) or {}).get("url_list", [""])[0] if isinstance(author.get("avatar_thumb"), dict) else "",
+                    },
+                })
 
-    if videos:
-        _cache_set(keyword, "tiktok", period, videos)
+            cursor = data.get("cursor")
+            if not cursor or len(all_videos) >= count:
+                break
 
-    return videos
+        except Exception as e:
+            print(f"ScrapeCreators API error: {e}")
+            break
 
+    # 再生数でソート
+    all_videos.sort(key=lambda x: x["views"], reverse=True)
+    result = all_videos[:count]
 
-def search_instagram_posts(keyword, period="1m", count=10):
-    """yt-dlpでInstagramハッシュタグ検索し、実在する投稿データを返す."""
-    cached = _cache_get(keyword, "instagram", period)
-    if cached:
-        return cached
+    if result:
+        _cache_set("search", keyword, "tiktok", period, result)
 
-    tag = keyword.replace(" ", "").replace("　", "")
-    search_url = f"https://www.instagram.com/explore/tags/{tag}/"
-    cmd = [
-        sys.executable, "-m", "yt_dlp",
-        "--dump-json", "--flat-playlist",
-        "--no-download", "--no-warnings",
-        "--playlist-end", str(count * 3),
-        search_url,
-    ]
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return []
-
-    if not result.stdout:
-        return []
-
-    max_days = _period_to_days(period)
-    cutoff = datetime.now() - timedelta(days=max_days)
-    posts = []
-
-    for line in result.stdout.strip().split("\n"):
-        if not line.strip():
-            continue
-        try:
-            d = json.loads(line)
-            upload_date = d.get("upload_date", "")
-            if upload_date:
-                try:
-                    dt = datetime.strptime(upload_date, "%Y%m%d")
-                    if dt < cutoff:
-                        continue
-                except ValueError:
-                    pass
-
-            view_count = int(d.get("view_count", 0) or 0)
-            like_count = int(d.get("like_count", 0) or 0)
-            comment_count = int(d.get("comment_count", 0) or 0)
-
-            thumbnail = d.get("thumbnail", "")
-            if not thumbnail and d.get("thumbnails"):
-                thumbnail = d["thumbnails"][0].get("url", "")
-
-            uploader = d.get("uploader", "") or d.get("channel", "")
-            uploader_id = d.get("uploader_id", "") or d.get("channel_id", "")
-            uploader_url = d.get("uploader_url", "") or d.get("channel_url", "")
-            follower_count = int(d.get("channel_follower_count", 0) or 0)
-
-            video_url = d.get("webpage_url", "") or d.get("url", "")
-
-            posts.append({
-                "id": d.get("id", ""),
-                "title": (d.get("title", "") or d.get("description", ""))[:120],
-                "description": d.get("description", ""),
-                "url": video_url,
-                "platform": "instagram",
-                "views": view_count,
-                "likes": like_count,
-                "comments": comment_count,
-                "shares": 0,
-                "duration": int(d.get("duration", 0) or 0),
-                "upload_date": upload_date,
-                "thumbnail": thumbnail,
-                "account": {
-                    "name": uploader,
-                    "id": uploader_id,
-                    "url": uploader_url,
-                    "followers": follower_count,
-                },
-            })
-        except (json.JSONDecodeError, ValueError, KeyError):
-            continue
-
-    posts.sort(key=lambda x: x["views"], reverse=True)
-    posts = posts[:count]
-
-    if posts:
-        _cache_set(keyword, "instagram", period, posts)
-
-    return posts
+    return result
 
 
 def search_videos(keyword, platform="both", period="1m", count=10):
-    """TikTok/Instagram両方を検索して統合結果を返す."""
-    results = []
-
+    """キーワード検索でリアル動画データを取得."""
     if platform in ("both", "tiktok"):
-        results.extend(search_tiktok_videos(keyword, period, count))
-
-    if platform in ("both", "instagram"):
-        results.extend(search_instagram_posts(keyword, period, count))
-
-    results.sort(key=lambda x: x["views"], reverse=True)
-    return results[:count]
+        return search_tiktok_keyword(keyword, period, count)
+    # Instagram検索はScrapeCreatorsでは未対応のためTikTokのみ
+    return search_tiktok_keyword(keyword, period, count)
 
 
 def get_keyword_volume(keyword, platform="both", period="1m"):
-    """キーワードのリアルボリューム(動画数・総再生数)を取得する.
-
-    yt-dlpでTikTok検索を行い、指定期間内の動画数と総再生数を集計。
-    """
-    cache_key_str = f"vol:{keyword}:{platform}:{period}"
-    cached = _cache_get(cache_key_str, platform, period)
+    """キーワードのリアルボリューム(動画数・総再生数)を取得."""
+    cached = _cache_get("vol", keyword, platform, period)
     if cached:
         return cached
 
-    max_days = _period_to_days(period)
-    cutoff = datetime.now() - timedelta(days=max_days)
-    total_views = 0
-    total_likes = 0
-    video_count = 0
-    top_views = 0
+    videos = search_tiktok_keyword(keyword, period, count=30, sort_by="relevance")
 
-    def _parse_results(stdout):
-        nonlocal total_views, total_likes, video_count, top_views
-        for line in stdout.strip().split("\n"):
-            if not line.strip():
-                continue
-            try:
-                d = json.loads(line)
-                upload_date = d.get("upload_date", "")
-                if upload_date:
-                    try:
-                        dt = datetime.strptime(upload_date, "%Y%m%d")
-                        if dt < cutoff:
-                            continue
-                    except ValueError:
-                        pass
-                views = int(d.get("view_count", 0) or 0)
-                likes = int(d.get("like_count", 0) or 0)
-                total_views += views
-                total_likes += likes
-                video_count += 1
-                if views > top_views:
-                    top_views = views
-            except (json.JSONDecodeError, ValueError):
-                continue
+    total_views = sum(v["views"] for v in videos)
+    total_likes = sum(v["likes"] for v in videos)
+    top_views = max((v["views"] for v in videos), default=0)
 
-    if platform in ("both", "tiktok"):
-        search_url = f"https://www.tiktok.com/search/video?q={keyword}"
-        cmd = [
-            sys.executable, "-m", "yt_dlp",
-            "--dump-json", "--flat-playlist",
-            "--no-download", "--no-warnings",
-            "--playlist-end", "50",
-            search_url,
-        ]
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
-            if result.stdout:
-                _parse_results(result.stdout)
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
-
-    if platform in ("both", "instagram"):
-        tag = keyword.replace(" ", "").replace("　", "")
-        search_url = f"https://www.instagram.com/explore/tags/{tag}/"
-        cmd = [
-            sys.executable, "-m", "yt_dlp",
-            "--dump-json", "--flat-playlist",
-            "--no-download", "--no-warnings",
-            "--playlist-end", "50",
-            search_url,
-        ]
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
-            if result.stdout:
-                _parse_results(result.stdout)
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
-
-    result_data = {
+    result = {
         "keyword": keyword,
         "period": period,
         "platform": platform,
-        "video_count": video_count,
+        "video_count": len(videos),
         "total_views": total_views,
         "total_likes": total_likes,
         "top_views": top_views,
-        "avg_views": total_views // video_count if video_count > 0 else 0,
+        "avg_views": total_views // len(videos) if videos else 0,
     }
 
-    if video_count > 0:
-        _cache_set(cache_key_str, platform, period, result_data)
+    if videos:
+        _cache_set("vol", keyword, platform, period, result)
 
-    return result_data
+    return result
 
 
 def get_bulk_volumes(keywords, platform="both", period="1m"):
-    """複数キーワードのボリュームを一括取得する."""
-    results = []
-    for kw in keywords:
-        vol = get_keyword_volume(kw, platform, period)
-        results.append(vol)
-    return results
+    """複数キーワードのボリュームを一括取得."""
+    return [get_keyword_volume(kw, platform, period) for kw in keywords]
