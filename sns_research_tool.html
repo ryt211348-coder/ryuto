@@ -62,9 +62,9 @@ svg.lines path{fill:none;stroke:#b0b8c4;stroke-width:1.5}
 </div>
 <div id="apiModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;display:none;align-items:center;justify-content:center">
 <div style="background:#fff;border-radius:12px;padding:24px;max-width:400px;width:90%">
-<h3 style="margin-bottom:12px;font-size:16px">ScrapeCreators APIキー設定</h3>
-<p style="font-size:12px;color:#666;margin-bottom:12px">リアルデータ取得にはAPIキーが必要です。<br><a href="https://app.scrapecreators.com" target="_blank" style="color:#4a6cf7">app.scrapecreators.com</a>で無料取得できます。</p>
-<input id="apiKeyInput" type="text" placeholder="APIキーを入力" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:12px">
+<h3 style="margin-bottom:12px;font-size:16px">Apify APIトークン設定</h3>
+<p style="font-size:12px;color:#666;margin-bottom:12px">リアルデータ取得にはApifyのAPIトークンが必要です（無料）。<br>1. <a href="https://apify.com" target="_blank" style="color:#4a6cf7">apify.com</a>で無料アカウント作成<br>2. Settings → Integrations → API tokensからコピー</p>
+<input id="apiKeyInput" type="text" placeholder="Apify APIトークンを入力" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:12px">
 <div style="display:flex;gap:8px"><button onclick="saveApiKey()" style="flex:1;padding:8px;background:#4a6cf7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">保存</button><button onclick="hideApiConfig()" style="flex:1;padding:8px;background:#eee;border:none;border-radius:6px;cursor:pointer">閉じる</button></div>
 <div id="apiStatus" style="font-size:11px;color:#888;margin-top:8px"></div>
 </div>

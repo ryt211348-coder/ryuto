@@ -1,4 +1,4 @@
-"""ScrapeCreators APIを使ったTikTokリアルデータ取得."""
+"""Apify TikTok Search APIを使ったリアルデータ取得."""
 
 import json
 import os
@@ -6,35 +6,35 @@ import hashlib
 import time
 import requests
 from pathlib import Path
-from datetime import datetime, timedelta
 
 
 CACHE_DIR = Path(__file__).parent.parent / ".search_cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
-API_BASE = "https://api.scrapecreators.com"
+APIFY_BASE = "https://api.apify.com/v2"
+ACTOR_ID = "novi~tiktok-search-api"  # 無料枠で使えるActor
 
 
-def _get_api_key():
-    key = os.environ.get("SCRAPECREATORS_API_KEY", "")
-    if not key:
+def _get_api_token():
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
         config_path = Path(__file__).parent.parent / ".api_config.json"
         if config_path.exists():
             try:
                 data = json.loads(config_path.read_text())
-                key = data.get("scrapecreators_api_key", "")
+                token = data.get("apify_api_token", "")
             except Exception:
                 pass
-    return key
+    return token
 
 
-def _cache_key(prefix, keyword, platform, period):
-    raw = f"{prefix}:{keyword}:{platform}:{period}"
+def _cache_key(prefix, keyword, period):
+    raw = f"{prefix}:{keyword}:{period}"
     return hashlib.md5(raw.encode()).hexdigest()
 
 
-def _cache_get(prefix, keyword, platform, period, ttl=3600):
-    key = _cache_key(prefix, keyword, platform, period)
+def _cache_get(prefix, keyword, period, ttl=3600):
+    key = _cache_key(prefix, keyword, period)
     path = CACHE_DIR / f"{key}.json"
     if path.exists():
         data = json.loads(path.read_text())
@@ -43,8 +43,8 @@ def _cache_get(prefix, keyword, platform, period, ttl=3600):
     return None
 
 
-def _cache_set(prefix, keyword, platform, period, results):
-    key = _cache_key(prefix, keyword, platform, period)
+def _cache_set(prefix, keyword, period, results):
+    key = _cache_key(prefix, keyword, period)
     path = CACHE_DIR / f"{key}.json"
     path.write_text(json.dumps({
         "ts": time.time(),
@@ -52,189 +52,169 @@ def _cache_set(prefix, keyword, platform, period, results):
     }, ensure_ascii=False))
 
 
-def _period_to_date_posted(period):
-    """期間をScrapeCreators APIのdate_postedパラメータに変換."""
-    # ScrapeCreators APIはdate_postedでフィルタ
-    mapping = {
-        "1w": "this-week",
-        "1m": "this-month",
-        "3m": "last-three-months",
-        "6m": "last-six-months",
-        "1y": "all-time",
-    }
-    return mapping.get(period, "this-month")
+def _period_to_apify(period):
+    """期間をApifyのdatePostedパラメータに変換."""
+    return {
+        "1w": "last_7_days",
+        "1m": "last_30_days",
+        "3m": "last_90_days",
+        "6m": "last_180_days",
+        "1y": "all_time",
+    }.get(period, "last_30_days")
 
 
-def _period_to_days(period):
-    return {"1w": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}.get(period, 30)
-
-
-def search_tiktok_keyword(keyword, period="1m", count=10, sort_by="relevance"):
-    """ScrapeCreators APIでTikTokキーワード検索."""
-    cached = _cache_get("search", keyword, "tiktok", period)
+def search_tiktok(keyword, period="1m", count=10, sort_by="relevance"):
+    """Apify経由でTikTokキーワード検索（同期実行）."""
+    cached = _cache_get("search", keyword, period)
     if cached:
         return cached
 
-    api_key = _get_api_key()
-    if not api_key:
+    token = _get_api_token()
+    if not token:
         return []
 
-    headers = {
-        "x-api-key": api_key,
-        "Content-Type": "application/json",
-    }
-    params = {
+    run_input = {
         "query": keyword,
-        "date_posted": _period_to_date_posted(period),
-        "sort_by": sort_by,
+        "datePosted": _period_to_apify(period),
+        "sortBy": sort_by,
         "region": "JP",
+        "maxResults": count,
     }
 
-    all_videos = []
-    cursor = None
+    try:
+        # 同期実行してデータセットを直接取得
+        resp = requests.post(
+            f"{APIFY_BASE}/acts/{ACTOR_ID}/run-sync-get-dataset-items",
+            params={"token": token},
+            json=run_input,
+            timeout=120,
+        )
 
-    # ページネーションで必要数取得
-    for _ in range(3):  # 最大3ページ
-        if cursor:
-            params["cursor"] = cursor
+        if resp.status_code != 200 and resp.status_code != 201:
+            print(f"Apify error: {resp.status_code} - {resp.text[:300]}")
+            return []
 
+        items = resp.json()
+        if not isinstance(items, list):
+            items = items.get("items", []) or items.get("data", []) or []
+
+    except Exception as e:
+        print(f"Apify request failed: {e}")
+        return []
+
+    videos = []
+    for item in items:
         try:
-            resp = requests.get(
-                f"{API_BASE}/v1/tiktok/search/keyword",
-                headers=headers,
-                params=params,
-                timeout=30,
-            )
-            if resp.status_code != 200:
-                print(f"ScrapeCreators API status: {resp.status_code} - {resp.text[:200]}")
-                break
+            # Apifyの出力形式に対応
+            stats = item.get("statistics") or item.get("stats") or {}
+            author = item.get("author") or item.get("authorMeta") or {}
+            video_info = item.get("video") or item.get("videoMeta") or {}
 
-            data = resp.json()
+            video_id = str(item.get("id") or item.get("aweme_id") or "")
+            author_id = str(author.get("unique_id") or author.get("uniqueId") or author.get("id") or "")
 
-            # レスポンス形式を柔軟に解析
-            items = (data.get("search_item_list")
-                     or data.get("data", {}).get("search_item_list")
-                     or data.get("item_list")
-                     or data.get("data", {}).get("item_list")
-                     or data.get("videos")
-                     or data.get("data", {}).get("videos")
-                     or [])
+            views = int(stats.get("play_count") or stats.get("playCount") or item.get("playCount") or item.get("views") or 0)
+            likes = int(stats.get("digg_count") or stats.get("diggCount") or item.get("diggCount") or item.get("likes") or 0)
+            comments = int(stats.get("comment_count") or stats.get("commentCount") or item.get("commentCount") or item.get("comments") or 0)
+            shares = int(stats.get("share_count") or stats.get("shareCount") or item.get("shareCount") or item.get("shares") or 0)
 
-            # itemsが空の場合、dataそのものがリストの可能性
-            if not items and isinstance(data.get("data"), list):
-                items = data["data"]
+            create_time = item.get("create_time") or item.get("createTime") or item.get("createTimeISO") or ""
+            if isinstance(create_time, (int, float)):
+                from datetime import datetime
+                create_time = datetime.fromtimestamp(create_time).strftime("%Y-%m-%d")
+            elif isinstance(create_time, str) and "T" in create_time:
+                create_time = create_time[:10]
 
-            print(f"ScrapeCreators: keyword='{keyword}', items={len(items)}, keys={list(data.keys())[:5]}")
+            # サムネイル
+            cover = ""
+            if isinstance(video_info.get("cover"), dict):
+                cover = (video_info["cover"].get("url_list") or [""])[0]
+            elif isinstance(video_info.get("cover"), str):
+                cover = video_info["cover"]
+            if not cover:
+                cover = item.get("cover") or item.get("thumbnail") or ""
 
-            for idx, item in enumerate(items):
-                info = item.get("aweme_info") or item.get("item") or item
-                stats = info.get("statistics") or info.get("stats") or info.get("video", {}).get("stats") or {}
-                author = info.get("author") or info.get("user") or {}
+            # URL
+            url = item.get("url") or item.get("webVideoUrl") or f"https://www.tiktok.com/@{author_id}/video/{video_id}"
 
-                # デバッグ: 最初のアイテムの構造を出力
-                if idx == 0:
-                    print(f"  First item keys: {list(info.keys())[:10]}")
-                    if stats: print(f"  Stats keys: {list(stats.keys())[:10]}")
-                    if author: print(f"  Author keys: {list(author.keys())[:10]}")
+            followers = int(author.get("follower_count") or author.get("followerCount") or author.get("fans") or 0)
+            avatar = ""
+            if isinstance(author.get("avatar_thumb"), dict):
+                avatar = (author["avatar_thumb"].get("url_list") or [""])[0]
+            elif isinstance(author.get("avatar"), str):
+                avatar = author["avatar"]
 
-                create_time = info.get("create_time", "")
-                if isinstance(create_time, (int, float)):
-                    create_time = datetime.fromtimestamp(create_time).strftime("%Y-%m-%d")
-                elif isinstance(create_time, str) and "T" in create_time:
-                    create_time = create_time[:10]
-
-                video_id = str(info.get("id") or info.get("aweme_id", ""))
-                author_id = str(author.get("unique_id") or author.get("uid", ""))
-
-                # サムネイル
-                cover = ""
-                video_obj = info.get("video") or {}
-                if video_obj.get("cover"):
-                    cover_data = video_obj["cover"]
-                    if isinstance(cover_data, dict):
-                        urls = cover_data.get("url_list", [])
-                        cover = urls[0] if urls else ""
-                    elif isinstance(cover_data, str):
-                        cover = cover_data
-                if not cover:
-                    cover = video_obj.get("dynamic_cover", {}).get("url_list", [""])[0] if isinstance(video_obj.get("dynamic_cover"), dict) else ""
-
-                views = int(stats.get("play_count") or stats.get("playCount") or stats.get("views") or info.get("play_count") or 0)
-                likes = int(stats.get("digg_count") or stats.get("diggCount") or stats.get("likes") or info.get("digg_count") or 0)
-                comments = int(stats.get("comment_count") or stats.get("commentCount") or stats.get("comments") or info.get("comment_count") or 0)
-                shares = int(stats.get("share_count") or stats.get("shareCount") or stats.get("shares") or info.get("share_count") or 0)
-
-                all_videos.append({
-                    "id": video_id,
-                    "title": (info.get("desc") or info.get("description") or info.get("title") or "")[:120],
-                    "description": info.get("desc") or info.get("description") or "",
-                    "url": info.get("url") or f"https://www.tiktok.com/@{author_id}/video/{video_id}",
-                    "platform": "tiktok",
-                    "views": views,
-                    "likes": likes,
-                    "comments": comments,
-                    "shares": shares,
-                    "duration": int(video_obj.get("duration", 0) or 0),
-                    "upload_date": create_time,
-                    "thumbnail": cover,
-                    "account": {
-                        "name": author.get("nickname", ""),
-                        "id": author_id,
-                        "url": f"https://www.tiktok.com/@{author_id}",
-                        "followers": int(author.get("follower_count", 0) or 0),
-                        "following": int(author.get("following_count", 0) or 0),
-                        "total_likes": int(author.get("total_favorited", 0) or 0),
-                        "avatar": (author.get("avatar_thumb", {}) or {}).get("url_list", [""])[0] if isinstance(author.get("avatar_thumb"), dict) else "",
-                    },
-                })
-
-            cursor = data.get("cursor")
-            if not cursor or len(all_videos) >= count:
-                break
-
+            videos.append({
+                "id": video_id,
+                "title": (item.get("desc") or item.get("text") or item.get("description") or "")[:120],
+                "url": url,
+                "platform": "tiktok",
+                "views": views,
+                "likes": likes,
+                "comments": comments,
+                "shares": shares,
+                "duration": int(video_info.get("duration") or item.get("duration") or 0),
+                "upload_date": create_time,
+                "thumbnail": cover,
+                "account": {
+                    "name": author.get("nickname") or author.get("name") or "",
+                    "id": author_id,
+                    "url": f"https://www.tiktok.com/@{author_id}",
+                    "followers": followers,
+                    "avatar": avatar,
+                },
+            })
         except Exception as e:
-            print(f"ScrapeCreators API error: {e}")
-            break
+            print(f"Parse error: {e}")
+            continue
 
-    # 再生数でソート
-    all_videos.sort(key=lambda x: x["views"], reverse=True)
-    result = all_videos[:count]
+    videos.sort(key=lambda x: x["views"], reverse=True)
+    result = videos[:count]
 
     if result:
-        _cache_set("search", keyword, "tiktok", period, result)
+        _cache_set("search", keyword, period, result)
 
     return result
 
 
 def search_tiktok_keyword_raw(keyword, period="1m"):
-    """デバッグ用: APIの生レスポンスを返す."""
-    api_key = _get_api_key()
-    if not api_key:
-        return {"error": "API key not set"}
-    headers = {"x-api-key": api_key, "Content-Type": "application/json"}
-    params = {"query": keyword, "date_posted": _period_to_date_posted(period), "sort_by": "relevance", "region": "JP"}
+    """デバッグ: APIの生レスポンスを返す."""
+    token = _get_api_token()
+    if not token:
+        return {"error": "Apify API token not set"}
+
+    run_input = {
+        "query": keyword,
+        "datePosted": _period_to_apify(period),
+        "sortBy": "relevance",
+        "region": "JP",
+        "maxResults": 3,
+    }
+
     try:
-        resp = requests.get(f"{API_BASE}/v1/tiktok/search/keyword", headers=headers, params=params, timeout=30)
-        return {"status": resp.status_code, "response": resp.json() if resp.status_code == 200 else resp.text[:500]}
+        resp = requests.post(
+            f"{APIFY_BASE}/acts/{ACTOR_ID}/run-sync-get-dataset-items",
+            params={"token": token},
+            json=run_input,
+            timeout=60,
+        )
+        return {"status": resp.status_code, "response": resp.json() if resp.status_code in (200, 201) else resp.text[:500]}
     except Exception as e:
         return {"error": str(e)}
 
 
 def search_videos(keyword, platform="both", period="1m", count=10):
     """キーワード検索でリアル動画データを取得."""
-    if platform in ("both", "tiktok"):
-        return search_tiktok_keyword(keyword, period, count)
-    # Instagram検索はScrapeCreatorsでは未対応のためTikTokのみ
-    return search_tiktok_keyword(keyword, period, count)
+    return search_tiktok(keyword, period, count)
 
 
 def get_keyword_volume(keyword, platform="both", period="1m"):
-    """キーワードのリアルボリューム(動画数・総再生数)を取得."""
-    cached = _cache_get("vol", keyword, platform, period)
+    """キーワードのリアルボリューム取得."""
+    cached = _cache_get("vol", keyword, period)
     if cached:
         return cached
 
-    videos = search_tiktok_keyword(keyword, period, count=30, sort_by="relevance")
+    videos = search_tiktok(keyword, period, count=20, sort_by="relevance")
 
     total_views = sum(v["views"] for v in videos)
     total_likes = sum(v["likes"] for v in videos)
@@ -252,7 +232,7 @@ def get_keyword_volume(keyword, platform="both", period="1m"):
     }
 
     if videos:
-        _cache_set("vol", keyword, platform, period, result)
+        _cache_set("vol", keyword, period, result)
 
     return result
 

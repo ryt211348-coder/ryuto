@@ -35,19 +35,31 @@ def load_api_key():
     if CONFIG_PATH.exists():
         try:
             data = json.loads(CONFIG_PATH.read_text())
+            # ScrapeCreators (legacy)
             key = data.get("scrapecreators_api_key", "")
             if key:
                 os.environ["SCRAPECREATORS_API_KEY"] = key
-            return key
+            # Apify
+            apify = data.get("apify_api_token", "")
+            if apify:
+                os.environ["APIFY_API_TOKEN"] = apify
+            return key or apify
         except Exception:
             pass
-    return os.environ.get("SCRAPECREATORS_API_KEY", "")
+    return os.environ.get("APIFY_API_TOKEN", "") or os.environ.get("SCRAPECREATORS_API_KEY", "")
 
 
 def save_api_key(key):
     """APIキーをファイルに保存する."""
-    CONFIG_PATH.write_text(json.dumps({"scrapecreators_api_key": key}))
-    os.environ["SCRAPECREATORS_API_KEY"] = key
+    existing = {}
+    if CONFIG_PATH.exists():
+        try:
+            existing = json.loads(CONFIG_PATH.read_text())
+        except Exception:
+            pass
+    existing["apify_api_token"] = key
+    CONFIG_PATH.write_text(json.dumps(existing))
+    os.environ["APIFY_API_TOKEN"] = key
 
 
 # 起動時にAPIキーを読み込む
