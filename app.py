@@ -269,14 +269,17 @@ def run_sheet_fetch(job_id: str, account_url: str):
             "url": sheet_data.url,
             "followers": sheet_data.followers,
             "total_views": f"{sheet_data.total_views:,}",
-            "total_views_detail": sheet_data.total_views_detail,
-            "monthly_views": f"{_format_number(sheet_data.monthly_views)}回",
+            "total_views_formatted": _format_number(sheet_data.total_views),
+            "monthly_views": _format_number(sheet_data.monthly_views),
             "monthly_posts": sheet_data.monthly_posts,
-            "long_form": f"{sheet_data.long_form_count}本\n平均 {_format_number(sheet_data.long_form_avg_views)}回/本",
-            "short_form": f"{sheet_data.short_form_count}本\n平均 {_format_number(sheet_data.short_form_avg_views)}回/本",
+            "avg_monthly_posts": sheet_data.avg_monthly_posts,
+            "avg_views_per_video": _format_number(sheet_data.avg_views_per_video),
             "follower_trend": sheet_data.follower_trend or "（要手動入力）",
             "first_post_date": sheet_data.first_post_date or "不明",
-            "video_count": len(videos),
+            "video_count": sheet_data.total_videos,
+            "active_months": sheet_data.active_months,
+            "total_months_span": sheet_data.total_months_span,
+            "posting_timeline": sheet_data.posting_timeline or [],
         }
 
     except Exception as e:

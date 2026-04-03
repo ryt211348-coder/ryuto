@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok シート埋めツール</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
+        /* ── テーブル ── */
         .sheet-table {
             width: 100%;
             border-collapse: collapse;
@@ -16,23 +18,38 @@
             border: 1px solid #3a3a4a;
             padding: 0.75rem 1rem;
             text-align: left;
+            vertical-align: top;
         }
         .sheet-table th {
             background: #2a2a3a;
             color: #ff79c6;
             font-weight: 600;
-            width: 30%;
-        }
-        .sheet-table td {
-            background: #1e1e2e;
-            color: #e0e0e0;
+            width: 25%;
         }
         .sheet-table td.value {
+            background: #1e1e2e;
             font-family: 'Consolas', 'Monaco', monospace;
             color: #50fa7b;
             font-size: 1rem;
             white-space: pre-line;
         }
+        .sheet-table td.action {
+            background: #1e1e2e;
+            width: 60px;
+            text-align: center;
+        }
+        .column-label {
+            color: #bd93f9;
+            font-weight: 700;
+            margin-right: 0.5rem;
+        }
+        .sub-value {
+            color: #6272a4;
+            font-size: 0.85rem;
+            margin-top: 0.3rem;
+        }
+
+        /* ── ボタン ── */
         .copy-btn {
             background: #44475a;
             border: none;
@@ -41,42 +58,23 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 0.8rem;
-            margin-left: 0.5rem;
             transition: background 0.2s;
         }
-        .copy-btn:hover {
-            background: #6272a4;
-        }
-        .copy-btn.copied {
-            background: #50fa7b;
-            color: #282a36;
-        }
-        .nav-link {
-            display: inline-block;
-            margin-bottom: 1rem;
-            color: #8be9fd;
-            text-decoration: none;
-        }
-        .nav-link:hover {
-            text-decoration: underline;
-        }
-        .note {
-            color: #6272a4;
-            font-size: 0.85rem;
-            margin-top: 0.5rem;
-        }
+        .copy-btn:hover { background: #6272a4; }
+        .copy-btn.copied { background: #50fa7b; color: #282a36; }
+
+        /* ── ステータス ── */
         .status-card {
             background: #1e1e2e;
             border: 1px solid #3a3a4a;
             border-radius: 8px;
-            padding: 1.5rem;
+            padding: 2rem;
             text-align: center;
             margin: 1.5rem 0;
         }
         .spinner {
             display: inline-block;
-            width: 24px;
-            height: 24px;
+            width: 24px; height: 24px;
             border: 3px solid #44475a;
             border-top: 3px solid #ff79c6;
             border-radius: 50%;
@@ -85,10 +83,68 @@
             vertical-align: middle;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .column-label {
-            color: #bd93f9;
-            font-weight: 600;
-            margin-right: 0.5rem;
+
+        /* ── グラフ ── */
+        .chart-section {
+            background: #1e1e2e;
+            border: 1px solid #3a3a4a;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .chart-section h3 {
+            color: #f8f8f2;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-height: 350px;
+        }
+
+        /* ── 統計カード ── */
+        .mini-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .mini-stat {
+            background: #1e1e2e;
+            border: 1px solid #3a3a4a;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .mini-stat .label {
+            color: #6272a4;
+            font-size: 0.8rem;
+            margin-bottom: 0.3rem;
+        }
+        .mini-stat .number {
+            color: #50fa7b;
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        .mini-stat .detail {
+            color: #6272a4;
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* ── ナビ ── */
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 1rem;
+            color: #8be9fd;
+            text-decoration: none;
+        }
+        .nav-link:hover { text-decoration: underline; }
+        .note {
+            color: #6272a4;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
         }
     </style>
 </head>
@@ -98,7 +154,7 @@
 
         <header class="header">
             <h1>TikTok シート埋めツール</h1>
-            <p class="subtitle">TikTokアカウントのデータを取得して、スプレッドシートに必要な指標を自動算出</p>
+            <p class="subtitle">TikTokアカウントのデータを取得 &rarr; スプレッドシートに必要な指標を自動算出</p>
         </header>
 
         <!-- 入力フォーム -->
@@ -119,7 +175,7 @@
             </div>
         </section>
 
-        <!-- プログレス -->
+        <!-- ステータス -->
         <section id="statusSection" class="hidden">
             <div class="status-card">
                 <div class="spinner"></div>
@@ -135,86 +191,101 @@
             </div>
         </section>
 
-        <!-- 結果テーブル -->
+        <!-- 結果 -->
         <section id="resultSection" class="hidden">
-            <h2 style="margin-bottom: 0.5rem;">取得結果</h2>
+
+            <!-- 統計サマリー -->
+            <div class="mini-stats" id="miniStats"></div>
+
+            <!-- シートデータテーブル -->
+            <h2 style="margin-bottom: 0.5rem;">シート用データ</h2>
             <p class="note" id="videoCountNote"></p>
 
             <table class="sheet-table">
                 <tr>
                     <th><span class="column-label">A</span> 媒体</th>
                     <td class="value" id="val-platform">TikTok</td>
-                    <td><button class="copy-btn" onclick="copyCell('val-platform', this)">コピー</button></td>
+                    <td class="action"><button class="copy-btn" onclick="copyCell('val-platform',this)">コピー</button></td>
                 </tr>
                 <tr>
                     <th><span class="column-label">B</span> URL</th>
                     <td class="value" id="val-url"></td>
-                    <td><button class="copy-btn" onclick="copyCell('val-url', this)">コピー</button></td>
+                    <td class="action"><button class="copy-btn" onclick="copyCell('val-url',this)">コピー</button></td>
                 </tr>
                 <tr>
                     <th><span class="column-label">C</span> 登録者</th>
                     <td class="value" id="val-followers"></td>
-                    <td><button class="copy-btn" onclick="copyCell('val-followers', this)">コピー</button></td>
+                    <td class="action"><button class="copy-btn" onclick="copyCell('val-followers',this)">コピー</button></td>
                 </tr>
                 <tr>
                     <th><span class="column-label">D</span> 総再生数</th>
                     <td class="value" id="val-total-views"></td>
-                    <td><button class="copy-btn" onclick="copyCell('val-total-views', this)">コピー</button></td>
+                    <td class="action"><button class="copy-btn" onclick="copyCell('val-total-views',this)">コピー</button></td>
                 </tr>
                 <tr>
                     <th><span class="column-label">E</span> 月間再生回数</th>
                     <td class="value" id="val-monthly-views"></td>
-                    <td><button class="copy-btn" onclick="copyCell('val-monthly-views', this)">コピー</button></td>
+                    <td class="action"><button class="copy-btn" onclick="copyCell('val-monthly-views',this)">コピー</button></td>
                 </tr>
                 <tr>
                     <th><span class="column-label">F</span> 月間投稿本数</th>
                     <td class="value" id="val-monthly-posts"></td>
-                    <td><button class="copy-btn" onclick="copyCell('val-monthly-posts', this)">コピー</button></td>
+                    <td class="action"><button class="copy-btn" onclick="copyCell('val-monthly-posts',this)">コピー</button></td>
                 </tr>
                 <tr>
-                    <th><span class="column-label">G</span> 長尺<br>（投稿本数・平均再生数）</th>
-                    <td class="value" id="val-long-form"></td>
-                    <td><button class="copy-btn" onclick="copyCell('val-long-form', this)">コピー</button></td>
+                    <th><span class="column-label">G</span> 平均再生数/本</th>
+                    <td class="value" id="val-avg-views"></td>
+                    <td class="action"><button class="copy-btn" onclick="copyCell('val-avg-views',this)">コピー</button></td>
                 </tr>
                 <tr>
-                    <th><span class="column-label">H</span> ショート<br>（投稿本数・平均再生数）</th>
-                    <td class="value" id="val-short-form"></td>
-                    <td><button class="copy-btn" onclick="copyCell('val-short-form', this)">コピー</button></td>
-                </tr>
-                <tr>
-                    <th><span class="column-label">I</span> 登録者推移</th>
+                    <th><span class="column-label">H</span> 登録者推移</th>
                     <td class="value" id="val-follower-trend"></td>
-                    <td><button class="copy-btn" onclick="copyCell('val-follower-trend', this)">コピー</button></td>
+                    <td class="action"><button class="copy-btn" onclick="copyCell('val-follower-trend',this)">コピー</button></td>
                 </tr>
                 <tr>
-                    <th><span class="column-label">J</span> 初投稿</th>
+                    <th><span class="column-label">I</span> 初投稿</th>
                     <td class="value" id="val-first-post"></td>
-                    <td><button class="copy-btn" onclick="copyCell('val-first-post', this)">コピー</button></td>
+                    <td class="action"><button class="copy-btn" onclick="copyCell('val-first-post',this)">コピー</button></td>
                 </tr>
             </table>
 
-            <button class="btn-primary" onclick="copyAllAsRow()" style="margin-right: 0.5rem;">
+            <button class="btn-primary" onclick="copyAllAsRow()" style="margin-right:0.5rem;">
                 全データを1行コピー（タブ区切り）
             </button>
             <button class="btn-secondary" onclick="resetForm()">別のアカウントを取得</button>
 
-            <p class="note" style="margin-top: 1rem;">
+            <p class="note" style="margin-top:1rem;">
                 ※「全データを1行コピー」でコピーした内容は、Google Sheetsのセルに直接ペーストできます。<br>
-                ※ 登録者推移(I列)はTikTokから直接取得できないため、Social Bladeなどで確認してください。
+                ※ 登録者推移(H列)はTikTokから直接取得できないため、Social Bladeなどで確認してください。
             </p>
+
+            <!-- 投稿頻度グラフ -->
+            <div class="chart-section" id="chartSection">
+                <h3>投稿頻度の推移（月別）</h3>
+                <div class="chart-container">
+                    <canvas id="timelineChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 再生数グラフ -->
+            <div class="chart-section" id="viewsChartSection">
+                <h3>月別再生数の推移</h3>
+                <div class="chart-container">
+                    <canvas id="viewsChart"></canvas>
+                </div>
+            </div>
         </section>
     </div>
 
     <script>
     let currentJobId = null;
     let pollInterval = null;
+    let timelineChartInstance = null;
+    let viewsChartInstance = null;
 
     function startFetch() {
         const url = document.getElementById('accountUrl').value.trim();
-        if (!url) {
-            alert('TikTokアカウントURLを入力してください');
-            return;
-        }
+        if (!url) { alert('TikTokアカウントURLを入力してください'); return; }
 
         document.getElementById('fetchBtn').disabled = true;
         document.getElementById('statusSection').classList.remove('hidden');
@@ -228,10 +299,7 @@
         })
         .then(r => r.json())
         .then(data => {
-            if (data.error) {
-                showError(data.error);
-                return;
-            }
+            if (data.error) { showError(data.error); return; }
             currentJobId = data.job_id;
             pollInterval = setInterval(pollStatus, 2000);
         })
@@ -240,12 +308,10 @@
 
     function pollStatus() {
         if (!currentJobId) return;
-
         fetch('/api/sheet/status/' + currentJobId)
         .then(r => r.json())
         .then(data => {
             document.getElementById('statusMessage').textContent = data.message || '処理中...';
-
             if (data.status === 'completed') {
                 clearInterval(pollInterval);
                 showResult(data.result);
@@ -257,24 +323,186 @@
         .catch(() => {});
     }
 
-    function showResult(result) {
+    function showResult(r) {
         document.getElementById('statusSection').classList.add('hidden');
         document.getElementById('resultSection').classList.remove('hidden');
         document.getElementById('fetchBtn').disabled = false;
 
-        document.getElementById('videoCountNote').textContent =
-            `${result.video_count} 本の動画から算出`;
+        // 統計サマリー
+        const statsHtml = `
+            <div class="mini-stat">
+                <div class="label">総動画数</div>
+                <div class="number">${r.video_count}</div>
+                <div class="detail">本</div>
+            </div>
+            <div class="mini-stat">
+                <div class="label">直近30日の投稿</div>
+                <div class="number">${r.monthly_posts}</div>
+                <div class="detail">本</div>
+            </div>
+            <div class="mini-stat">
+                <div class="label">平均月間投稿本数</div>
+                <div class="number">${r.avg_monthly_posts}</div>
+                <div class="detail">本/月（活動月のみ）</div>
+            </div>
+            <div class="mini-stat">
+                <div class="label">活動期間</div>
+                <div class="number">${r.active_months}<span style="font-size:0.8rem;color:#6272a4">/${r.total_months_span}</span></div>
+                <div class="detail">ヶ月（活動/全期間）</div>
+            </div>
+        `;
+        document.getElementById('miniStats').innerHTML = statsHtml;
 
-        document.getElementById('val-url').textContent = result.url;
-        document.getElementById('val-followers').textContent = result.followers;
-        document.getElementById('val-total-views').textContent =
-            result.total_views + '\n' + result.total_views_detail;
-        document.getElementById('val-monthly-views').textContent = result.monthly_views;
-        document.getElementById('val-monthly-posts').textContent = result.monthly_posts;
-        document.getElementById('val-long-form').textContent = result.long_form;
-        document.getElementById('val-short-form').textContent = result.short_form;
-        document.getElementById('val-follower-trend').textContent = result.follower_trend;
-        document.getElementById('val-first-post').textContent = result.first_post_date;
+        // テーブル値
+        document.getElementById('videoCountNote').textContent =
+            `${r.video_count} 本の動画から算出`;
+        document.getElementById('val-url').textContent = r.url;
+        document.getElementById('val-followers').textContent = r.followers || '取得不可';
+        document.getElementById('val-total-views').textContent = r.total_views;
+        document.getElementById('val-monthly-views').textContent = r.monthly_views + '回';
+        document.getElementById('val-monthly-posts').textContent =
+            `${r.monthly_posts}本（平均 ${r.avg_monthly_posts}本/月）`;
+        document.getElementById('val-avg-views').textContent = r.avg_views_per_video + '回';
+        document.getElementById('val-follower-trend').textContent = r.follower_trend;
+        document.getElementById('val-first-post').textContent = r.first_post_date;
+
+        // グラフ描画
+        if (r.posting_timeline && r.posting_timeline.length > 0) {
+            renderTimeline(r.posting_timeline, r.avg_monthly_posts);
+            document.getElementById('chartSection').style.display = '';
+            document.getElementById('viewsChartSection').style.display = '';
+        } else {
+            document.getElementById('chartSection').style.display = 'none';
+            document.getElementById('viewsChartSection').style.display = 'none';
+        }
+    }
+
+    function renderTimeline(timeline, avgPosts) {
+        const labels = timeline.map(t => t.month);
+        const counts = timeline.map(t => t.count);
+        const views = timeline.map(t => t.views);
+
+        // 投稿数グラフ
+        if (timelineChartInstance) timelineChartInstance.destroy();
+        const ctx1 = document.getElementById('timelineChart').getContext('2d');
+        timelineChartInstance = new Chart(ctx1, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '月間投稿数',
+                        data: counts,
+                        borderColor: '#ff79c6',
+                        backgroundColor: 'rgba(255,121,198,0.15)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2,
+                        pointHoverRadius: 5,
+                        borderWidth: 2,
+                    },
+                    {
+                        label: '平均投稿数',
+                        data: Array(labels.length).fill(avgPosts),
+                        borderColor: '#6272a4',
+                        borderDash: [6, 4],
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        fill: false,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { labels: { color: '#f8f8f2', font: { size: 12 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                if (ctx.datasetIndex === 0) return `投稿数: ${ctx.parsed.y}本`;
+                                return `平均: ${avgPosts}本/月`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#6272a4',
+                            maxRotation: 45,
+                            autoSkip: true,
+                            maxTicksLimit: 24,
+                        },
+                        grid: { color: 'rgba(98,114,164,0.2)' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#6272a4', stepSize: 1 },
+                        grid: { color: 'rgba(98,114,164,0.2)' }
+                    }
+                }
+            }
+        });
+
+        // 再生数グラフ
+        if (viewsChartInstance) viewsChartInstance.destroy();
+        const ctx2 = document.getElementById('viewsChart').getContext('2d');
+        viewsChartInstance = new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '月間再生数',
+                    data: views,
+                    backgroundColor: 'rgba(139,233,253,0.5)',
+                    borderColor: '#8be9fd',
+                    borderWidth: 1,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#f8f8f2', font: { size: 12 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const v = ctx.parsed.y;
+                                if (v >= 100000000) return `再生数: ${(v/100000000).toFixed(1)}億`;
+                                if (v >= 10000) return `再生数: ${(v/10000).toFixed(1)}万`;
+                                return `再生数: ${v.toLocaleString()}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#6272a4',
+                            maxRotation: 45,
+                            autoSkip: true,
+                            maxTicksLimit: 24,
+                        },
+                        grid: { color: 'rgba(98,114,164,0.2)' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#6272a4',
+                            callback: function(v) {
+                                if (v >= 100000000) return (v/100000000).toFixed(0) + '億';
+                                if (v >= 10000) return (v/10000).toFixed(0) + '万';
+                                return v.toLocaleString();
+                            }
+                        },
+                        grid: { color: 'rgba(98,114,164,0.2)' }
+                    }
+                }
+            }
+        });
     }
 
     function showError(msg) {
@@ -298,24 +526,28 @@
         navigator.clipboard.writeText(text).then(() => {
             btn.textContent = 'OK!';
             btn.classList.add('copied');
-            setTimeout(() => {
-                btn.textContent = 'コピー';
-                btn.classList.remove('copied');
-            }, 1500);
+            setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 1500);
         });
     }
 
     function copyAllAsRow() {
         const ids = [
-            'val-platform', 'val-url', 'val-followers',
-            'val-total-views', 'val-monthly-views', 'val-monthly-posts',
-            'val-long-form', 'val-short-form', 'val-follower-trend', 'val-first-post'
+            'val-platform','val-url','val-followers','val-total-views',
+            'val-monthly-views','val-monthly-posts','val-avg-views',
+            'val-follower-trend','val-first-post'
         ];
         const row = ids.map(id => document.getElementById(id).textContent).join('\t');
         navigator.clipboard.writeText(row).then(() => {
             alert('コピーしました！Google Sheetsにペーストしてください。');
         });
     }
+
+    // Enter キーでも実行
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('accountUrl').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') startFetch();
+        });
+    });
     </script>
 </body>
 </html>
