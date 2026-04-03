@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TikTok シート埋め &amp; 分析ツール</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0f1a;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6}
+.container{max-width:1200px;margin:0 auto;padding:1.5rem}
+h1{color:#ff79c6;font-size:1.8rem;margin-bottom:.3rem}
+h2{color:#bd93f9;font-size:1.2rem;margin:2rem 0 1rem;border-bottom:1px solid #3a3a4a;padding-bottom:.5rem}
+h3{color:#f8f8f2;font-size:1rem;margin-bottom:.8rem}
+.subtitle{color:#6272a4;font-size:.9rem;margin-bottom:1.5rem}
+a{color:#8be9fd;text-decoration:none}a:hover{text-decoration:underline}
+.hidden{display:none!important}
+.form-card{background:#1e1e2e;border:1px solid #3a3a4a;border-radius:12px;padding:1.5rem;margin:1rem 0}
+.form-group{margin-bottom:1rem}
+.form-group label{display:block;color:#f8f8f2;margin-bottom:.3rem;font-weight:600;font-size:.9rem}
+.form-group input,.form-group textarea{width:100%;background:#282a36;border:1px solid #44475a;color:#f8f8f2;padding:.7rem 1rem;border-radius:8px;font-size:.95rem}
+.form-group input:focus,.form-group textarea:focus{outline:none;border-color:#ff79c6}
+.btn-primary{background:linear-gradient(135deg,#ff79c6,#bd93f9);color:#fff;border:none;padding:.7rem 2rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;width:100%;transition:opacity .2s}
+.btn-primary:hover{opacity:.9}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{background:#44475a;color:#f8f8f2;border:none;padding:.5rem 1.2rem;border-radius:6px;cursor:pointer;font-size:.9rem}
+.btn-secondary:hover{background:#6272a4}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin:1.5rem 0}
+.stat{background:#1e1e2e;border:1px solid #3a3a4a;border-radius:8px;padding:1rem;text-align:center}
+.stat .label{color:#6272a4;font-size:.8rem}
+.stat .number{color:#50fa7b;font-size:1.5rem;font-weight:700;margin:.3rem 0}
+.stat .detail{color:#6272a4;font-size:.75rem}
+.sheet-table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9rem}
+.sheet-table th,.sheet-table td{border:1px solid #3a3a4a;padding:.6rem .8rem;text-align:left}
+.sheet-table th{background:#2a2a3a;color:#ff79c6;font-weight:600;width:25%}
+.sheet-table td{background:#1e1e2e}
+.col-label{color:#bd93f9;font-weight:700;margin-right:.3rem}
+.sheet-val{color:#50fa7b;font-family:monospace}
+.chart-box{background:#1e1e2e;border:1px solid #3a3a4a;border-radius:8px;padding:1.5rem;margin:1rem 0}
+.chart-wrap{position:relative;height:300px}
+.copy-btn{background:#44475a;border:none;color:#f8f8f2;padding:.3rem .8rem;border-radius:4px;cursor:pointer;font-size:.8rem;transition:all .2s}
+.copy-btn:hover{background:#6272a4}
+.copy-btn.copied{background:#50fa7b;color:#282a36}
+.copy-all{background:#ff79c6;color:#282a36;border:none;padding:.5rem 1.2rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:.9rem;margin:1rem 0}
+.copy-all:hover{background:#ff92d0}
+.tabs{display:flex;gap:0;margin-top:2rem;border-bottom:2px solid #3a3a4a}
+.tab{background:none;border:none;color:#6272a4;padding:.7rem 1.2rem;cursor:pointer;font-size:.9rem;border-bottom:2px solid transparent;margin-bottom:-2px}
+.tab.active{color:#ff79c6;border-bottom-color:#ff79c6}
+.tab:hover{color:#f8f8f2}
+.tab-panel{display:none;padding-top:1rem}
+.tab-panel.active{display:block}
+.controls{display:flex;gap:1rem;margin:1rem 0;flex-wrap:wrap;align-items:center}
+.controls input,.controls select{background:#1e1e2e;border:1px solid #3a3a4a;color:#f8f8f2;padding:.5rem .8rem;border-radius:6px;font-size:.9rem}
+.controls input{flex:1;min-width:200px}
+.video-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.video-table th{background:#2a2a3a;color:#ff79c6;padding:.6rem;text-align:left;cursor:pointer;user-select:none;white-space:nowrap}
+.video-table th:hover{background:#3a3a5a}
+.video-table td{border-bottom:1px solid #2a2a3a;padding:.6rem;vertical-align:top}
+.video-table tr:hover td{background:#1a1a2a}
+.video-title{color:#f8f8f2;font-weight:500;max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.video-title:hover{white-space:normal}
+.num{text-align:right;font-family:monospace;color:#50fa7b}
+.date-col{white-space:nowrap;color:#6272a4}
+.status-card{background:#1e1e2e;border:1px solid #3a3a4a;border-radius:8px;padding:2rem;text-align:center;margin:1.5rem 0}
+.spinner{display:inline-block;width:24px;height:24px;border:3px solid #44475a;border-top:3px solid #ff79c6;border-radius:50%;animation:spin .8s linear infinite;margin-right:.5rem;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.badge{display:inline-block;background:#44475a;color:#f8f8f2;padding:.1rem .5rem;border-radius:10px;font-size:.75rem;margin-left:.3rem}
+.note{color:#6272a4;font-size:.85rem;margin-top:.5rem}
+.method-tabs{display:flex;gap:.5rem;margin-bottom:1rem}
+.method-tab{background:#282a36;border:1px solid #44475a;color:#6272a4;padding:.5rem 1rem;border-radius:6px;cursor:pointer;font-size:.85rem}
+.method-tab.active{background:#44475a;color:#ff79c6;border-color:#ff79c6}
+.step-box{background:#282a36;border:1px solid #44475a;border-radius:8px;padding:1rem;margin:.5rem 0;font-size:.9rem}
+.step-box code{background:#1e1e2e;padding:.2rem .5rem;border-radius:4px;font-size:.85rem;color:#50fa7b;word-break:break-all}
+.step-num{display:inline-block;background:#ff79c6;color:#282a36;width:24px;height:24px;border-radius:50%;text-align:center;line-height:24px;font-weight:700;font-size:.8rem;margin-right:.5rem}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>TikTok シート埋め &amp; 分析ツール</h1>
+<p class="subtitle">ブラウザだけで完結 — TikTokアカウントのデータを取得・視覚化・シートにコピー</p>
+</header>
+
+<!-- ====== 入力セクション ====== -->
+<section id="inputSection">
+<div class="form-card">
+
+<div class="method-tabs">
+<button class="method-tab active" onclick="switchMethod('auto')">自動取得</button>
+<button class="method-tab" onclick="switchMethod('manual')">手動取得（確実）</button>
+</div>
+
+<!-- 自動取得 -->
+<div id="method-auto">
+<div class="form-group">
+<label>TikTokアカウントURL</label>
+<input type="text" id="accountUrl" placeholder="https://www.tiktok.com/@username" autocomplete="off">
+</div>
+<button class="btn-primary" id="fetchBtn" onclick="startAutoFetch()">データを取得する</button>
+<p class="note" style="margin-top:.8rem">CORSプロキシ経由で取得を試みます。うまくいかない場合は「手動取得」をお使いください。</p>
+</div>
+
+<!-- 手動取得 -->
+<div id="method-manual" class="hidden">
+<p style="margin-bottom:1rem;color:#f8f8f2">TikTokのプロフィールページからデータを直接コピーする方法です。<strong>100%確実</strong>に動きます。</p>
+
+<div class="step-box">
+<span class="step-num">1</span> TikTokで対象のプロフィールページを開く（例: <a href="https://www.tiktok.com/@misakism13" target="_blank">@misakism13</a>）
+</div>
+<div class="step-box">
+<span class="step-num">2</span> そのページで <strong>F12</strong>（またはCmd+Option+I）を押して開発者ツールを開く → <strong>Console</strong>タブを選択
+</div>
+<div class="step-box">
+<span class="step-num">3</span> 以下のコードをConsoleにコピペして Enter を押す:<br><br>
+<code id="bookmarkletCode">(() => { const s = document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__'); if (!s) { alert('データが見つかりません。TikTokのプロフィールページで実行してください。'); return; } const d = JSON.parse(s.textContent); const ud = d?.['__DEFAULT_SCOPE__']?.['webapp.user-detail']; const user = ud?.userInfo?.user || {}; const stats = ud?.userInfo?.stats || {}; let items = []; for (const k of Object.keys(d?.['__DEFAULT_SCOPE__'] || {})) { const m = d['__DEFAULT_SCOPE__'][k]; if (m?.itemList) { items = m.itemList; break; } } const videos = items.map(v => ({ id: v.id, desc: v.desc || '', views: v.stats?.playCount || 0, likes: v.stats?.diggCount || 0, comments: v.stats?.commentCount || 0, shares: v.stats?.shareCount || 0, duration: v.video?.duration || 0, createTime: v.createTime || 0, cover: v.video?.cover || '' })); const result = JSON.stringify({ user: { uniqueId: user.uniqueId, nickname: user.nickname, secUid: user.secUid, followers: stats.followerCount, following: stats.followingCount, hearts: stats.heartCount, videoCount: stats.videoCount }, videos }); copy(result); alert('コピー完了！(' + videos.length + '本) ツールに戻って貼り付けてください。'); })()</code>
+<br><br><button class="btn-secondary" onclick="copyBookmarklet()">このコードをコピー</button>
+</div>
+<div class="step-box">
+<span class="step-num">4</span> 自動的にクリップボードにコピーされるので、下のテキストエリアに貼り付けてください:
+</div>
+
+<div class="form-group">
+<label>取得したデータを貼り付け</label>
+<textarea id="manualData" rows="6" placeholder='ここにペースト（{"user":...,"videos":...} のJSON）'></textarea>
+</div>
+<button class="btn-primary" onclick="processManualData()">データを分析する</button>
+</div>
+
+</div>
+</section>
+
+<!-- ====== ステータス ====== -->
+<section id="statusSection" class="hidden">
+<div class="status-card">
+<div class="spinner"></div>
+<span id="statusMessage">取得中...</span>
+</div>
+</section>
+
+<!-- ====== エラー ====== -->
+<section id="errorSection" class="hidden">
+<div class="form-card" style="border-color:#ff5555">
+<p id="errorMessage" style="color:#ff5555;margin-bottom:1rem"></p>
+<button class="btn-secondary" onclick="resetAll()">やり直す</button>
+<button class="btn-secondary" style="margin-left:.5rem" onclick="switchMethod('manual');resetAll()">手動取得に切り替え</button>
+</div>
+</section>
+
+<!-- ====== 結果 ====== -->
+<section id="resultSection" class="hidden">
+
+<div id="accountHeader"></div>
+<div class="stats" id="miniStats"></div>
+
+<div class="tabs">
+<button class="tab active" onclick="switchTab('sheet')">シートデータ</button>
+<button class="tab" onclick="switchTab('charts')">チャート</button>
+<button class="tab" onclick="switchTab('videos')">全動画一覧 <span class="badge" id="videoBadge"></span></button>
+<button class="tab" onclick="switchTab('top')">再生数TOP20</button>
+</div>
+
+<!-- シートデータ -->
+<div class="tab-panel active" id="panel-sheet">
+<h2>スプレッドシート用データ</h2>
+<button class="copy-all" onclick="copyAllAsRow()">全データを1行コピー（タブ区切り → Sheetsにペースト可）</button>
+<table class="sheet-table" id="sheetTable"></table>
+</div>
+
+<!-- チャート -->
+<div class="tab-panel" id="panel-charts">
+<div class="chart-box"><h3>累計再生数の推移</h3><div class="chart-wrap"><canvas id="cumulativeChart"></canvas></div></div>
+<div class="chart-box"><h3>月別投稿数の推移（波グラフ）</h3><div class="chart-wrap"><canvas id="postingChart"></canvas></div></div>
+<div class="chart-box"><h3>月別再生数の推移</h3><div class="chart-wrap"><canvas id="viewsChart"></canvas></div></div>
+</div>
+
+<!-- 全動画一覧 -->
+<div class="tab-panel" id="panel-videos">
+<h2>全動画一覧</h2>
+<div class="controls">
+<input type="text" id="searchInput" placeholder="タイトル検索..." oninput="filterVideos()">
+<select id="sortSelect" onchange="sortVideos()">
+<option value="views-desc">再生数（多い順）</option>
+<option value="views-asc">再生数（少ない順）</option>
+<option value="likes-desc">いいね（多い順）</option>
+<option value="date-desc">日付（新しい順）</option>
+<option value="date-asc">日付（古い順）</option>
+</select>
+</div>
+<div id="videoCount" class="note"></div>
+<table class="video-table"><thead><tr>
+<th style="width:40px">#</th>
+<th>タイトル / 説明</th>
+<th onclick="sortByCol('views')" style="width:100px">再生数</th>
+<th onclick="sortByCol('likes')" style="width:90px">いいね</th>
+<th onclick="sortByCol('comments')" style="width:80px">コメント</th>
+<th onclick="sortByCol('shares')" style="width:80px">シェア</th>
+<th onclick="sortByCol('date')" style="width:100px">投稿日</th>
+</tr></thead><tbody id="videoTableBody"></tbody></table>
+</div>
+
+<!-- TOP20 -->
+<div class="tab-panel" id="panel-top">
+<h2>再生数 TOP20</h2>
+<div id="topVideosList"></div>
+</div>
+
+<button class="btn-secondary" style="margin-top:2rem" onclick="resetAll()">別のアカウントを分析</button>
+</section>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// データ & 状態
+// ═══════════════════════════════════════════════════════════════
+let allVideos = [];
+let displayedVideos = [];
+let currentSort = 'views-desc';
+let userData = null;
+let chartsRendered = false;
+
+// ═══════════════════════════════════════════════════════════════
+// 入力メソッド切替
+// ═══════════════════════════════════════════════════════════════
+function switchMethod(m) {
+    document.querySelectorAll('.method-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('method-auto').classList.toggle('hidden', m !== 'auto');
+    document.getElementById('method-manual').classList.toggle('hidden', m !== 'manual');
+}
+
+function copyBookmarklet() {
+    const code = document.getElementById('bookmarkletCode').textContent;
+    navigator.clipboard.writeText(code).then(() => alert('コピーしました！TikTokのConsoleに貼り付けてください。'));
+}
+
+function resetAll() {
+    ['statusSection','errorSection','resultSection'].forEach(id =>
+        document.getElementById(id).classList.add('hidden'));
+    document.getElementById('inputSection').classList.remove('hidden');
+    document.getElementById('fetchBtn').disabled = false;
+    chartsRendered = false;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 自動取得（CORSプロキシ経由）
+// ═══════════════════════════════════════════════════════════════
+const CORS_PROXIES = [
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+async function fetchWithProxy(url) {
+    for (const mkProxy of CORS_PROXIES) {
+        try {
+            const proxyUrl = mkProxy(url);
+            const r = await fetch(proxyUrl, { headers: { 'Accept': 'text/html,application/json' } });
+            if (r.ok) {
+                const text = await r.text();
+                if (text.length > 500) return text;
+            }
+        } catch (e) { /* try next */ }
+    }
+    throw new Error('全てのプロキシで取得に失敗しました');
+}
+
+function extractDataFromHtml(html, username) {
+    // __UNIVERSAL_DATA_FOR_REHYDRATION__ からJSON抽出
+    const match = html.match(/<script[^>]*id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/);
+    if (!match) throw new Error('TikTokページのデータ構造を解析できませんでした');
+
+    const data = JSON.parse(match[1]);
+    const scope = data['__DEFAULT_SCOPE__'] || {};
+
+    // ユーザー情報
+    const ud = scope['webapp.user-detail'] || {};
+    const user = ud?.userInfo?.user || {};
+    const stats = ud?.userInfo?.stats || {};
+
+    // 動画リスト
+    let items = [];
+    for (const key of Object.keys(scope)) {
+        const mod = scope[key];
+        if (mod && mod.itemList && Array.isArray(mod.itemList)) {
+            items = mod.itemList;
+            break;
+        }
+    }
+
+    const videos = items.map(v => ({
+        id: v.id || '',
+        desc: v.desc || '',
+        views: v.stats?.playCount || 0,
+        likes: v.stats?.diggCount || 0,
+        comments: v.stats?.commentCount || 0,
+        shares: v.stats?.shareCount || 0,
+        duration: v.video?.duration || 0,
+        createTime: v.createTime || 0,
+        cover: v.video?.cover || '',
+    }));
+
+    return {
+        user: {
+            uniqueId: user.uniqueId || username,
+            nickname: user.nickname || '',
+            secUid: user.secUid || '',
+            followers: stats.followerCount || 0,
+            hearts: stats.heartCount || 0,
+            videoCount: stats.videoCount || 0,
+        },
+        videos,
+    };
+}
+
+async function fetchMoreVideos(secUid, username, existingVideos) {
+    if (!secUid) return existingVideos;
+
+    const existingIds = new Set(existingVideos.map(v => v.id));
+    let cursor = 0;
+    let allVids = [...existingVideos];
+    let retries = 0;
+
+    while (allVids.length < 500 && retries < 3) {
+        try {
+            const apiUrl = `https://www.tiktok.com/api/post/item_list/?aid=1988&count=35&cursor=${cursor}&secUid=${encodeURIComponent(secUid)}&device_platform=web_pc`;
+            const text = await fetchWithProxy(apiUrl);
+            const data = JSON.parse(text);
+            const items = data.itemList || [];
+            if (!items.length) break;
+
+            for (const v of items) {
+                if (!existingIds.has(v.id)) {
+                    existingIds.add(v.id);
+                    allVids.push({
+                        id: v.id, desc: v.desc || '',
+                        views: v.stats?.playCount || 0,
+                        likes: v.stats?.diggCount || 0,
+                        comments: v.stats?.commentCount || 0,
+                        shares: v.stats?.shareCount || 0,
+                        duration: v.video?.duration || 0,
+                        createTime: v.createTime || 0,
+                        cover: v.video?.cover || '',
+                    });
+                }
+            }
+            setStatus(`動画取得中... ${allVids.length}本`);
+            if (!data.hasMore) break;
+            cursor = data.cursor || (cursor + 35);
+            await new Promise(r => setTimeout(r, 800));
+            retries = 0;
+        } catch (e) {
+            retries++;
+            await new Promise(r => setTimeout(r, 1500));
+        }
+    }
+    return allVids;
+}
+
+function setStatus(msg) {
+    document.getElementById('statusMessage').textContent = msg;
+}
+
+async function startAutoFetch() {
+    const urlInput = document.getElementById('accountUrl').value.trim();
+    if (!urlInput) { alert('URLを入力してください'); return; }
+
+    const username = urlInput.replace(/.*@/, '').replace(/\/.*/, '').trim();
+    if (!username) { alert('正しいTikTokURLを入力してください'); return; }
+
+    document.getElementById('inputSection').classList.add('hidden');
+    document.getElementById('statusSection').classList.remove('hidden');
+    document.getElementById('errorSection').classList.add('hidden');
+    document.getElementById('fetchBtn').disabled = true;
+
+    try {
+        setStatus(`@${username} のプロフィールを取得中...`);
+        const html = await fetchWithProxy(`https://www.tiktok.com/@${username}`);
+        const result = extractDataFromHtml(html, username);
+
+        if (result.videos.length === 0 && result.user.videoCount === 0) {
+            throw new Error('動画データが見つかりませんでした。手動取得をお試しください。');
+        }
+
+        setStatus(`${result.videos.length}本取得。追加データを取得中...`);
+
+        if (result.user.secUid) {
+            result.videos = await fetchMoreVideos(result.user.secUid, username, result.videos);
+        }
+
+        processResult(result, username);
+    } catch (e) {
+        document.getElementById('statusSection').classList.add('hidden');
+        document.getElementById('errorSection').classList.remove('hidden');
+        document.getElementById('errorMessage').textContent = `取得エラー: ${e.message}`;
+        document.getElementById('inputSection').classList.remove('hidden');
+        document.getElementById('fetchBtn').disabled = false;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 手動取得
+// ═══════════════════════════════════════════════════════════════
+function processManualData() {
+    const raw = document.getElementById('manualData').value.trim();
+    if (!raw) { alert('データを貼り付けてください'); return; }
+
+    try {
+        const result = JSON.parse(raw);
+        if (!result.videos || !Array.isArray(result.videos)) {
+            throw new Error('videos配列が見つかりません');
+        }
+        const username = result.user?.uniqueId || 'unknown';
+        document.getElementById('inputSection').classList.add('hidden');
+        processResult(result, username);
+    } catch (e) {
+        alert('JSONの解析に失敗しました: ' + e.message);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// データ処理 & 表示
+// ═══════════════════════════════════════════════════════════════
+function processResult(result, username) {
+    document.getElementById('statusSection').classList.add('hidden');
+    document.getElementById('resultSection').classList.remove('hidden');
+
+    userData = result.user;
+    allVideos = result.videos.map(v => {
+        const ts = parseInt(v.createTime) || 0;
+        const dt = ts > 1000000000 ? new Date(ts * 1000) : null;
+        return {
+            id: v.id, title: v.desc || '(タイトルなし)',
+            description: v.desc || '', url: `https://www.tiktok.com/@${username}/video/${v.id}`,
+            views: v.views || 0, likes: v.likes || 0,
+            comments: v.comments || 0, shares: v.shares || 0,
+            duration: v.duration || 0, date: dt ? dt.toISOString().slice(0,10) : '',
+            timestamp: ts,
+        };
+    });
+    displayedVideos = [...allVideos];
+
+    renderHeader(username);
+    renderStats();
+    renderSheetTable(username);
+    applySortToDisplayed();
+    renderVideoTable();
+    renderTop20();
+    document.getElementById('videoBadge').textContent = allVideos.length;
+}
+
+function fmtNum(n) {
+    if (n >= 1e8) return (n/1e8).toFixed(1) + '億';
+    if (n >= 1e4) return (n/1e4).toFixed(1) + '万';
+    return n.toLocaleString();
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ── ヘッダー ──
+function renderHeader(username) {
+    const u = userData || {};
+    document.getElementById('accountHeader').innerHTML = `
+        <h2 style="border:none;margin-bottom:0">@${escHtml(username)} ${u.nickname ? '(' + escHtml(u.nickname) + ')' : ''}</h2>
+        <p class="note">取得動画数: ${allVideos.length}本 ${u.videoCount ? '/ 公開動画: ' + u.videoCount + '本' : ''}</p>
+    `;
+}
+
+// ── 統計 ──
+function renderStats() {
+    const totalViews = allVideos.reduce((s,v) => s+v.views, 0);
+    const avgViews = allVideos.length ? Math.round(totalViews / allVideos.length) : 0;
+    const now = Date.now() / 1000;
+    const monthly = allVideos.filter(v => v.timestamp && (now - v.timestamp) < 30*86400);
+    const monthlyViews = monthly.reduce((s,v) => s+v.views, 0);
+
+    // 月別集計
+    const byMonth = {};
+    allVideos.forEach(v => {
+        if (!v.date) return;
+        const m = v.date.slice(0,7);
+        byMonth[m] = (byMonth[m] || 0) + 1;
+    });
+    const activeMonths = Object.keys(byMonth).length;
+    const totalPosts = Object.values(byMonth).reduce((s,c) => s+c, 0);
+    const avgMonthly = activeMonths ? (totalPosts / activeMonths).toFixed(1) : 0;
+
+    // 全期間
+    const dates = allVideos.filter(v=>v.date).map(v=>v.date).sort();
+    let totalSpan = 0;
+    if (dates.length >= 2) {
+        const first = new Date(dates[0]);
+        const last = new Date(dates[dates.length-1]);
+        totalSpan = Math.ceil((last - first) / (30*86400*1000)) + 1;
+    }
+
+    const followers = userData?.followers || 0;
+
+    document.getElementById('miniStats').innerHTML = `
+        <div class="stat"><div class="label">総再生数</div><div class="number">${fmtNum(totalViews)}</div><div class="detail">${totalViews.toLocaleString()}回</div></div>
+        <div class="stat"><div class="label">登録者</div><div class="number">${followers ? fmtNum(followers) + '人' : '—'}</div></div>
+        <div class="stat"><div class="label">平均再生数/本</div><div class="number">${fmtNum(avgViews)}</div></div>
+        <div class="stat"><div class="label">月間投稿（30日）</div><div class="number">${monthly.length}</div><div class="detail">本</div></div>
+        <div class="stat"><div class="label">平均月間投稿数</div><div class="number">${avgMonthly}</div><div class="detail">本/月</div></div>
+        <div class="stat"><div class="label">月間再生回数</div><div class="number">${fmtNum(monthlyViews)}</div></div>
+        <div class="stat"><div class="label">活動期間</div><div class="number">${activeMonths}<span style="font-size:.8rem;color:#6272a4">/${totalSpan || '?'}</span></div><div class="detail">ヶ月</div></div>
+        <div class="stat"><div class="label">総動画数</div><div class="number">${allVideos.length}</div><div class="detail">本</div></div>
+    `;
+}
+
+// ── シートテーブル ──
+function renderSheetTable(username) {
+    const totalViews = allVideos.reduce((s,v) => s+v.views, 0);
+    const avgViews = allVideos.length ? Math.round(totalViews / allVideos.length) : 0;
+    const now = Date.now() / 1000;
+    const monthly = allVideos.filter(v => v.timestamp && (now - v.timestamp) < 30*86400);
+    const monthlyViews = monthly.reduce((s,v) => s+v.views, 0);
+    const byMonth = {};
+    allVideos.forEach(v => { if(v.date) { const m=v.date.slice(0,7); byMonth[m]=(byMonth[m]||0)+1; }});
+    const activeMonths = Object.keys(byMonth).length;
+    const avgMonthly = activeMonths ? (Object.values(byMonth).reduce((s,c)=>s+c,0) / activeMonths).toFixed(1) : 0;
+    const dates = allVideos.filter(v=>v.date).map(v=>v.date).sort();
+    const firstPost = dates.length ? dates[0] : '不明';
+    const followers = userData?.followers;
+
+    const rows = [
+        ['A','媒体','TikTok'],
+        ['B','URL',`https://www.tiktok.com/@${username}`],
+        ['C','登録者', followers ? fmtNum(followers) + '人' : '取得不可'],
+        ['D','総再生数', totalViews.toLocaleString()],
+        ['E','月間再生回数', fmtNum(monthlyViews) + '回'],
+        ['F','月間投稿本数', `${monthly.length}本（平均 ${avgMonthly}本/月）`],
+        ['G','平均再生数/本', fmtNum(avgViews) + '回'],
+        ['H','登録者推移','（要手動入力）'],
+        ['I','初投稿', firstPost],
+    ];
+
+    let html = '';
+    rows.forEach(([col, label, val], i) => {
+        html += `<tr><th><span class="col-label">${col}</span> ${label}</th>
+        <td><span class="sheet-val" id="sv-${i}">${escHtml(val)}</span>
+        <button class="copy-btn" onclick="cc('sv-${i}',this)" style="margin-left:.5rem">コピー</button></td></tr>`;
+    });
+    document.getElementById('sheetTable').innerHTML = html;
+}
+
+function cc(id, btn) {
+    navigator.clipboard.writeText(document.getElementById(id).textContent).then(() => {
+        btn.textContent='OK!'; btn.classList.add('copied');
+        setTimeout(()=>{btn.textContent='コピー';btn.classList.remove('copied')},1500);
+    });
+}
+
+function copyAllAsRow() {
+    const vals = [];
+    document.querySelectorAll('.sheet-val').forEach(el => vals.push(el.textContent));
+    navigator.clipboard.writeText(vals.join('\t')).then(() =>
+        alert('コピーしました！\nGoogle Sheetsにペーストしてください。'));
+}
+
+// ── タブ切替 ──
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.closest('.tab').classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    if (name === 'charts' && !chartsRendered) { renderCharts(); chartsRendered = true; }
+}
+
+// ── チャート ──
+function renderCharts() {
+    // タイムライン集計
+    const byMonth = {};
+    allVideos.forEach(v => {
+        if (!v.date) return;
+        const m = v.date.slice(0,7);
+        if (!byMonth[m]) byMonth[m] = { count:0, views:0 };
+        byMonth[m].count++;
+        byMonth[m].views += v.views;
+    });
+
+    const sortedMonths = Object.keys(byMonth).sort();
+    if (sortedMonths.length < 2) { return; }
+
+    // 全月埋め
+    const allMonths = [];
+    let [y,mo] = sortedMonths[0].split('-').map(Number);
+    const [ey,emo] = sortedMonths[sortedMonths.length-1].split('-').map(Number);
+    while (y < ey || (y === ey && mo <= emo)) {
+        const key = `${y}-${String(mo).padStart(2,'0')}`;
+        allMonths.push(key);
+        mo++; if(mo>12){mo=1;y++;}
+    }
+
+    const counts = allMonths.map(m => byMonth[m]?.count || 0);
+    const views = allMonths.map(m => byMonth[m]?.views || 0);
+    const activeCounts = counts.filter(c => c > 0);
+    const avgPosts = activeCounts.length ? (activeCounts.reduce((a,b)=>a+b,0) / activeCounts.length) : 0;
+
+    // 累計再生数
+    const sorted = [...allVideos].filter(v=>v.timestamp).sort((a,b)=>a.timestamp-b.timestamp);
+    let cumDates = [], cumVals = [], total = 0;
+    sorted.forEach(v => { total += v.views; cumDates.push(v.date); cumVals.push(total); });
+
+    const co = (tickFmt) => ({
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        plugins:{legend:{labels:{color:'#f8f8f2',font:{size:12}}}},
+        scales:{
+            x:{ticks:{color:'#6272a4',maxRotation:45,autoSkip:true,maxTicksLimit:24},grid:{color:'rgba(98,114,164,.15)'}},
+            y:{beginAtZero:true,ticks:{color:'#6272a4',callback:tickFmt},grid:{color:'rgba(98,114,164,.15)'}}
+        }
+    });
+    const fv = v => { if(v>=1e8)return(v/1e8).toFixed(0)+'億'; if(v>=1e4)return(v/1e4).toFixed(0)+'万'; return v.toLocaleString(); };
+
+    new Chart(document.getElementById('cumulativeChart'), {
+        type:'line', data:{ labels:cumDates, datasets:[{
+            label:'累計再生数',data:cumVals,borderColor:'#50fa7b',backgroundColor:'rgba(80,250,123,.1)',
+            fill:true,tension:.3,pointRadius:0,borderWidth:2
+        }]}, options:co(fv)
+    });
+
+    new Chart(document.getElementById('postingChart'), {
+        type:'line', data:{ labels:allMonths, datasets:[
+            {label:'月間投稿数',data:counts,borderColor:'#ff79c6',backgroundColor:'rgba(255,121,198,.15)',fill:true,tension:.3,pointRadius:2,borderWidth:2},
+            {label:`平均 (${avgPosts.toFixed(1)}本/月)`,data:Array(allMonths.length).fill(avgPosts),borderColor:'#6272a4',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false}
+        ]}, options:co(v=>v+'本')
+    });
+
+    new Chart(document.getElementById('viewsChart'), {
+        type:'bar', data:{ labels:allMonths, datasets:[{
+            label:'月間再生数',data:views,backgroundColor:'rgba(139,233,253,.5)',borderColor:'#8be9fd',borderWidth:1,borderRadius:3
+        }]}, options:co(fv)
+    });
+}
+
+// ── 動画テーブル ──
+function renderVideoTable() {
+    let html = '';
+    displayedVideos.forEach((v,i) => {
+        html += `<tr><td style="color:#6272a4">${i+1}</td>
+        <td><a href="${v.url}" target="_blank" class="video-title">${escHtml(v.title)}</a></td>
+        <td class="num">${fmtNum(v.views)}</td><td class="num">${fmtNum(v.likes)}</td>
+        <td class="num">${fmtNum(v.comments)}</td><td class="num">${fmtNum(v.shares)}</td>
+        <td class="date-col">${v.date}</td></tr>`;
+    });
+    document.getElementById('videoTableBody').innerHTML = html;
+    document.getElementById('videoCount').textContent = `表示: ${displayedVideos.length} / ${allVideos.length} 本`;
+}
+
+function filterVideos() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    displayedVideos = allVideos.filter(v => (v.title+' '+v.description).toLowerCase().includes(q));
+    applySortToDisplayed(); renderVideoTable();
+}
+
+function sortVideos() { currentSort = document.getElementById('sortSelect').value; applySortToDisplayed(); renderVideoTable(); }
+function sortByCol(f) {
+    const [cf,cd] = currentSort.split('-');
+    currentSort = cf===f ? f+'-'+(cd==='desc'?'asc':'desc') : f+'-desc';
+    document.getElementById('sortSelect').value = currentSort;
+    applySortToDisplayed(); renderVideoTable();
+}
+
+function applySortToDisplayed() {
+    const [field,dir] = currentSort.split('-');
+    const m = dir==='desc' ? -1 : 1;
+    displayedVideos.sort((a,b) => {
+        if(field==='date') { const va=a.date||'',vb=b.date||''; return va<vb?-m:va>vb?m:0; }
+        return ((a[field]||0)-(b[field]||0))*m;
+    });
+}
+
+// ── TOP20 ──
+function renderTop20() {
+    const top = [...allVideos].sort((a,b)=>b.views-a.views).slice(0,20);
+    let html = '<div style="display:grid;gap:1rem">';
+    top.forEach((v,i) => {
+        const eng = v.views>0 ? ((v.likes+v.comments+v.shares)/v.views*100).toFixed(2) : 0;
+        html += `<div style="background:#1e1e2e;border:1px solid #3a3a4a;border-radius:8px;padding:1rem;display:flex;gap:1rem">
+            <div style="color:#ff79c6;font-size:1.5rem;font-weight:700;min-width:40px;text-align:center">${i+1}</div>
+            <div style="flex:1"><a href="${v.url}" target="_blank" style="font-weight:600">${escHtml(v.title)}</a>
+            <div style="display:flex;gap:1.5rem;margin-top:.5rem;flex-wrap:wrap;font-size:.85rem">
+                <span style="color:#50fa7b;font-weight:600">${fmtNum(v.views)}再生</span>
+                <span style="color:#ff79c6">${fmtNum(v.likes)}いいね</span>
+                <span style="color:#8be9fd">${fmtNum(v.comments)}コメント</span>
+                <span style="color:#ffb86c">${fmtNum(v.shares)}シェア</span>
+                <span style="color:#6272a4">ENG率: ${eng}%</span>
+                <span style="color:#6272a4">${v.date}</span>
+            </div></div></div>`;
+    });
+    html += '</div>';
+    document.getElementById('topVideosList').innerHTML = html;
+}
+
+// Enter キー対応
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('accountUrl').addEventListener('keypress', e => {
+        if (e.key === 'Enter') startAutoFetch();
+    });
+});
+</script>
+</body>
+</html>
