@@ -332,6 +332,43 @@ function extractUsername(input) {
     return null;
 }
 
+// ===== CORS-aware fetch helper =====
+// Try multiple proxy strategies to bypass CORS restrictions
+async function corsFetch(url, options = {}) {
+    // Strategy 1: Direct (works if CORS is allowed)
+    try {
+        const r = await fetch(url, options);
+        if (r.ok) return r;
+    } catch(e) { console.log('Direct fetch failed, trying proxies...'); }
+
+    // For proxy strategies, convert POST to GET with query params
+    let getUrl = url;
+    if (options.body) {
+        const sep = url.includes('?') ? '&' : '?';
+        getUrl = url + sep + options.body;
+    }
+
+    // Strategy 2: corsproxy.io
+    try {
+        const r = await fetch('https://corsproxy.io/?' + encodeURIComponent(getUrl));
+        if (r.ok) return r;
+    } catch(e) { console.log('corsproxy.io failed'); }
+
+    // Strategy 3: allorigins
+    try {
+        const r = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(getUrl));
+        if (r.ok) return r;
+    } catch(e) { console.log('allorigins failed'); }
+
+    // Strategy 4: corsproxy.org
+    try {
+        const r = await fetch('https://corsproxy.org/?' + encodeURIComponent(getUrl));
+        if (r.ok) return r;
+    } catch(e) { console.log('corsproxy.org failed'); }
+
+    throw new Error('全てのプロキシで接続に失敗しました。右上の「手動追加」からデータを入力してください。');
+}
+
 // ===== Fetch via TikWM API =====
 async function fetchVideos() {
     const input = document.getElementById('urlInput').value.trim();
@@ -350,60 +387,43 @@ async function fetchVideos() {
         let cursor = 0;
         let hasMore = true;
         let page = 0;
-        const maxPages = 10; // max 10 pages
+        const maxPages = 10;
 
         while (hasMore && page < maxPages) {
             page++;
             updateStatus(`ページ ${page} を取得中...`, (page / maxPages) * 100);
 
-            const formData = new URLSearchParams();
-            formData.append('unique_id', username);
-            formData.append('count', '30');
-            formData.append('cursor', cursor.toString());
+            const apiUrl = 'https://www.tikwm.com/api/user/posts';
+            const params = `unique_id=${encodeURIComponent(username)}&count=30&cursor=${cursor}`;
 
-            const response = await fetch('https://www.tikwm.com/api/user/posts', {
+            const response = await corsFetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData.toString()
+                body: params
             });
-
-            if (!response.ok) throw new Error(`API error: ${response.status}`);
 
             const data = await response.json();
 
             if (data.code !== 0 && data.code !== undefined) {
-                // Try alternative endpoint
-                const resp2 = await fetch(`https://www.tikwm.com/api/user/posts?unique_id=${username}&count=30&cursor=${cursor}`);
-                const data2 = await resp2.json();
-                if (data2.code !== 0 && data2.code !== undefined) {
-                    throw new Error(data2.msg || 'ユーザーが見つかりませんでした');
+                if (page === 1) {
+                    throw new Error(data.msg || 'ユーザーが見つかりませんでした');
                 }
-                if (data2.data && data2.data.videos) {
-                    allVideos = allVideos.concat(data2.data.videos);
-                    hasMore = data2.data.hasMore || false;
-                    cursor = data2.data.cursor || 0;
-                } else {
-                    hasMore = false;
-                }
+                hasMore = false;
+            } else if (data.data && data.data.videos && data.data.videos.length > 0) {
+                allVideos = allVideos.concat(data.data.videos);
+                hasMore = data.data.hasMore || false;
+                cursor = data.data.cursor || 0;
             } else {
-                if (data.data && data.data.videos && data.data.videos.length > 0) {
-                    allVideos = allVideos.concat(data.data.videos);
-                    hasMore = data.data.hasMore || false;
-                    cursor = data.data.cursor || 0;
-                } else {
-                    hasMore = false;
-                }
+                hasMore = false;
             }
 
-            // small delay between pages
-            if (hasMore) await new Promise(r => setTimeout(r, 500));
+            if (hasMore) await new Promise(r => setTimeout(r, 800));
         }
 
         if (allVideos.length === 0) {
             throw new Error('動画が見つかりませんでした。ユーザー名を確認してください。');
         }
 
-        // Transform data
         videoData = allVideos.map((v, i) => ({
             id: v.video_id || v.id || `vid_${i}`,
             url: `https://www.tiktok.com/@${username}/video/${v.video_id || v.id}`,
