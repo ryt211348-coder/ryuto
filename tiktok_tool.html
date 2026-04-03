@@ -97,26 +97,26 @@ a{color:#8be9fd;text-decoration:none}a:hover{text-decoration:underline}
 <input type="text" id="accountUrl" placeholder="https://www.tiktok.com/@username" autocomplete="off">
 </div>
 <button class="btn-primary" id="fetchBtn" onclick="startAutoFetch()">データを取得する</button>
-<p class="note" style="margin-top:.8rem">CORSプロキシ経由で取得を試みます。うまくいかない場合は「手動取得」をお使いください。</p>
+<p class="note" style="margin-top:.8rem">CORSプロキシ経由で取得を試みます。<br>登録者数しか取れない・動画が0本の場合は「手動取得（確実）」をお使いください。全動画を取得できます。</p>
 </div>
 
 <!-- 手動取得 -->
 <div id="method-manual" class="hidden">
-<p style="margin-bottom:1rem;color:#f8f8f2">TikTokのプロフィールページからデータを直接コピーする方法です。<strong>100%確実</strong>に動きます。</p>
+<p style="margin-bottom:1rem;color:#f8f8f2">TikTokのプロフィールページからデータを直接取得する方法です。<strong>全動画を取得</strong>できます。</p>
 
 <div class="step-box">
 <span class="step-num">1</span> TikTokで対象のプロフィールページを開く（例: <a href="https://www.tiktok.com/@misakism13" target="_blank">@misakism13</a>）
 </div>
 <div class="step-box">
-<span class="step-num">2</span> そのページで <strong>F12</strong>（またはCmd+Option+I）を押して開発者ツールを開く → <strong>Console</strong>タブを選択
+<span class="step-num">2</span> そのページで <strong>F12</strong>（Macは <strong>Cmd+Option+I</strong>）を押して開発者ツールを開く → <strong>Console</strong>タブを選択
 </div>
 <div class="step-box">
-<span class="step-num">3</span> 以下のコードをConsoleにコピペして Enter を押す:<br><br>
-<code id="bookmarkletCode">(() => { const s = document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__'); if (!s) { alert('データが見つかりません。TikTokのプロフィールページで実行してください。'); return; } const d = JSON.parse(s.textContent); const ud = d?.['__DEFAULT_SCOPE__']?.['webapp.user-detail']; const user = ud?.userInfo?.user || {}; const stats = ud?.userInfo?.stats || {}; let items = []; for (const k of Object.keys(d?.['__DEFAULT_SCOPE__'] || {})) { const m = d['__DEFAULT_SCOPE__'][k]; if (m?.itemList) { items = m.itemList; break; } } const videos = items.map(v => ({ id: v.id, desc: v.desc || '', views: v.stats?.playCount || 0, likes: v.stats?.diggCount || 0, comments: v.stats?.commentCount || 0, shares: v.stats?.shareCount || 0, duration: v.video?.duration || 0, createTime: v.createTime || 0, cover: v.video?.cover || '' })); const result = JSON.stringify({ user: { uniqueId: user.uniqueId, nickname: user.nickname, secUid: user.secUid, followers: stats.followerCount, following: stats.followingCount, hearts: stats.heartCount, videoCount: stats.videoCount }, videos }); copy(result); alert('コピー完了！(' + videos.length + '本) ツールに戻って貼り付けてください。'); })()</code>
+<span class="step-num">3</span> 以下のコードをConsoleにコピペして Enter を押す（全動画を自動取得します。少し時間がかかります）:<br><br>
+<code id="bookmarkletCode">(async()=>{const s=document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__');if(!s){alert('TikTokのプロフィールページで実行してください');return;}const d=JSON.parse(s.textContent);const ud=d?.['__DEFAULT_SCOPE__']?.['webapp.user-detail'];const user=ud?.userInfo?.user||{};const stats=ud?.userInfo?.stats||{};const secUid=user.secUid;if(!secUid){alert('secUidが取得できませんでした');return;}console.log('取得開始: @'+user.uniqueId+' ('+stats.videoCount+'本)');const all=[];let cursor=0;let hasMore=true;while(hasMore){try{const r=await fetch('/api/post/item_list/?aid=1988&count=35&cursor='+cursor+'&secUid='+encodeURIComponent(secUid)+'&device_platform=web_pc');const j=await r.json();const items=j.itemList||[];items.forEach(v=>{all.push({id:v.id,desc:v.desc||'',views:v.stats?.playCount||0,likes:v.stats?.diggCount||0,comments:v.stats?.commentCount||0,shares:v.stats?.shareCount||0,duration:v.video?.duration||0,createTime:v.createTime||0,cover:v.video?.cover||''});});console.log('取得中... '+all.length+'本');hasMore=j.hasMore||false;cursor=j.cursor||(cursor+35);await new Promise(r=>setTimeout(r,800));}catch(e){console.log('エラー:',e);break;}}const result=JSON.stringify({user:{uniqueId:user.uniqueId,nickname:user.nickname,secUid:secUid,followers:stats.followerCount,following:stats.followingCount,hearts:stats.heartCount,videoCount:stats.videoCount},videos:all});copy(result);alert('取得完了！ '+all.length+'本の動画データをコピーしました。\\nツールに戻って貼り付けてください。');})()</code>
 <br><br><button class="btn-secondary" onclick="copyBookmarklet()">このコードをコピー</button>
 </div>
 <div class="step-box">
-<span class="step-num">4</span> 自動的にクリップボードにコピーされるので、下のテキストエリアに貼り付けてください:
+<span class="step-num">4</span> 「取得完了！」のアラートが出たら、このページに戻って下のテキストエリアに <strong>Cmd+V</strong> で貼り付け:
 </div>
 
 <div class="form-group">
