@@ -422,6 +422,12 @@
                 <table class="comparison-table" id="comparisonTable"></table>
             </div>
 
+            <!-- Period Stats -->
+            <div class="comparison-section">
+                <h3>期間別 平均再生回数</h3>
+                <table class="comparison-table" id="periodTable"></table>
+            </div>
+
             <!-- Monthly Bar Chart -->
             <div class="bar-section">
                 <h3>月別 再生回数（ショート / 長尺）</h3>
@@ -735,8 +741,37 @@ function analyzeVideos(videos, channelData) {
     const totalShortsViews = shorts.reduce((s, v) => s + v.views, 0);
     const totalLongsViews = longs.reduce((s, v) => s + v.views, 0);
 
-    // Last 30 days
+    // Period-based stats
     const now = new Date();
+    const periods = [
+        { key: 'week', label: '1週間', days: 7 },
+        { key: 'month', label: '1ヶ月', days: 30 },
+        { key: 'halfYear', label: '半年', days: 180 },
+        { key: 'year', label: '1年', days: 365 },
+    ];
+
+    function calcPeriodStats(videos, daysAgo) {
+        const cutoff = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+        const filtered = videos.filter(v => new Date(v.publishedAt) >= cutoff);
+        const totalViews = filtered.reduce((s, v) => s + v.views, 0);
+        return {
+            count: filtered.length,
+            totalViews,
+            avgViews: filtered.length ? Math.round(totalViews / filtered.length) : 0,
+        };
+    }
+
+    const periodStats = {};
+    for (const p of periods) {
+        periodStats[p.key] = {
+            label: p.label,
+            shorts: calcPeriodStats(shorts, p.days),
+            longs: calcPeriodStats(longs, p.days),
+            all: calcPeriodStats([...shorts, ...longs], p.days),
+        };
+    }
+
+    // Recent (30 days) for backward compat
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const recentShorts = shorts.filter(v => new Date(v.publishedAt) >= thirtyDaysAgo);
     const recentLongs = longs.filter(v => new Date(v.publishedAt) >= thirtyDaysAgo);
@@ -762,6 +797,7 @@ function analyzeVideos(videos, channelData) {
             shortsViews: recentShortsViews,
             longsViews: recentLongsViews,
         },
+        periodStats,
         monthly,
     };
 }
@@ -858,6 +894,31 @@ function renderResults(result) {
             </tr>
         </tbody>
     `;
+
+    // Period Stats Table
+    const ps = r.periodStats;
+    let periodHtml = `
+        <thead>
+            <tr><th>期間</th><th>ショート本数</th><th>ショート平均再生</th><th>長尺本数</th><th>長尺平均再生</th><th>全体本数</th><th>全体平均再生</th></tr>
+        </thead>
+        <tbody>
+    `;
+    for (const key of ['week', 'month', 'halfYear', 'year']) {
+        const p = ps[key];
+        periodHtml += `
+            <tr>
+                <td style="text-align:left;font-weight:bold">${p.label}</td>
+                <td class="type-shorts">${p.shorts.count}</td>
+                <td class="type-shorts">${formatNumber(p.shorts.avgViews)}</td>
+                <td class="type-long">${p.longs.count}</td>
+                <td class="type-long">${formatNumber(p.longs.avgViews)}</td>
+                <td>${p.all.count}</td>
+                <td>${formatNumber(p.all.avgViews)}</td>
+            </tr>
+        `;
+    }
+    periodHtml += '</tbody>';
+    document.getElementById('periodTable').innerHTML = periodHtml;
 
     // Monthly Bar Chart (last 12 months)
     const chartMonths = r.monthly.slice(0, 12);
