@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok シート埋めツール</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .sheet-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.95rem;
+        }
+        .sheet-table th, .sheet-table td {
+            border: 1px solid #3a3a4a;
+            padding: 0.75rem 1rem;
+            text-align: left;
+        }
+        .sheet-table th {
+            background: #2a2a3a;
+            color: #ff79c6;
+            font-weight: 600;
+            width: 30%;
+        }
+        .sheet-table td {
+            background: #1e1e2e;
+            color: #e0e0e0;
+        }
+        .sheet-table td.value {
+            font-family: 'Consolas', 'Monaco', monospace;
+            color: #50fa7b;
+            font-size: 1rem;
+            white-space: pre-line;
+        }
+        .copy-btn {
+            background: #44475a;
+            border: none;
+            color: #f8f8f2;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover {
+            background: #6272a4;
+        }
+        .copy-btn.copied {
+            background: #50fa7b;
+            color: #282a36;
+        }
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 1rem;
+            color: #8be9fd;
+            text-decoration: none;
+        }
+        .nav-link:hover {
+            text-decoration: underline;
+        }
+        .note {
+            color: #6272a4;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+        .status-card {
+            background: #1e1e2e;
+            border: 1px solid #3a3a4a;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            margin: 1.5rem 0;
+        }
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #44475a;
+            border-top: 3px solid #ff79c6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .column-label {
+            color: #bd93f9;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="nav-link">&larr; バイラル分析ツールに戻る</a>
+
+        <header class="header">
+            <h1>TikTok シート埋めツール</h1>
+            <p class="subtitle">TikTokアカウントのデータを取得して、スプレッドシートに必要な指標を自動算出</p>
+        </header>
+
+        <!-- 入力フォーム -->
+        <section id="inputSection">
+            <div class="form-card">
+                <div class="form-group">
+                    <label for="accountUrl">TikTokアカウントURL</label>
+                    <input
+                        type="text"
+                        id="accountUrl"
+                        placeholder="https://www.tiktok.com/@username"
+                        autocomplete="off"
+                    >
+                </div>
+                <button class="btn-primary" id="fetchBtn" onclick="startFetch()">
+                    データを取得する
+                </button>
+            </div>
+        </section>
+
+        <!-- プログレス -->
+        <section id="statusSection" class="hidden">
+            <div class="status-card">
+                <div class="spinner"></div>
+                <span id="statusMessage">取得中...</span>
+            </div>
+        </section>
+
+        <!-- エラー -->
+        <section id="errorSection" class="hidden">
+            <div class="error-card">
+                <p id="errorMessage"></p>
+                <button class="btn-secondary" onclick="resetForm()">やり直す</button>
+            </div>
+        </section>
+
+        <!-- 結果テーブル -->
+        <section id="resultSection" class="hidden">
+            <h2 style="margin-bottom: 0.5rem;">取得結果</h2>
+            <p class="note" id="videoCountNote"></p>
+
+            <table class="sheet-table">
+                <tr>
+                    <th><span class="column-label">A</span> 媒体</th>
+                    <td class="value" id="val-platform">TikTok</td>
+                    <td><button class="copy-btn" onclick="copyCell('val-platform', this)">コピー</button></td>
+                </tr>
+                <tr>
+                    <th><span class="column-label">B</span> URL</th>
+                    <td class="value" id="val-url"></td>
+                    <td><button class="copy-btn" onclick="copyCell('val-url', this)">コピー</button></td>
+                </tr>
+                <tr>
+                    <th><span class="column-label">C</span> 登録者</th>
+                    <td class="value" id="val-followers"></td>
+                    <td><button class="copy-btn" onclick="copyCell('val-followers', this)">コピー</button></td>
+                </tr>
+                <tr>
+                    <th><span class="column-label">D</span> 総再生数</th>
+                    <td class="value" id="val-total-views"></td>
+                    <td><button class="copy-btn" onclick="copyCell('val-total-views', this)">コピー</button></td>
+                </tr>
+                <tr>
+                    <th><span class="column-label">E</span> 月間再生回数</th>
+                    <td class="value" id="val-monthly-views"></td>
+                    <td><button class="copy-btn" onclick="copyCell('val-monthly-views', this)">コピー</button></td>
+                </tr>
+                <tr>
+                    <th><span class="column-label">F</span> 月間投稿本数</th>
+                    <td class="value" id="val-monthly-posts"></td>
+                    <td><button class="copy-btn" onclick="copyCell('val-monthly-posts', this)">コピー</button></td>
+                </tr>
+                <tr>
+                    <th><span class="column-label">G</span> 長尺<br>（投稿本数・平均再生数）</th>
+                    <td class="value" id="val-long-form"></td>
+                    <td><button class="copy-btn" onclick="copyCell('val-long-form', this)">コピー</button></td>
+                </tr>
+                <tr>
+                    <th><span class="column-label">H</span> ショート<br>（投稿本数・平均再生数）</th>
+                    <td class="value" id="val-short-form"></td>
+                    <td><button class="copy-btn" onclick="copyCell('val-short-form', this)">コピー</button></td>
+                </tr>
+                <tr>
+                    <th><span class="column-label">I</span> 登録者推移</th>
+                    <td class="value" id="val-follower-trend"></td>
+                    <td><button class="copy-btn" onclick="copyCell('val-follower-trend', this)">コピー</button></td>
+                </tr>
+                <tr>
+                    <th><span class="column-label">J</span> 初投稿</th>
+                    <td class="value" id="val-first-post"></td>
+                    <td><button class="copy-btn" onclick="copyCell('val-first-post', this)">コピー</button></td>
+                </tr>
+            </table>
+
+            <button class="btn-primary" onclick="copyAllAsRow()" style="margin-right: 0.5rem;">
+                全データを1行コピー（タブ区切り）
+            </button>
+            <button class="btn-secondary" onclick="resetForm()">別のアカウントを取得</button>
+
+            <p class="note" style="margin-top: 1rem;">
+                ※「全データを1行コピー」でコピーした内容は、Google Sheetsのセルに直接ペーストできます。<br>
+                ※ 登録者推移(I列)はTikTokから直接取得できないため、Social Bladeなどで確認してください。
+            </p>
+        </section>
+    </div>
+
+    <script>
+    let currentJobId = null;
+    let pollInterval = null;
+
+    function startFetch() {
+        const url = document.getElementById('accountUrl').value.trim();
+        if (!url) {
+            alert('TikTokアカウントURLを入力してください');
+            return;
+        }
+
+        document.getElementById('fetchBtn').disabled = true;
+        document.getElementById('statusSection').classList.remove('hidden');
+        document.getElementById('errorSection').classList.add('hidden');
+        document.getElementById('resultSection').classList.add('hidden');
+
+        fetch('/api/sheet/fetch', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({account_url: url}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            currentJobId = data.job_id;
+            pollInterval = setInterval(pollStatus, 2000);
+        })
+        .catch(err => showError('通信エラー: ' + err.message));
+    }
+
+    function pollStatus() {
+        if (!currentJobId) return;
+
+        fetch('/api/sheet/status/' + currentJobId)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('statusMessage').textContent = data.message || '処理中...';
+
+            if (data.status === 'completed') {
+                clearInterval(pollInterval);
+                showResult(data.result);
+            } else if (data.status === 'error') {
+                clearInterval(pollInterval);
+                showError(data.message);
+            }
+        })
+        .catch(() => {});
+    }
+
+    function showResult(result) {
+        document.getElementById('statusSection').classList.add('hidden');
+        document.getElementById('resultSection').classList.remove('hidden');
+        document.getElementById('fetchBtn').disabled = false;
+
+        document.getElementById('videoCountNote').textContent =
+            `${result.video_count} 本の動画から算出`;
+
+        document.getElementById('val-url').textContent = result.url;
+        document.getElementById('val-followers').textContent = result.followers;
+        document.getElementById('val-total-views').textContent =
+            result.total_views + '\n' + result.total_views_detail;
+        document.getElementById('val-monthly-views').textContent = result.monthly_views;
+        document.getElementById('val-monthly-posts').textContent = result.monthly_posts;
+        document.getElementById('val-long-form').textContent = result.long_form;
+        document.getElementById('val-short-form').textContent = result.short_form;
+        document.getElementById('val-follower-trend').textContent = result.follower_trend;
+        document.getElementById('val-first-post').textContent = result.first_post_date;
+    }
+
+    function showError(msg) {
+        document.getElementById('statusSection').classList.add('hidden');
+        document.getElementById('errorSection').classList.remove('hidden');
+        document.getElementById('errorMessage').textContent = msg;
+        document.getElementById('fetchBtn').disabled = false;
+        clearInterval(pollInterval);
+    }
+
+    function resetForm() {
+        document.getElementById('statusSection').classList.add('hidden');
+        document.getElementById('errorSection').classList.add('hidden');
+        document.getElementById('resultSection').classList.add('hidden');
+        document.getElementById('fetchBtn').disabled = false;
+        currentJobId = null;
+    }
+
+    function copyCell(id, btn) {
+        const text = document.getElementById(id).textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            btn.textContent = 'OK!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = 'コピー';
+                btn.classList.remove('copied');
+            }, 1500);
+        });
+    }
+
+    function copyAllAsRow() {
+        const ids = [
+            'val-platform', 'val-url', 'val-followers',
+            'val-total-views', 'val-monthly-views', 'val-monthly-posts',
+            'val-long-form', 'val-short-form', 'val-follower-trend', 'val-first-post'
+        ];
+        const row = ids.map(id => document.getElementById(id).textContent).join('\t');
+        navigator.clipboard.writeText(row).then(() => {
+            alert('コピーしました！Google Sheetsにペーストしてください。');
+        });
+    }
+    </script>
+</body>
+</html>

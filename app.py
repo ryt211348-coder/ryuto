@@ -18,6 +18,7 @@ from tiktok_analyzer.analyzer import (
     analyze_viral_patterns,
     generate_report,
 )
+from tiktok_sheet_tool import compute_sheet_data, _format_number
 
 app = Flask(__name__)
 
@@ -237,6 +238,87 @@ def set_config():
         return jsonify({"error": "APIキーを入力してください"}), 400
     save_api_key(key)
     return jsonify({"success": True, "message": "APIキーを保存しました"})
+
+
+# ─── シートツール API ─────────────────────────────────────────────────────────
+
+sheet_jobs = {}
+
+
+def run_sheet_fetch(job_id: str, account_url: str):
+    """バックグラウンドでシート用データを取得する."""
+    job = sheet_jobs[job_id]
+    try:
+        job["status"] = "fetching"
+        job["message"] = "動画メタデータを取得中..."
+        videos = extract_account_videos(account_url)
+
+        if not videos:
+            job["status"] = "error"
+            job["message"] = "動画が見つかりませんでした。URLを確認してください。"
+            return
+
+        job["status"] = "computing"
+        job["message"] = f"{len(videos)} 本の動画を検出。データ算出中..."
+        sheet_data = compute_sheet_data(account_url, videos)
+
+        job["status"] = "completed"
+        job["message"] = "完了！"
+        job["result"] = {
+            "platform": sheet_data.platform,
+            "url": sheet_data.url,
+            "followers": sheet_data.followers,
+            "total_views": f"{sheet_data.total_views:,}",
+            "total_views_detail": sheet_data.total_views_detail,
+            "monthly_views": f"{_format_number(sheet_data.monthly_views)}回",
+            "monthly_posts": sheet_data.monthly_posts,
+            "long_form": f"{sheet_data.long_form_count}本\n平均 {_format_number(sheet_data.long_form_avg_views)}回/本",
+            "short_form": f"{sheet_data.short_form_count}本\n平均 {_format_number(sheet_data.short_form_avg_views)}回/本",
+            "follower_trend": sheet_data.follower_trend or "（要手動入力）",
+            "first_post_date": sheet_data.first_post_date or "不明",
+            "video_count": len(videos),
+        }
+
+    except Exception as e:
+        job["status"] = "error"
+        job["message"] = f"エラー: {str(e)}"
+
+
+@app.route("/sheet")
+def sheet_page():
+    return render_template("sheet.html")
+
+
+@app.route("/api/sheet/fetch", methods=["POST"])
+def start_sheet_fetch():
+    data = request.get_json()
+    account_url = data.get("account_url", "").strip()
+
+    if not account_url:
+        return jsonify({"error": "TikTokアカウントURLを入力してください"}), 400
+
+    job_id = str(uuid.uuid4())[:8]
+    sheet_jobs[job_id] = {
+        "status": "queued",
+        "message": "取得を開始しています...",
+    }
+
+    thread = threading.Thread(
+        target=run_sheet_fetch,
+        args=(job_id, account_url),
+        daemon=True,
+    )
+    thread.start()
+
+    return jsonify({"job_id": job_id})
+
+
+@app.route("/api/sheet/status/<job_id>")
+def sheet_job_status(job_id):
+    job = sheet_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "ジョブが見つかりません"}), 404
+    return jsonify(job)
 
 
 if __name__ == "__main__":
